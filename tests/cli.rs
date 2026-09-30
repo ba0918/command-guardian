@@ -282,3 +282,20 @@ fn req_004_check_ignores_the_callers_git_environment() {
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
     assert!(r.stdout.contains("allow"), "{}", r.stdout);
 }
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_reserved_words_do_not_hide_command_lists() {
+    // if/then、while/do、until/do、{ ...; }、! の本文もコマンド列として読む。
+    let home = temp_home();
+    for cmd in [
+        "if true; then rm -rf /etc/x; fi",
+        "while true; do rm -rf /etc/x; done",
+        "until true; do rm -rf /etc/x; done",
+        "{ rm -rf /etc/x; }",
+        "! rm -rf /etc/x",
+    ] {
+        let r = run(&["check", cmd, "--cwd", "/tmp/scratch"], home.path());
+        assert_eq!(r.code, 2, "{cmd}: stdout {} stderr {}", r.stdout, r.stderr);
+    }
+}

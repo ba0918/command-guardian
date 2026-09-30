@@ -573,6 +573,34 @@ pub fn tokenize_with_errors(input: &str) -> (Vec<Tok>, Vec<String>) {
     Lexer::new(input).run()
 }
 
+/// 先頭に来たときに区切りとして読み飛ばす予約語とグループ化の記号。
+/// `for` は本文の供給元を読むため `parse_for` が扱う。
+fn is_reserved_word(text: &str) -> bool {
+    matches!(
+        text,
+        "if" | "then"
+            | "elif"
+            | "else"
+            | "fi"
+            | "while"
+            | "until"
+            | "do"
+            | "done"
+            | "case"
+            | "esac"
+            | "in"
+            | "select"
+            | "function"
+            | "coproc"
+            | "time"
+            | "{"
+            | "}"
+            | "!"
+            | "[["
+            | "]]"
+    )
+}
+
 struct Parser {
     toks: Vec<Tok>,
     pos: usize,
@@ -637,6 +665,12 @@ impl Parser {
                 let item = self.parse_for();
                 self.depth -= 1;
                 items.push(item);
+                continue;
+            }
+            // 予約語とグループ化の記号は区切りとして読み飛ばす。「if ...; then rm ...; fi」
+            // や「{ rm ...; }」の本文もコマンド列として読むため。
+            if self.word_text().is_some_and(is_reserved_word) {
+                self.advance();
                 continue;
             }
             if matches!(
