@@ -1,6 +1,6 @@
 # 破壊的効果の判定
 
-コマンドから破壊的効果を取り出し、対象パスを分類して、`allow`、`ask`、`block` を決めるまでを扱う。文面は messages.md、設定は config.md、エージェントへの返し方は agents.md が扱う。
+コマンドから破壊的効果を取り出し、対象パスを分類して、`allow`、`ask`、`block` を決めるまでを扱う。文面は messages.md、設定は config.md、エージェントへの返し方は agents.md が扱う。コマンド文字列を構文解析する部分は parser.md が扱う。
 
 ## Requirements
 

@@ -10,3 +10,5 @@
 | protected | パスの分類の 1 つ。システムの領域、ホームそれ自体、作業ディレクトリそれ自体、リポジトリのルート、.git、設定で追加した保護ルート | docs/decision/records/2026-09-30-hook-guardian-scope.md#A17 |
 | unknown | パスの分類の 1 つ。上のどれでもなく、消えると戻せない恐れがあるもの | docs/decision/records/2026-09-30-hook-guardian-scope.md#A7 |
 | M1 | この IR に書かれた要求の全体を満たす最初のリリース | docs/decision/records/2026-09-30-hook-guardian-scope.md#A6, docs/decision/records/2026-09-30-hook-guardian-scope.md#A23, docs/decision/records/2026-09-30-hook-guardian-scope.md#A41 |
+| guardian-parser | コマンドの構文解析を担う crate。OSS のシェルパーサを背後に隠し、訪問済みの正規化した構文木だけを公開する | docs/decision/records/2026-10-01-parser.md#A6 |
+| brush-parser | 構文解析に使う OSS のシェルパーサ。`guardian-parser` の背後に隠す | docs/decision/records/2026-10-01-parser.md#A2, docs/decision/records/2026-10-01-parser.md#A6, docs/decision/records/2026-10-01-parser.md#A11 |
