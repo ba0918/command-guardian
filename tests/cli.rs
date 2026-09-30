@@ -55,6 +55,18 @@ fn temp_home() -> tempfile::TempDir {
         .unwrap()
 }
 
+/// フックの環境（GIT_DIR など）を引き継がずに git を起動する。
+fn git(root: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(root).env("GIT_CONFIG_NOSYSTEM", "1");
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            cmd.env_remove(&name);
+        }
+    }
+    cmd
+}
+
 fn git_repo() -> tempfile::TempDir {
     let dir = tempfile::Builder::new()
         .prefix("hook-guardian-cli-git-")
@@ -75,13 +87,7 @@ fn git_repo() -> tempfile::TempDir {
             "init",
         ],
     ] {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(&args)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .output()
-            .unwrap();
+        let out = git(root).args(&args).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
     dir
@@ -245,4 +251,34 @@ fn req_005_empty_home_keeps_other_homes_protected() {
     );
     assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
     assert!(r.stdout.contains("block"), "{}", r.stdout);
+}
+
+// @kotowari[REQ-004]
+#[test]
+fn req_004_check_ignores_the_callers_git_environment() {
+    // git フックから起動されると GIT_DIR や GIT_INDEX_FILE が渡ってくる。
+    // 対象の作業ツリーの分類に影響させない。
+    let repo = git_repo();
+    let xdg = temp_home();
+    // フィクスチャは実ユーザのホームの下にあるため、HOME は実環境のままにする。
+    let real_home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap();
+    let r = run_env(
+        &[
+            "check",
+            "rm tracked.txt",
+            "--cwd",
+            repo.path().to_str().unwrap(),
+        ],
+        &[
+            ("HOME", real_home.to_str().unwrap()),
+            ("XDG_CONFIG_HOME", xdg.path().to_str().unwrap()),
+            ("TMPDIR", "/tmp"),
+            ("GIT_DIR", "/nonexistent/hook-guardian-git-dir"),
+            ("GIT_INDEX_FILE", "/nonexistent/hook-guardian-index"),
+        ],
+    );
+    assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("allow"), "{}", r.stdout);
 }

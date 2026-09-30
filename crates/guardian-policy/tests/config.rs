@@ -297,6 +297,18 @@ fn req_015_broken_project_config_is_ignored_with_a_warning() {
     assert_eq!(r.verdict, Verdict::Ask);
 }
 
+/// フックの環境（GIT_DIR など）を引き継がずに git を起動する。
+fn git(root: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(root).env("GIT_CONFIG_NOSYSTEM", "1");
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            cmd.env_remove(&name);
+        }
+    }
+    cmd
+}
+
 fn git_repo() -> tempfile::TempDir {
     let dir = fixture_dir("hook-guardian-policy-git-");
     let root = dir.path();
@@ -314,13 +326,7 @@ fn git_repo() -> tempfile::TempDir {
             "init",
         ],
     ] {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(&args)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .output()
-            .unwrap();
+        let out = git(root).args(&args).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
     dir

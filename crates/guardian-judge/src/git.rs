@@ -23,11 +23,20 @@ pub struct SystemGit;
 
 impl GitRunner for SystemGit {
     fn status(&self, root: &Path, path: &Path) -> Result<String, GitError> {
-        let out = Command::new("git")
+        let mut command = Command::new("git");
+        command
             .arg("-C")
             .arg(root)
             .args(["status", "--porcelain", "-uall", "--"])
-            .arg(path)
+            .arg(path);
+        // git がフックなどに渡す環境（GIT_DIR・GIT_INDEX_FILE など）を引き継ぐと、
+        // 対象の作業ツリーではなく呼び出し元のリポジトリを見てしまう。
+        for (name, _) in std::env::vars_os() {
+            if name.to_string_lossy().starts_with("GIT_") {
+                command.env_remove(&name);
+            }
+        }
+        let out = command
             .output()
             .map_err(|e| GitError(format!("git を起動できない: {e}")))?;
         if !out.status.success() {

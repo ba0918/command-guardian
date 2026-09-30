@@ -14,18 +14,29 @@ pub struct Fixture {
 }
 
 pub fn git_run(root: &Path, args: &[&str]) {
-    let out = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(root)
         .args(args)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .unwrap();
+        .env("GIT_CONFIG_NOSYSTEM", "1");
+    clear_git_env(&mut command);
+    let out = command.output().unwrap();
     assert!(
         out.status.success(),
         "git {args:?}: {}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+/// git がフックに渡す環境（GIT_DIR など）を外す。フィクスチャの git が
+/// 呼び出し元のリポジトリではなく、フィクスチャ自身を見るようにする。
+pub fn clear_git_env(command: &mut Command) {
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(&name);
+        }
+    }
 }
 
 /// .git と 1 コミットだけを持つフィクスチャ。

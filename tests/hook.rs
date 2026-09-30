@@ -60,6 +60,18 @@ fn temp_dir(prefix: &str) -> tempfile::TempDir {
         .unwrap()
 }
 
+/// フックの環境（GIT_DIR など）を引き継がずに git を起動する。
+fn git(root: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(root).env("GIT_CONFIG_NOSYSTEM", "1");
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            cmd.env_remove(&name);
+        }
+    }
+    cmd
+}
+
 /// 未追跡のファイルを 1 つ持つ git の作業ツリー。
 fn git_repo_with_untracked() -> tempfile::TempDir {
     let dir = temp_dir("hook-guardian-hook-git-");
@@ -78,13 +90,7 @@ fn git_repo_with_untracked() -> tempfile::TempDir {
             "init",
         ],
     ] {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(&args)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .output()
-            .unwrap();
+        let out = git(root).args(&args).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
     std::fs::write(root.join("notes.txt"), "notes\n").unwrap();

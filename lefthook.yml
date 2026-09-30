@@ -13,7 +13,9 @@ pre-commit:
     test:
       priority: 3
       glob: "*.{rs,toml}"
-      run: cargo test --workspace --locked
+      # git はフックに GIT_DIR や GIT_INDEX_FILE を渡す。テストが起動する
+      # git がそれに引きずられないよう、外してから走らせる。
+      run: unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR; cargo test --workspace --locked
     kotowari:
       priority: 4
       glob: "*.{rs,md,yaml}"
