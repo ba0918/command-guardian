@@ -161,11 +161,8 @@ fn req_005_repo_root_itself_is_protected() {
         git_enabled: true,
     });
     assert_eq!(j.classify_path(&root, false).class, Class::Protected);
-    // リポジトリのルートそれ自体だけが保護。配下は分類の対象。
-    assert_eq!(
-        j.classify_path(&root.join("src"), false).class,
-        Class::Unknown
-    );
+    // リポジトリのルートそれ自体だけが保護。配下は git の分類に従う。
+    assert_eq!(j.classify_path(&root.join("src"), false).class, Class::Vcs);
     // glob の base がリポジトリのルートに一致するときは block。
     let cwd = root.clone();
     let mut effects = extract_effects(

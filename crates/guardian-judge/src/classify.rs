@@ -1,5 +1,6 @@
 //! パスの分類。fs を見て 4 分類する。設定は読まない。
 
+use crate::git::{find_worktree_root, GitRunner, SystemGit};
 use guardian_core::{Class, ProtectedKind, Why};
 use std::path::{Component, Path, PathBuf};
 
@@ -27,6 +28,7 @@ impl Classification {
 
 pub struct Judge {
     env: JudgeEnv,
+    git: Box<dyn GitRunner>,
 }
 
 /// 配下のすべてに当てるシステムの領域。
@@ -37,7 +39,15 @@ const SYSTEM_AREAS: &[&str] = &[
 
 impl Judge {
     pub fn new(env: JudgeEnv) -> Judge {
-        Judge { env }
+        Judge {
+            env,
+            git: Box::new(SystemGit),
+        }
+    }
+
+    /// git の起動を差し替えた judge。テストに使う。
+    pub fn with_git(env: JudgeEnv, git: Box<dyn GitRunner>) -> Judge {
+        Judge { env, git }
     }
 
     /// 1 つのパスを分類する。`dereference` は末尾スラッシュ付きの削除。
@@ -57,17 +67,7 @@ impl Judge {
 
     /// パスを含む git の作業ツリーのルート。`.git` の上方探索だけで決め、git は起動しない。
     pub fn worktree_root(&self, path: &Path) -> Option<PathBuf> {
-        let start = if path.is_dir() {
-            path.to_path_buf()
-        } else {
-            path.parent().map(|p| p.to_path_buf())?
-        };
-        for dir in start.ancestors() {
-            if dir.join(".git").symlink_metadata().is_ok() {
-                return Some(dir.to_path_buf());
-            }
-        }
-        None
+        find_worktree_root(path)
     }
 
     fn ephemeral_roots(&self) -> Vec<PathBuf> {
@@ -153,11 +153,30 @@ impl Judge {
                     Why::Protected(ProtectedKind::RepoRoot),
                 );
             }
-            // 作業ツリーの中の分類は git status で決める（git が無効なら unknown のまま）。
-            return Classification::new(Class::Unknown, Why::Unmanaged);
+            return self.git_classify(&root, path);
         }
 
         Classification::new(Class::Unknown, Why::Unmanaged)
+    }
+
+    /// 作業ツリーの中のパスを、git status の報告の有無で分ける。
+    fn git_classify(&self, root: &Path, path: &Path) -> Classification {
+        if !self.env.git_enabled {
+            return Classification::new(Class::Unknown, Why::Unmanaged);
+        }
+        match self.git.status(root, path) {
+            Ok(report) => {
+                let report = report.trim();
+                if report.is_empty() {
+                    Classification::new(Class::Vcs, Why::Vcs)
+                } else if report.lines().any(|l| l.starts_with("??")) {
+                    Classification::new(Class::Unknown, Why::Untracked)
+                } else {
+                    Classification::new(Class::Unknown, Why::Uncommitted)
+                }
+            }
+            Err(_) => Classification::new(Class::Unknown, Why::GitFailed),
+        }
     }
 
     fn is_other_home(&self, path: &Path) -> bool {
