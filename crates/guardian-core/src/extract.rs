@@ -96,6 +96,7 @@ pub struct Analysis {
 pub fn analyze(command: &str, env: &Env) -> Analysis {
     let (script, mut errors) = parse::parse_script_with_errors(command);
     collect_subst_errors(&script.items, &mut errors, 0);
+    collect_unreadable_bodies(&script.items, &mut errors, 0);
     let mut ctx = Context::new(env);
     let mut out = Vec::new();
     extract_items(&script.items, &mut ctx, &mut out, 0);
@@ -144,6 +145,106 @@ fn collect_subst_errors(items: &[Item], errors: &mut Vec<String>, depth: usize) 
                 collect_subst_errors(body, errors, depth + 1);
             }
         }
+    }
+}
+
+/// 本文を読めないシェル起動と eval を集める。判定できない入力は ask に落とす（REQ-010）。
+fn collect_unreadable_bodies(items: &[Item], errors: &mut Vec<String>, depth: usize) {
+    if depth > 16 {
+        return;
+    }
+    for item in items {
+        match item {
+            Item::Simple(p) => {
+                for cmd in &p.commands {
+                    check_unreadable_command(cmd, errors, depth);
+                    for w in &cmd.words {
+                        visit_word_bodies(w, errors, depth);
+                    }
+                    for r in &cmd.redirects {
+                        let w = match r {
+                            Redirect::Out(w)
+                            | Redirect::Append(w)
+                            | Redirect::Clobber(w)
+                            | Redirect::In(w)
+                            | Redirect::Heredoc(w) => w,
+                        };
+                        visit_word_bodies(w, errors, depth);
+                    }
+                }
+            }
+            Item::For { words, body, .. } => {
+                for w in words {
+                    visit_word_bodies(w, errors, depth);
+                }
+                collect_unreadable_bodies(body, errors, depth + 1);
+            }
+        }
+    }
+}
+
+fn visit_word_bodies(w: &Word, errors: &mut Vec<String>, depth: usize) {
+    for part in &w.parts {
+        if let Part::Subst(inner) = part {
+            let script = parse::parse_script(inner);
+            collect_unreadable_bodies(&script.items, errors, depth + 1);
+        }
+    }
+}
+
+/// 1 つのコマンドの本文が読めるかを確かめる。読めないときは理由を足す。
+fn check_unreadable_command(cmd: &SimpleCommand, errors: &mut Vec<String>, depth: usize) {
+    let mut idx = 0;
+    while idx < cmd.words.len() && split_assignment(&cmd.words[idx]).is_some() {
+        idx += 1;
+    }
+    let mut words: &[Word] = &cmd.words[idx..];
+    while let Some(first) = words.first() {
+        let name = basename(&first.text);
+        if name == "sudo" || name == "doas" {
+            words = strip_wrapper(words, name);
+            continue;
+        }
+        break;
+    }
+    let Some(first) = words.first() else {
+        return;
+    };
+    let name = basename(&first.text);
+    let args = &words[1..];
+    match name {
+        "bash" | "sh" | "zsh" | "dash" | "ksh" => {
+            let Some(i) = shell_c_index(args) else {
+                return;
+            };
+            match args.get(i + 1).and_then(Word::literal_value) {
+                Some(inner) => {
+                    let script = parse::parse_script(&inner);
+                    collect_unreadable_bodies(&script.items, errors, depth + 1);
+                }
+                None => errors.push(format!(
+                    "シェルの本文を読めないため判定できません: {}",
+                    first.text
+                )),
+            }
+        }
+        "eval" => {
+            let mut pieces = Vec::new();
+            for w in args {
+                match w.literal_value() {
+                    Some(s) => pieces.push(s),
+                    None => {
+                        errors.push("eval の本文を読めないため判定できません".to_string());
+                        return;
+                    }
+                }
+            }
+            if !pieces.is_empty() {
+                let script = parse::parse_script(&pieces.join(" "));
+                collect_unreadable_bodies(&script.items, errors, depth + 1);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -535,21 +636,24 @@ fn xargs_effects(
     });
 }
 
-fn shell_c_string(args: &[Word]) -> Option<String> {
+/// `-c` の位置を探す。見つからなければ None。
+fn shell_c_index(args: &[Word]) -> Option<usize> {
     let mut i = 0;
     while i < args.len() {
         let t = &args[i].text;
         let is_c =
             t == "-c" || (t.starts_with('-') && !t.starts_with("--") && t[1..].contains('c'));
         if is_c {
-            if let Some(next) = args.get(i + 1) {
-                return next.literal_value();
-            }
-            return None;
+            return Some(i);
         }
         i += 1;
     }
     None
+}
+
+fn shell_c_string(args: &[Word]) -> Option<String> {
+    let i = shell_c_index(args)?;
+    args.get(i + 1)?.literal_value()
 }
 
 fn update_cwd(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {

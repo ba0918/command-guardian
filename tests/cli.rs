@@ -351,3 +351,26 @@ fn req_002_mktemp_descendants_allow() {
     );
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
+
+// @kotowari[REQ-010]
+#[test]
+fn req_010_unreadable_shell_and_eval_bodies_ask() {
+    // 本文がリテラルでないシェル起動と eval は判定できないので ask。
+    let home = temp_home();
+    for cmd in ["bash -c \"$CMD\"", "sh -c $S", "eval \"$CMD\""] {
+        let r = run(&["check", cmd, "--cwd", "/tmp/scratch"], home.path());
+        assert_eq!(r.code, 1, "{cmd}: stdout {} stderr {}", r.stdout, r.stderr);
+        assert!(r.stdout.contains("ask"), "{cmd}: {}", r.stdout);
+    }
+    // リテラルの本文は読めるので allow のまま。
+    let r = run(
+        &[
+            "check",
+            "bash -c 'rm -rf /tmp/scratch/x'",
+            "--cwd",
+            "/tmp/scratch",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}
