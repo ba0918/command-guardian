@@ -145,6 +145,8 @@ pub fn load(
                     filtered.rules_custom = kept;
                     merge(&mut config, &filtered);
                 } else {
+                    // 信頼していない層でも、読み込み時に出た警告（規則の形など）は残す。
+                    warnings.extend(layer.warnings.iter().cloned());
                     warnings.extend(restrict_project(&mut config, &layer));
                 }
             }

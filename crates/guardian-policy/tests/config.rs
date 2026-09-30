@@ -350,3 +350,23 @@ fn req_006_user_git_enabled_false_makes_worktree_paths_unknown() {
     );
     assert_eq!(verdict_of(&e, "rm -rf tracked.txt"), Verdict::Ask);
 }
+
+// @kotowari[REQ-027]
+#[test]
+fn req_027_untrusted_project_guard_rule_warning_is_kept() {
+    // reason の無い規則は形の誤り。信頼していないプロジェクト設定でも
+    // 無効にした警告を落とさない。
+    let dir = fixture_dir("hook-guardian-conf-");
+    let root = dir.path().canonicalize().unwrap();
+    write(
+        &root.join(".hook-guardian.toml"),
+        "[[commands.guard]]\nprogram = \"git\"\ndeny = [[\"push\"]]\n",
+    );
+    let e = engine(None, &root);
+    let r = e.check("git push origin main");
+    assert!(
+        r.warnings.iter().any(|w| w.contains("見張り")),
+        "{:?}",
+        r.warnings
+    );
+}
