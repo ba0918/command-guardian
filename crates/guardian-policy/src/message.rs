@@ -13,7 +13,7 @@ pub fn display_target(target: &Target) -> String {
             s
         }
         Target::GlobBase(base) => format!("{}/…", base.display()),
-        Target::Children(base) => format!("{} の配下", base.display()),
+        Target::Children { base, .. } => format!("{} の配下", base.display()),
         Target::Mktemp => "mktemp が作ったパス".to_string(),
         Target::UnknownSource => "供給元が分からない対象集合".to_string(),
         Target::Unresolved(text) => format!("{text}（解決できないパス）"),

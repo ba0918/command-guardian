@@ -41,7 +41,7 @@ fn verdict_for(target: &Target) -> Verdict {
             verdict(judge().classify_path(path, *dereference).class)
         }
         Target::GlobBase(base) => verdict(judge().classify_path(base, false).class),
-        Target::Children(base) => verdict(judge().classify_children(base).class),
+        Target::Children { base, .. } => verdict(judge().classify_children(base).class),
     }
 }
 

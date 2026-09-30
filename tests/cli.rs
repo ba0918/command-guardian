@@ -299,3 +299,38 @@ fn req_001_reserved_words_do_not_hide_command_lists() {
         assert_eq!(r.code, 2, "{cmd}: stdout {} stderr {}", r.stdout, r.stderr);
     }
 }
+
+// @kotowari[REQ-007]
+#[test]
+fn req_007_trailing_slash_dereferences_through_the_engine() {
+    // /tmp の中のリンクは、リンクそれ自体なら ephemeral、末尾スラッシュ付きは
+    // リンク先（/etc）を分類して block にする。
+    let link_dir = tempfile::Builder::new()
+        .prefix("hook-guardian-link-")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let link = link_dir.path().join("link");
+    std::os::unix::fs::symlink("/etc", &link).unwrap();
+    let home = temp_home();
+
+    let plain = format!("rm -rf {}", link.display());
+    let r = run(
+        &["check", plain.as_str(), "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
+
+    let slashed = format!("rm -rf {}/", link.display());
+    let r = run(
+        &["check", slashed.as_str(), "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+
+    let find = format!("find {}/ -delete", link.display());
+    let r = run(
+        &["check", find.as_str(), "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}

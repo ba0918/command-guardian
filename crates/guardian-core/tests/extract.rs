@@ -67,7 +67,10 @@ fn req_001_find_delete_takes_children_of_base() {
         effects("find /tmp/scratch -delete"),
         vec![Effect {
             op: Op::Delete,
-            target: Target::Children(PathBuf::from("/tmp/scratch"))
+            target: Target::Children {
+                base: PathBuf::from("/tmp/scratch"),
+                dereference: false,
+            }
         }]
     );
 }
@@ -79,7 +82,10 @@ fn req_001_find_exec_rm_takes_children_of_base() {
         effects("find . -name __pycache__ -exec rm -rf {} +"),
         vec![Effect {
             op: Op::Delete,
-            target: Target::Children(PathBuf::from("/home/you/work/repo"))
+            target: Target::Children {
+                base: PathBuf::from("/home/you/work/repo"),
+                dereference: false,
+            }
         }]
     );
 }
@@ -91,7 +97,10 @@ fn req_001_xargs_rm_takes_source_children() {
         effects("find /tmp/scratch -type f | xargs rm -f"),
         vec![Effect {
             op: Op::Delete,
-            target: Target::Children(PathBuf::from("/tmp/scratch"))
+            target: Target::Children {
+                base: PathBuf::from("/tmp/scratch"),
+                dereference: false,
+            }
         }]
     );
     assert_eq!(

@@ -86,7 +86,10 @@ fn req_011_messages_fit_two_to_four_lines_for_every_target_shape() {
             dereference: false,
         },
         Target::GlobBase(PathBuf::from("/tmp/x")),
-        Target::Children(PathBuf::from("/tmp/x")),
+        Target::Children {
+            base: PathBuf::from("/tmp/x"),
+            dereference: false,
+        },
         Target::Mktemp,
         Target::UnknownSource,
         Target::Unresolved("$X".to_string()),

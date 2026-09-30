@@ -52,17 +52,27 @@ impl Judge {
 
     /// 1 つのパスを分類する。`dereference` は末尾スラッシュ付きの削除。
     pub fn classify_path(&self, path: &Path, dereference: bool) -> Classification {
-        let path = if dereference {
-            std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
-        } else {
-            path.to_path_buf()
-        };
+        let path = self.resolve_dereference(path, dereference);
         self.classify_inner(&path, false)
     }
 
     /// 供給元の子（find・xargs・for の対象集合）を分類する。
     pub fn classify_children(&self, base: &Path) -> Classification {
-        self.classify_inner(base, true)
+        self.classify_children_deref(base, false)
+    }
+
+    /// 末尾スラッシュ付きの起点は、リンク先を解決してから子を分類する。
+    pub fn classify_children_deref(&self, base: &Path, dereference: bool) -> Classification {
+        let base = self.resolve_dereference(base, dereference);
+        self.classify_inner(&base, true)
+    }
+
+    fn resolve_dereference(&self, path: &Path, dereference: bool) -> PathBuf {
+        if dereference {
+            std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+        } else {
+            path.to_path_buf()
+        }
     }
 
     /// パスを含む git の作業ツリーのルート。`.git` の上方探索だけで決め、git は起動しない。

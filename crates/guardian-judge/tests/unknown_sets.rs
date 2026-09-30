@@ -14,7 +14,7 @@ fn effects(root: &Path, command: &str) -> Vec<Effect> {
 fn classify(root: &Path, target: &Target) -> Classification {
     let judge: Judge = judge_for(root);
     match target {
-        Target::Children(base) => judge.classify_children(base),
+        Target::Children { base, .. } => judge.classify_children(base),
         Target::Path { path, dereference } => judge.classify_path(path, *dereference),
         Target::GlobBase(base) => judge.classify_path(base, false),
         Target::Mktemp => Classification {

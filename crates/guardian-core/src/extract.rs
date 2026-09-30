@@ -181,20 +181,21 @@ fn extract_items(items: &[Item], ctx: &mut Context, out: &mut Vec<Effect>, depth
 }
 
 fn extract_pipeline(p: &Pipeline, ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
-    let mut children_source: Option<PathBuf> = None;
+    let mut children_source: Option<(PathBuf, bool)> = None;
     for cmd in &p.commands {
         children_source = extract_command(cmd, ctx, out, depth, children_source);
     }
 }
 
-/// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の base）を返す。
+/// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の base と
+/// 末尾スラッシュの有無）を返す。
 fn extract_command(
     cmd: &SimpleCommand,
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
-    children_source: Option<PathBuf>,
-) -> Option<PathBuf> {
+    children_source: Option<(PathBuf, bool)>,
+) -> Option<(PathBuf, bool)> {
     let mut idx = 0;
     let mut assignments = Vec::new();
     while idx < cmd.words.len() {
@@ -424,10 +425,11 @@ fn find_effects(
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
-) -> Option<PathBuf> {
+) -> Option<(PathBuf, bool)> {
     let base_word = args
         .iter()
         .find(|w| !w.text.starts_with('-') || w.text == "-");
+    let dereference = base_word.is_some_and(|w| w.text.ends_with('/'));
     let base_res = match base_word {
         Some(w) => resolve_word(w, ctx, out, depth),
         None => resolve_text(".", false, ctx),
@@ -448,12 +450,15 @@ fn find_effects(
         i += 1;
     }
     let base_path = match &base_res {
-        Resolved::Path(p) | Resolved::Glob(p) => Some(p.clone()),
+        Resolved::Path(p) | Resolved::Glob(p) => Some((p.clone(), dereference)),
         _ => None,
     };
     if has_delete {
         let target = match base_res {
-            Resolved::Path(p) | Resolved::Glob(p) => Target::Children(p),
+            Resolved::Path(p) | Resolved::Glob(p) => Target::Children {
+                base: p,
+                dereference,
+            },
             Resolved::Mktemp => Target::Mktemp,
             Resolved::UnknownSource => Target::UnknownSource,
             Resolved::Unresolved(t) => Target::Unresolved(t),
@@ -489,7 +494,7 @@ const XARGS_VALUED: &[&str] = &[
 
 fn xargs_effects(
     args: &[Word],
-    children_source: Option<PathBuf>,
+    children_source: Option<(PathBuf, bool)>,
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
@@ -520,7 +525,7 @@ fn xargs_effects(
     }
     // 引数中の対象は供給元から来る。供給元が分かればその子、分からなければ unknown。
     let target = match children_source {
-        Some(p) => Target::Children(p),
+        Some((base, dereference)) => Target::Children { base, dereference },
         None => Target::UnknownSource,
     };
     let _ = (ctx, depth);

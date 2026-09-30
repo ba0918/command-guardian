@@ -220,7 +220,9 @@ impl Engine {
                         self.judge.classify_path(path, *dereference)
                     }
                     Target::GlobBase(base) => self.judge.classify_path(base, false),
-                    Target::Children(base) => self.judge.classify_children(base),
+                    Target::Children { base, dereference } => {
+                        self.judge.classify_children_deref(base, *dereference)
+                    }
                     _ => unreachable!(),
                 };
                 let verdict = match c.class {
@@ -240,11 +242,12 @@ impl Engine {
     /// 設定の保護ルートと許可ルートを先に当てる。
     fn apply_roots(&self, target: &Target) -> Option<(Class, Why, Verdict)> {
         let (path, children) = match target {
-            Target::Path { path, .. } => (path.as_path(), false),
-            Target::GlobBase(base) => (base.as_path(), false),
-            Target::Children(base) => (base.as_path(), true),
+            Target::Path { path, dereference } => (self.deref_path(path, *dereference), false),
+            Target::GlobBase(base) => (base.clone(), false),
+            Target::Children { base, dereference } => (self.deref_path(base, *dereference), true),
             _ => return None,
         };
+        let path = path.as_path();
         for root in &self.config.protected_roots {
             if root.as_os_str().is_empty() {
                 continue;
@@ -270,6 +273,15 @@ impl Engine {
             }
         }
         None
+    }
+
+    /// 末尾スラッシュ付きの対象は、リンク先を解決してからルートに当てる。
+    fn deref_path(&self, path: &Path, dereference: bool) -> PathBuf {
+        if dereference {
+            std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+        } else {
+            path.to_path_buf()
+        }
     }
 
     fn compose_message(&self, effects: &[EffectReport], rules: &[RuleReport]) -> String {

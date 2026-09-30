@@ -64,7 +64,8 @@ pub enum Target {
     /// glob を含む対象。分類にはこの base（広がり得る最も外側のディレクトリ）を使う。
     GlobBase(PathBuf),
     /// 対象がコマンド本文に無い効果。base の子を分類する（find / xargs / for）。
-    Children(PathBuf),
+    /// `dereference` は起点が末尾スラッシュ付きの削除のとき（リンク先を解決する）。
+    Children { base: PathBuf, dereference: bool },
     /// コマンド自身が mktemp で作ったパス。
     Mktemp,
     /// 供給元も確定できない対象集合（find 以外のパイプ元、非リテラルの for など）。
