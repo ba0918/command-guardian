@@ -334,8 +334,18 @@ fn extract_command(
     let args = &words[1..];
 
     match name {
-        "rm" | "rmdir" | "unlink" | "shred" => {
+        "rm" | "rmdir" | "unlink" => {
             for target in option_targets(args, &[]) {
+                let res = resolve_word(target, ctx, out, depth);
+                out.push(Effect {
+                    op: Op::Delete,
+                    target: res.into_target(target),
+                });
+            }
+            None
+        }
+        "shred" => {
+            for target in option_targets(args, SHRED_VALUED) {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Delete,
@@ -376,7 +386,7 @@ fn extract_command(
         }
         "mkfs" | "wipefs" => {
             let valued: &[&str] = if name == "mkfs" {
-                &["-t", "--type"]
+                &["-t", "--type", "-L", "--label"]
             } else {
                 &["-o", "-O", "-t", "--offset", "--types", "--output"]
             };
@@ -390,7 +400,7 @@ fn extract_command(
             None
         }
         _ if name.starts_with("mkfs") => {
-            for target in option_targets(args, &["-t", "--type"]) {
+            for target in option_targets(args, &["-t", "--type", "-L", "--label"]) {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Format,
@@ -491,6 +501,9 @@ fn strip_prefix_word(w: &Word, prefix: &str) -> Option<Word> {
 
 const TRUNCATE_VALUED: &[&str] = &["-s", "--size", "-r", "--reference"];
 
+/// shred の値付きオプション。値は削除の対象ではない。
+const SHRED_VALUED: &[&str] = &["-n", "--iterations", "-s", "--size", "--random-source"];
+
 /// 効果の対象を、`-` で始まる語を読み飛ばして集める。
 fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
     let mut targets = Vec::new();
@@ -521,15 +534,36 @@ fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
     targets
 }
 
+/// find の起点の語。先頭の全体オプションだけを読み飛ばし、述語が先に来るときは
+/// 起点なし（cwd）とする。
+fn find_base_word(args: &[Word]) -> Option<&Word> {
+    let mut i = 0;
+    while i < args.len() {
+        let t = &args[i].text;
+        if t == "-L" || t == "-H" || t == "-P" {
+            i += 1;
+            continue;
+        }
+        if t == "-D" || t == "-O" {
+            i += 2;
+            continue;
+        }
+        if t.starts_with('-') && t != "-" {
+            // 述語が先に来るときは起点なし（cwd）。
+            return None;
+        }
+        return Some(&args[i]);
+    }
+    None
+}
+
 fn find_effects(
     args: &[Word],
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
 ) -> Option<(PathBuf, bool)> {
-    let base_word = args
-        .iter()
-        .find(|w| !w.text.starts_with('-') || w.text == "-");
+    let base_word = find_base_word(args);
     let dereference = base_word.is_some_and(|w| w.text.ends_with('/'));
     let base_res = match base_word {
         Some(w) => resolve_word(w, ctx, out, depth),

@@ -297,3 +297,60 @@ fn req_001_four_excluded_operations_have_no_effects() {
         vec![]
     );
 }
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_option_values_are_not_targets() {
+    // shred の値付きオプション（-n/--iterations、-s/--size）は削除の対象ではない。
+    assert_eq!(
+        effects("shred -n 3 /tmp/scratch/x"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/tmp/scratch/x")
+        }]
+    );
+    assert_eq!(
+        effects("shred --iterations=3 /tmp/scratch/y"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/tmp/scratch/y")
+        }]
+    );
+    // mkfs の -L/--label も形式の対象ではない。
+    assert_eq!(
+        effects("mkfs.ext4 -L mylabel /dev/sdb1"),
+        vec![Effect {
+            op: Op::Format,
+            target: path("/dev/sdb1")
+        }]
+    );
+}
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_without_a_start_point_uses_cwd() {
+    for cmd in ["find -name foo -delete", "find -maxdepth 2 -delete"] {
+        assert_eq!(
+            effects(cmd),
+            vec![Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/home/you/work/repo"),
+                    dereference: false,
+                },
+            }],
+            "{cmd}"
+        );
+    }
+    // 先頭の全体オプション（-L など）は読み飛ばす。
+    assert_eq!(
+        effects("find -L . -name foo -delete"),
+        vec![Effect {
+            op: Op::Delete,
+            target: Target::Children {
+                base: PathBuf::from("/home/you/work/repo"),
+                dereference: false,
+            },
+        }]
+    );
+}
