@@ -218,7 +218,8 @@ pub fn normalize(path: &Path) -> PathBuf {
         match comp {
             Component::CurDir => {}
             Component::ParentDir => {
-                if !out.pop() {
+                // ルートより上へは行かない。相対パスの先頭の ".." は残す。
+                if !out.pop() && !out.has_root() {
                     out.push("..");
                 }
             }

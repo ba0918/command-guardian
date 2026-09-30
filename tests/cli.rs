@@ -399,6 +399,23 @@ fn req_010_unreadable_program_word_asks() {
     }
 }
 
+// @kotowari[REQ-005, REQ-006]
+#[test]
+fn req_005_traversal_above_the_root_is_clamped() {
+    // ルートより上へ出る綴りはルートで止まり、行き先の /etc として block になる。
+    let home = temp_home();
+    for cmd in ["rm -rf /../etc", "rm -rf /tmp/../../etc"] {
+        let r = run(
+            &["check", cmd, "--cwd", "/tmp/scratch", "--format", "json"],
+            home.path(),
+        );
+        assert_eq!(r.code, 2, "{cmd}: stdout {} stderr {}", r.stdout, r.stderr);
+        let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
+        assert_eq!(value["effects"][0]["path"], "/etc", "{cmd}");
+        assert_eq!(value["effects"][0]["class"], "protected", "{cmd}");
+    }
+}
+
 // @kotowari[REQ-002]
 #[test]
 fn req_002_other_user_tilde_paths_block() {

@@ -509,6 +509,22 @@ fn req_001_substitution_in_a_dd_argument_is_read() {
     );
 }
 
+// @kotowari[REQ-005]
+#[test]
+fn req_005_parent_dir_at_the_root_is_clamped() {
+    // ルートより上へ出る綴りは、ルートで止めて解決する。
+    for cmd in ["rm -rf /../etc", "rm -rf /tmp/../../etc"] {
+        assert_eq!(
+            effects(cmd),
+            vec![Effect {
+                op: Op::Delete,
+                target: path("/etc")
+            }],
+            "{cmd}"
+        );
+    }
+}
+
 // @kotowari[REQ-010]
 #[test]
 fn req_010_a_trailing_wrapper_option_is_not_a_command() {
