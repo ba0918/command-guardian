@@ -198,8 +198,7 @@ impl Lexer {
         let mut text = String::new();
         let mut has_glob = false;
 
-        loop {
-            let Some(c) = self.peek(0) else { break };
+        while let Some(c) = self.peek(0) {
             match c {
                 ' ' | '\t' | '\n' => break,
                 ';' | '&' | '|' | '>' | '<' | '(' | ')' => break,
@@ -493,8 +492,7 @@ impl Lexer {
     }
 
     fn run(mut self) -> (Vec<Tok>, Vec<String>) {
-        loop {
-            let Some(c) = self.peek(0) else { break };
+        while let Some(c) = self.peek(0) {
             match c {
                 ' ' | '\t' => {
                     self.i += 1;

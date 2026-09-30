@@ -214,8 +214,7 @@ fn extract_command(
     extract_redirects(cmd, ctx, out, depth);
 
     // ラッパー（sudo / doas）と env の代入を外す。
-    loop {
-        let Some(first) = words.first() else { break };
+    while let Some(first) = words.first() {
         let name = basename(&first.text);
         if name == "sudo" || name == "doas" {
             words = strip_wrapper(words, name);
@@ -223,9 +222,7 @@ fn extract_command(
         }
         break;
     }
-    let Some(first) = words.first() else {
-        return None;
-    };
+    let first = words.first()?;
     let name = basename(&first.text);
     let args = &words[1..];
 
@@ -314,10 +311,7 @@ fn extract_command(
         "eval" => {
             let mut pieces = Vec::new();
             for w in args {
-                match w.literal_value() {
-                    Some(s) => pieces.push(s),
-                    None => return None,
-                }
+                pieces.push(w.literal_value()?);
             }
             if !pieces.is_empty() {
                 let script = parse::parse_script(&pieces.join(" "));
