@@ -97,6 +97,8 @@ dependencies = [
  "guardian-core",
  "guardian-judge",
  "guardian-policy",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

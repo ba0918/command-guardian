@@ -21,6 +21,10 @@ path = "src/main.rs"
 guardian-core = { path = "crates/guardian-core" }
 guardian-judge = { path = "crates/guardian-judge" }
 guardian-policy = { path = "crates/guardian-policy" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [workspace.dependencies]
 regex = "1.13"

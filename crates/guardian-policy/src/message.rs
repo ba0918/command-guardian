@@ -84,15 +84,16 @@ fn alternative_phrase(why: &Why) -> &'static str {
     }
 }
 
+/// 非 allow の理由を 1 行にする。
+pub fn reason_line(class: Class, why: &Why) -> String {
+    format!("{}で、{}", reason_phrase(class, why), loss_phrase(why))
+}
+
 /// 非 allow の文面。`block` はエージェント向け、`ask` は利用者向けに書く。
 pub fn non_allow_message(op: Op, target: &Target, class: Class, why: &Why) -> String {
     let lines = [
         format!("{}: {}", op_label(op), display_target(target)),
-        format!(
-            "理由: {}で、{}",
-            reason_phrase(class, why),
-            loss_phrase(why)
-        ),
+        format!("理由: {}", reason_line(class, why)),
         format!("代替: {}", alternative_phrase(why)),
     ];
     lines.join("\n")
