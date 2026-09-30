@@ -1,0 +1,165 @@
+# hook-guardian-scope
+
+## Context
+
+hook-guardian は、危険な Bash コマンドを止める既存の PreToolUse フック（`block_dangerous_command.py`、Claude Code と Codex の両方に配線済み）を置き換える Rust 製 CLI の構想。
+現状の不満は 2 つある。誤ブロックが多く（ブロックの記録が 292 セッションに 796 件ある）、調整のたびにコードを直す必要がある（rm の許可先はセッションの cwd と tmp に埋め込まれ、危険パターンもコード内の定数）。
+とくに rm / rmdir は「cwd と tmp の下だけ削除でき、判定できないものはすべてブロック」という設計のため、パスを指定した削除で誤ブロックしやすい。
+この記録は、何をどこまで作るか、設定で何を変えられるようにするか、rm をどう判定するかを決めるためのもの。
+
+Position: 承認の材料を提示し、利用者が承認した（コミット）。次は実装計画（kotowari-plan）に渡す。
+
+## Agreements
+
+- A1 hook-guardian は `block_dangerous_command.py` の後継とし、置き換えにとどめず強化する。判定は許可ルートとの照合ではなく、対象パスの意味論（そのパスを消すと何が失われるか）で行う。
+  - why: 現状は rm が拒否されすぎてほぼ全部止まり、作業に支障が出ている。ルートの足し引きでは「追跡済みか」「生成物か」といった区別ができず、調整が終わらない
+  - decided_by: 利用者
+- A2 実装は Cargo の workspace で `crates/guardian-core`、`crates/guardian-judge`、`crates/guardian-policy` の 3 crate に分け、判定機とポリシーを分離する。各 crate の責務境界は第 2 ラウンドで決める。
+  - why: 判定の意味論（judge）と設定（policy）を分けると、判定を設定から独立してテストできる
+  - decided_by: 利用者
+- A3 判定の語彙は allow / ask / block の 3 値とし、確信が持てないときの既定は ask にする。block は「消えると戻せないうえ危険と確信できる対象」だけに残す。
+  - why: 判定不能を一律ブロックする現行方針が誤ブロックの主因。ask はその場の許可ダイアログで通せるので作業が止まらない
+  - decided_by: 利用者（推奨を採用）
+- A4 設定で変えられるようにするものは、(a) 削除を許すルートと保護するルート、(b) ルールの有効・無効、(c) 判定不能時の振る舞い、(d) 危険パターンの追加とする。judge の対象は rm に限らず、パスを指定する破壊的操作を含める。
+  - why: 調整のたびにコードを直す状態をなくす。パスを壊す操作は rm だけではない
+  - decided_by: 利用者（推奨を採用。対象コマンドの注記付き）
+- A5 設定は TOML とし、組み込み既定・利用者設定・プロジェクト設定の 3 層で後勝ちにする。読めない・壊れているときは組み込み既定で動き、警告を出す。
+  - why: 設定のタイポで全部が止まるのを避ける
+  - decided_by: 利用者（推奨を採用）
+- A6 一通り完成させ、しばらくドッグフーディングしてから公開する。早期のリリースはしない。
+  - why: 実使用で誤判定を潰してから出す
+  - decided_by: 利用者
+- A7 パスの判定は 4 分類（ephemeral / vcs / protected / unknown）とし、判定は順に allow / allow / block / ask に対応させる。原則は「消えると戻せない唯一のコピーか」。ephemeral は tmp ルート配下、またはこのコマンド自身が `mktemp` で作ったパスを指す。
+  - why: ルートの照合では追跡済み・生成物・未追跡を区別できず誤ブロックが残る。実測コーパスのほぼ全件がこの分類で allow / ask に落ちる
+  - decided_by: 利用者（推奨を採用）
+  - superseded_by: [A28](./2026-09-30-hook-guardian-scope.md#A28)
+- A8 vcs 分類の条件は、M1 では「`git status --porcelain -uall -- <path>` が空」の 1 本とする。ステージ済み変更や submodule の細かい扱いは、実測で困ってから足す。
+  - why: 条件を増やすほど判定の説明とテストが重くなる。まず 1 本で運用し、誤判定が出た箇所だけ分ける
+  - decided_by: 利用者（推奨を採用）
+- A9 丸ごと消してよいルート（allowed_roots）を設定で追加できるようにし、既定は tmp ルートのみとする。セッション cwd は丸ごと許可しない。
+  - why: cwd の丸ごと許可は未追跡の成果物を消す操作まで通す。tmp は慣習的に使い捨てで、`~/.cache` などを足すかは利用者が決める
+  - decided_by: 利用者（推奨を採用）
+- A10 crate の責務は次のとおり。core はシェル構文の解析・破壊的効果の抽出・パス解決・共通の型を持ち、設定に依存しない。judge は fs と git からパスを 4 分類し、設定を読まず、そのパスが作業ツリー内のときだけ git を起動する。policy は 3 層設定の読み込み・分類から判定への対応・ルートの追加・判定の合成を担う。バイナリは CLI とフックの口を提供する。
+  - why: 判定の意味論を設定から独立させると、実測コーパスをそのままテストに使える
+  - decided_by: 利用者（推奨を採用）
+- A11 判定の単位は効果（操作・パス・再帰の有無）とし、M1 が扱う効果は delete / format / truncate の 3 つとする。リダイレクト `>` による切り詰めは truncate として扱う。
+  - why: パスを壊す操作は rm だけではない。効果に正規化すると同じパス判定を全操作で共有できる
+  - decided_by: 利用者（推奨を採用）
+- A12 git clean、mv・cp の上書き、sed -i、rsync --delete は M1 で扱わず、後続のラウンドで効果を足す。
+  - why: 一度に全部入れると検証が重い。M1 は既存フックの守備範囲を効果モデルで置き換える
+  - decided_by: 利用者（推奨を採用）
+- A13 複数の効果があるときの判定は最悪値（block > ask > allow）で合成する。
+  - why: 1 つでも危険と確信できる対象があれば通してはならない
+  - decided_by: 利用者（推奨を採用）
+- A14 judge や git の内部エラー、判定不能は ask とする。フックが内部エラーで block することはない。
+  - why: 誤ブロックで作業を止めない原則を、異常時にも通す
+  - decided_by: 利用者（推奨を採用）
+- A15 ask の表示には、操作とパス、ask の理由（未追跡、未コミット変更あり、解決不能、管理外）、対処のヒント（allowed_roots への追加、コミット、tmp に移してから消す）を出す。
+  - why: その場で判断して通せるようにする。理由が分からないと設定も直せない
+  - decided_by: 利用者（推奨を採用）
+- A16 判定の応答時間は通常 100ms 未満を目標とする。git の起動はリポジトリ内のパスを判定するときだけに限る。
+  - why: フックは全 Bash 呼び出しの前段で走るので、遅さが作業全体に効く
+  - decided_by: 利用者（推奨を採用）
+- A17 protected の既定セットは次のとおり。システム領域（`/`、`/etc`、`/usr`、`/bin`、`/sbin`、`/lib`、`/lib64`、`/boot`、`/dev`、`/proc`、`/sys`、`/run`、`/opt`、`/srv`、`/root`、`/var` のうち `/var/tmp` を除く）、他ユーザーのホーム、tmp ルート自体（`/tmp`、`/var/tmp`、`$TMPDIR`）、`$HOME` 自体、セッション cwd 自体、リポジトリルート、`.git`、設定した保護パスを block する。tmp ルートの中身と、tmp 配下にある cwd 自体は ephemeral として allow する。`/mnt/*` は protected に入れず ask とする。glob の base が protected に一致する場合も同じ判定にする。
+  - why: block は「システム領域や作業の全体を丸ごと消す」場合に絞り、WSL の Windows ドライブのような判定できない領域は ask に落とす
+  - decided_by: 利用者（推奨を採用）
+- A18 設定の契約は次のとおり。利用者設定を `$XDG_CONFIG_HOME/hook-guardian/config.toml`（既定 `~/.config/hook-guardian/config.toml`）に、プロジェクト設定を cwd から上方探索した最初の `.hook-guardian.toml` 1 枚に置く。マージは組み込み < 利用者 < プロジェクトで、リストは追加、スカラーは後勝ち。主なキーは `[paths] allowed_roots, protected_roots`、`[unknown] verdict`、`[rules] disable`、`[[rules.custom]] name, pattern, verdict`、`[git] enabled` とする。
+  - why: 置き場とマージ規則を固定すると、どの設定が効いているかを説明できる
+  - decided_by: 利用者（推奨を採用）
+- A19 CLI はバイナリ `hook-guardian` とし、`hook-guardian hook --agent claude|codex`（フックの口）と `hook-guardian check '<command>' --cwd <DIR> [--format text|json]`（手動・テスト用の判定）の 2 つを M1 に含める。診断系のコマンドは後から足す。
+  - why: フックの口と、同じ判定を手で再現できる口の 2 つがあると、ドッグフーディングとテストが同じ道を通る
+  - decided_by: 利用者（推奨を採用）
+- A20 プロジェクト設定（`.hook-guardian.toml`）は、既定では締める方向の変更（protected_roots の追加、unknown の ask から block への厳格化、ask/block を返す custom パターンの追加）だけを反映し、allowed_roots の追加・ルールの無効化・判定の緩和は無視して警告を出す。利用者設定の `trusted_projects` にパスを書いたリポジトリに限り、全反映する。
+  - why: クローンしただけのリポジトリの設定で守りを外せる経路を塞ぐ
+  - decided_by: 利用者（推奨を採用）
+- A21 symlink の意味論は旧フックと同じにする。rm は symlink 自体を消し、リンク先は消さない。分類はリンクのパス自体を対象とし、末尾スラッシュ付きの削除だけリンク先の分類で判定する。ハードリンクは 1 つのリンクを消すだけとして扱う。
+  - why: リンク先を消す恐れで allow を block に寄せる必要がない。旧フックの意味論を捨てる理由がない
+  - decided_by: 利用者（推奨を採用）
+- A22 `[mode] enforce = true|shadow` を持つ。shadow では常に何も返さず、判定をログに残す。ログは `$XDG_STATE_HOME/hook-guardian/`（既定 `~/.local/state/hook-guardian/`）に 0600 で、時刻・判定・理由・対象パス・コマンド本文を 1 行ずつ書く。ドッグフーディング後に消す前提で、リポジトリには入れない。
+  - why: 旧フックと並走して食い違いを集めないと誤判定の実測が増えない。コマンド本文には秘密が混ざりうるので権限を絞り、追跡しない
+  - decided_by: 利用者（推奨を採用）
+- A23 M1 の成果物は Linux x86_64（WSL）の単一バイナリとし、GitHub Releases で配布する。インストールは `mise use -g github:ba0918/hook-guardian` とし、CI でビルドとテストを回す。Windows ネイティブと macOS は作らない。dotfiles 側の配線の差し替えと旧フックの削除は、このリポジトリの範囲外の別作業とする。
+  - why: 利用環境は WSL。配布の形を既存ツールと揃えると導入が 1 行で済む
+  - decided_by: 利用者（推奨を採用）
+- A24 フックへの写像は次のとおり。Claude Code では allow は何も返さず、ask は `permissionDecision: "ask"` を理由付きで返し、block は `"deny"` を理由付きで返す。`permission_mode` が `dontAsk` か `bypassPermissions` のときは ask を何も返さないに落とす。Codex では block は `"deny"` を理由付きで返し、allow・ask・内部エラーは何も返さない。Codex を full-auto で使うと ask 相当が誰にも届かないことは既知の制約とする。影実行では両方で何も返さない。
+  - why: Codex の PreToolUse は ask に対応せず、allow も updatedInput なしでは失敗扱いになる。確認の出口がないので、確信のある block だけを返し、残りは Codex 本来の承認フローに委ねる
+  - decided_by: 利用者（推奨を採用）
+- A25 対象集合が静的に確定しない破壊的操作（find の削除、xargs、ループ内の rm）は、供給元（find の起点、パイプの元）の子の分類で判定する。システム領域と `.git` の配下は block、tmp ルートの配下は allow、git 作業ツリーはそのディレクトリの `git status` が空なら allow・そうでなければ ask、それ以外と供給元不明は ask。絞り込み（`-name` など）は M1 の判定に使わない。protected の適用範囲は、システム領域と `.git` が配下すべて、tmp ルート・`$HOME`・cwd・リポジトリルートがそのものだけとする。
+  - why: 作業ツリーが clean なら配下は追跡済みか無視済みなので、供給元の子の分類が対象すべての分類と一致する
+  - decided_by: 利用者（推奨を採用）
+  - superseded_by: [A33](./2026-09-30-hook-guardian-scope.md#A33)
+- A26 block の表示は、操作・パス・分類（システム領域、リポジトリルート、`.git`、tmp ルート自体など）と、その分類を block する理由を 1〜2 行で出す。
+  - why: block は protected のときだけなので、分類名がそのまま理由になる
+  - decided_by: 利用者（推奨を採用）
+- A27 `check` コマンドは判定を stdout に出し（既定 text、`--format json` で JSON）、終了コードは allow=0、ask=1、block=2、実行失敗=3 とする。`hook` はプロトコル都合で常に 0 を返し、判定は JSON か無出力で表す。
+  - why: テストとドッグフーディングで判定を機械的に扱えるようにする
+  - decided_by: 利用者（推奨を採用）
+- A28 非 allow の応答はすべて「何を・なぜ・代替」の文面にする。deny は LLM 向けに、ask はユーザ向けに書く。A7 の unknown のうちパスを解決できない場合は ask ではなく deny とし、literal なパスで指定し直すなどの代替を示す。ask の理由を LLM に渡す追加の仕組み（`additionalContext` など）は M1 では使わない。
+  - why: deny の理由は LLM に届くので、次の一手を示せばユーザを挟まずにやり直せる。未解決のパスは、そもそもユーザにも安全性を判断できない
+  - decided_by: 利用者（推奨を採用）
+- A29 パスの解決は、絶対パス、相対パス、"~" の付いたパス、環境変数 "HOME"・"TMPDIR"・"PWD"、リテラルの代入（"&&" の連結を含む）、リテラルの "cd"、"mktemp" が作ったパスの範囲で行う。解決できないパスは未解決とする。
+  - why: 実測コーパスで誤ブロックの大半がこの解決の不足によるものだった
+  - decided_by: 利用者（第 2 ラウンドの説明の推奨を採用）
+- A30 非 allow の文面は 2 行から 4 行とし、代替が無いときは無いと書く。
+  - why: 文面を短く保ち、次に打てる手があるかどうかを曖昧にしない
+  - decided_by: 利用者（第 6 ラウンドの説明の推奨を採用）
+- A31 設定の既定は、"git.enabled" を true、"mode.enforce" を true、"unknown.verdict" を "ask"、"paths.allowed_roots" を一時領域のルート、"paths.protected_roots"・"rules.disable"・"rules.custom"・"trusted_projects" を空とする。
+  - why: ドッグフーディングを始める既定の振る舞いを 1 か所に固定する
+  - decided_by: 利用者（第 3・第 4 ラウンドの推奨を採用）
+- A32 「ルール」は名前を持つ判定の単位とする。組み込みのルールは効果の取り出しの単位（"delete"、"truncate"、"format"）で、"rules.disable" はこの名前で無効化し、無効にした効果は取り出さない。カスタムのルールは名前、正規表現のパターン、判定を持ち、引用とヒアドキュメントを外したコマンド本文に照合して、一致した判定を合成に加える。allow を返すカスタムのルールは利用者設定でのみ有効とする。
+  - why: キーの存在だけでは実装も検証もできない。緩めるパターンをプロジェクト設定から足せると A20 の信頼の規則が崩れる
+  - decided_by: 利用者（推奨を採用）
+- A33 設定で追加した保護ルートと、ほかの利用者のホームは、その配下のすべてに当てる。A25 の「システム領域と ".git" が配下すべて、それ以外はそのものだけ」から、この 2 つを除く改訂とする。
+  - why: 保護ルートの目的はルートの中身を守ることで、それ自体だけを守っては意味がない
+  - decided_by: 利用者（推奨を採用）
+- A34 "check" は、"--format json" のとき、"verdict" と、効果ごとの "op"、"path"、"class"、"verdict"、"reason" を JSON で出す。影実行でも判定を出し、判定を出せない失敗は終了コード 3 とする。設定の不備は既定で判定を続けるので 0、1、2 のいずれかになる。
+  - why: テストと CI が判定を機械的に扱える形に固定する。影実行はフックの口にだけ効く
+  - decided_by: 利用者（推奨を採用）
+- A35 フックの呼び分けは "hook-guardian hook --agent claude|codex" の引数で行い、出力は両方とも "hookSpecificOutput" の封筒に入れ、"hookEventName" を "PreToolUse"、"permissionDecision" と "permissionDecisionReason" を置く。
+  - why: 第 4 ラウンドの調査で確認した両エージェントの外部仕様に合わせる
+  - decided_by: 利用者（第 4 ラウンドの調査結果の反映）
+- A36 glob を含む対象は、glob が広がり得る最も外側のディレクトリを base として分類し、base が保護領域に一致するときは、保護と同じ判定にする。
+  - why: "rm -rf *" のような対象を、base の分類で一意に決める
+  - decided_by: 利用者（A17 の glob の扱いの明示化）
+- A37 設定値のパスは、"~" をホームに展開し、プロジェクト設定の中の相対パスはそのリポジトリのルート基準で解決する。
+  - why: コマンド中のパスの解決（A29）と揃え、設定を書く人に絶対パスを強いるのを避ける
+  - decided_by: 利用者（推奨を採用）
+- A38 効果の取り出し元は、削除が "rm"、"rmdir"、"unlink"、"find" の "-delete" と "-exec rm"、"xargs" の "rm"、"shred"、切り詰めがリダイレクトの ">"、"dd" の "of="、"truncate"、フォーマットが "mkfs"、"wipefs"、"dd" のブロックデバイスへの書き込みとする。解析は、コマンド列、パイプ、引用、ヒアドキュメント、コマンド置換、sudo と doas のラッパー、シェルの "bash -c" と "eval" の内側まで行う。
+  - why: 旧フックの守備範囲（A12）を、効果モデルの実装とテストが書ける単位まで下ろす
+  - decided_by: 利用者（A11・A12 の明示化）
+- A39 "git.enabled" が false のときは、git による分類を行わない（作業ツリーの中のパスも `vcs` にしない）。
+  - why: "git による分類を使うかどうか" というキーの意味の明示化
+  - decided_by: 利用者（第 3 ラウンドの推奨の明示化）
+- A40 判定の対象は、フックの入力のうち Bash のコマンドを含むものだけとする。それ以外の入力では何もしない。
+  - why: 旧フックと同じ守備範囲から始める
+  - decided_by: 利用者（A1 の後継の決定の踏襲）
+- A41 `M1` は、この IR に書かれた要求の全体を満たす最初のリリースを指す。
+  - why: 段階の名前の意味を固定する
+  - decided_by: 利用者（A6 の明示化）
+- A42 設定の "[[commands.guard]]" に、プログラムごとの使い方を止める構造化の規則を置く。各規則は "program"、"reason"、"verdict"（"ask" か "block"、既定は "ask"）と、任意の "options-with-value"、"for"、"deny"、"deny-flags"、"deny-option-values"、"deny-env"、"only"、"examples.deny"、"examples.allow" を持つ。M1 に含め、正規表現の "rules.custom" も残す。
+  - why: 危険な操作は削除系だけではない。kakoi で確かめた構造化ルールで program ごとの使い方を止める
+  - decided_by: 利用者（推奨を採用）
+- A43 一致した規則の "verdict" は、効果の判定と同じ合成（最悪値）に加える。1 つの起動に複数の規則が当たってよく、理由は当たった規則ごとに示す。プロジェクト設定の規則も締める方向なので、そのまま反映する。
+  - why: 判定の入口を 1 つに保ち、設定の信頼の規則（A20）とも揃う
+  - decided_by: 利用者（推奨を採用）
+- A44 語の照合は kakoi と同じ（"/regex/" 記法、語全体、先頭一致、"options-with-value" の読み飛ばし、"--"、単文字フラグのまとめ書き、"deny-option-values"、"only"、"for"）。"program" は語の basename で照合し、パス付きの起動にも当てる。ラッパーとシェルの "bash -c"・"eval" の内側も展開してから照合する。"deny-env" は、コマンド本文の先頭の "NAME=value" とラッパー越しの代入を対象にし、フック自身の環境は見ない。同梱の見本として "git push" の ask と "-c alias.*" の拒否の例をコメントで置く。
+  - why: 別名やオプション越しのすり抜けを、kakoi で確かめた語の照合で塞ぐ
+  - decided_by: 利用者（推奨を採用）
+- A45 規則の例（"examples.deny"、"examples.allow"）は読み込み時に検証する。合わない例、壊れた正規表現、形の誤りがある規則は、その規則だけを無効にして警告を出す。設定の全体は組み込みの既定で続ける。
+  - why: A5 の「壊れているときは既定で動き警告を出す」の具体化
+  - decided_by: 利用者（推奨を採用）
+- A46 hook-guardian の見張りは、事故を減らす柵であり、境界ではない。悪意ある迂回を強制力で防ぐ仕組み（実行の隔離やアクセス制御）は持たず、判定はコマンド本文と設定だけで行う。
+  - why: kakoi は実行時の強制で守れるが、hook-guardian は実行前の判定なので同じ守りは持てない。この差を仕様に明記する
+  - decided_by: 利用者
+- A47 "commands.guard" の規則の細部は次のとおり。各規則の "reason" は空でない文字列とし、"deny"、"deny-flags"、"deny-option-values"、"deny-env"、"only" のどれも持たない規則は形の誤りとする。"commands.guard" の既定は空とする。
+  - why: kakoi の規則の形を成す最低限を、実装と検証が書ける単位まで下ろす
+  - decided_by: 利用者（A42 の採用の明示化）
+- A48 "only" は書いた使い方だけを通し、書いていない使い方をその規則の "verdict" にする。"examples.deny" の各例がその規則で一致し、"examples.allow" の各例が一致しないことを読み込み時に確かめる。例は、シェルと同じ引用の規則で語に分け、先頭の "NAME=value" を環境として読む。
+  - why: "only" と例の意味を、実装が書ける単位まで下ろす
+  - decided_by: 利用者（A42・A44 の採用の明示化）
+
+## Undecided
+
+- U1 git clean、mv・cp の上書き、sed -i、rsync --delete を M1 の後にどう判定するか。
+  - decides: 利用者（後続のラウンド）
+  - related: A12
