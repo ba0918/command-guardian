@@ -42,19 +42,27 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
         .unwrap_or(0);
     writeln!(
         file,
-        "{now}\t{}\t{}\t{}\t{command}",
+        "{now}\t{}\t{}\t{}\t{}",
         report.verdict,
-        reason_text(report),
-        target_text(report)
+        escape_field(&reason_text(report)),
+        escape_field(&target_text(report)),
+        escape_field(command)
     )
 }
 
-/// 理由。文面は複数行なので 1 行にたたむ。
+/// 1 行 1 レコードを守るため、改行とタブをエスケープする。
+fn escape_field(s: &str) -> String {
+    s.replace('\r', "\\r")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t")
+}
+
+/// 理由。無ければ "-"。
 fn reason_text(report: &Report) -> String {
     if report.message.is_empty() {
         "-".to_string()
     } else {
-        report.message.replace('\n', " ")
+        report.message.clone()
     }
 }
 

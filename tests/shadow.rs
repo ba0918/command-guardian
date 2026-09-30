@@ -232,3 +232,26 @@ fn req_019_empty_state_home_falls_back_to_home_local_state() {
         .is_file());
     assert!(!scratch.path().join("hook-guardian/shadow.log").exists());
 }
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_multiline_command_stays_one_record() {
+    // コマンド本文の改行とタブをエスケープし、1 判定 1 行 5 フィールドを守る。
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    write_shadow_config(xdg.path());
+    run_hook(
+        &bash_input("echo a\tb\nrm -rf /tmp/scratch/x", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    let path = state.path().join("hook-guardian/shadow.log");
+    let log = std::fs::read_to_string(&path).unwrap();
+    let line = log.trim_end();
+    assert!(!line.contains('\n'), "{log}");
+    assert_eq!(line.split('\t').count(), 5, "{line}");
+    assert!(line.contains("\\n"), "{line}");
+    assert!(line.contains("\\t"), "{line}");
+}
