@@ -21,12 +21,17 @@
 | implement | ba0918-tdd |
 | release | ba0918-release |
 | review | ba0918-verification |
+| writing or revising IR or decision records, acting on `kotowari check`, placing `@kotowari` marks in tests, or reading `kotowari mutants` | kotowari |
+| deciding where a new request starts (use this, not ba0918-using-workflow) | kotowari-using-workflow |
 
 Refer to each rule by its skill name. Read every rule that applies before starting the work it
 governs. A rule once read stays in force for the rest of the context: read it again only after
 the context has been compacted or cleared, or when the rule itself has changed. On a delegated
 task, a rule the delegation prompt names as already inlined is in force from that prompt — do
 not read it again; read every other rule this table routes to the work as usual.
+
+The two kotowari rows are hand-maintained in this repository, not generated from skill
+metadata. Keep them when regenerating the table.
 
 ## Project Context
 
