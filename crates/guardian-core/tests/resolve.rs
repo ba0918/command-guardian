@@ -153,3 +153,17 @@ fn req_002_paths_built_on_mktemp_resolve() {
         vec![delete(Target::Unresolved("$d/../x".to_string()))]
     );
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_other_user_tilde_paths_are_unresolved() {
+    // "~" と "~/" 以外の "~..." は、cwd 相対にせず未解決として扱う。
+    assert_eq!(
+        effects("rm -rf ~root/x"),
+        vec![delete(Target::Unresolved("~root/x".to_string()))]
+    );
+    assert_eq!(
+        effects("rm -rf ~+/x"),
+        vec![delete(Target::Unresolved("~+/x".to_string()))]
+    );
+}

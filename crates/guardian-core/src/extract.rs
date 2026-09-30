@@ -809,6 +809,9 @@ fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
             Some(h) => h.join(rest).to_string_lossy().to_string(),
             None => return Resolved::Unresolved(text.to_string()),
         }
+    } else if text.starts_with('~') {
+        // "~user" や "~+" は解決しない。cwd 相対にはしない。
+        return Resolved::Unresolved(text.to_string());
     } else {
         text.to_string()
     };

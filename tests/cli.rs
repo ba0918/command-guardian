@@ -374,3 +374,15 @@ fn req_010_unreadable_shell_and_eval_bodies_ask() {
     );
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_other_user_tilde_paths_block() {
+    // ~root/x は解決できないので block。cwd 相対にもしない。
+    let home = temp_home();
+    let r = run(
+        &["check", "rm -rf ~root/x", "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}
