@@ -1,0 +1,32 @@
+//! S6: 解析の失敗の検出（REQ-010）。
+
+use guardian_core::{analyze, Env};
+use std::path::PathBuf;
+
+fn env() -> Env {
+    Env {
+        home: Some(PathBuf::from("/home/you")),
+        tmpdir: Some(PathBuf::from("/tmp")),
+        cwd: Some(PathBuf::from("/home/you/work/repo")),
+    }
+}
+
+// @kotowari[REQ-010]
+#[test]
+fn req_010_unterminated_quotes_are_parse_errors() {
+    for cmd in [
+        "rm -rf '/etc/foo",
+        "rm -rf \"/etc/foo",
+        "rm -rf `rm /etc/foo",
+        "rm -rf $(rm /etc/foo",
+        "rm -rf ${HOME",
+    ] {
+        let a = analyze(cmd, &env());
+        assert!(!a.parse_errors.is_empty(), "{cmd}");
+    }
+    // 閉じた入力は失敗にしない。
+    assert!(analyze("rm -rf /etc/foo", &env()).parse_errors.is_empty());
+    assert!(analyze("rm -rf $(rm /etc/foo)", &env())
+        .parse_errors
+        .is_empty());
+}

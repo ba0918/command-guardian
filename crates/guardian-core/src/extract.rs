@@ -77,11 +77,69 @@ impl Context {
 
 /// コマンド文字列から効果を取り出す。
 pub fn extract_effects(command: &str, env: &Env) -> Vec<Effect> {
-    let script = parse::parse_script(command);
+    analyze(command, env).effects
+}
+
+/// 判定の材料。効果と、解析の失敗。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Analysis {
+    pub effects: Vec<Effect>,
+    pub parse_errors: Vec<String>,
+}
+
+/// コマンド文字列を解析して効果を取り出す。解析の失敗も返す。
+pub fn analyze(command: &str, env: &Env) -> Analysis {
+    let (script, mut errors) = parse::parse_script_with_errors(command);
+    collect_subst_errors(&script.items, &mut errors, 0);
     let mut ctx = Context::new(env);
     let mut out = Vec::new();
     extract_items(&script.items, &mut ctx, &mut out, 0);
-    out
+    Analysis {
+        effects: out,
+        parse_errors: errors,
+    }
+}
+
+/// コマンド置換の内側の解析の失敗を集める。
+fn collect_subst_errors(items: &[Item], errors: &mut Vec<String>, depth: usize) {
+    if depth > 16 {
+        return;
+    }
+    let visit_word = |w: &Word, errors: &mut Vec<String>| {
+        for part in &w.parts {
+            if let Part::Subst(inner) = part {
+                let (script, mut inner_errors) = parse::parse_script_with_errors(inner);
+                errors.append(&mut inner_errors);
+                collect_subst_errors(&script.items, errors, depth + 1);
+            }
+        }
+    };
+    for item in items {
+        match item {
+            Item::Simple(p) => {
+                for cmd in &p.commands {
+                    for w in &cmd.words {
+                        visit_word(w, errors);
+                    }
+                    for r in &cmd.redirects {
+                        match r {
+                            Redirect::Out(w)
+                            | Redirect::Append(w)
+                            | Redirect::Clobber(w)
+                            | Redirect::In(w)
+                            | Redirect::Heredoc(w) => visit_word(w, errors),
+                        }
+                    }
+                }
+            }
+            Item::For { words, body, .. } => {
+                for w in words {
+                    visit_word(w, errors);
+                }
+                collect_subst_errors(body, errors, depth + 1);
+            }
+        }
+    }
 }
 
 fn extract_items(items: &[Item], ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {

@@ -5,6 +5,6 @@ pub mod extract;
 pub mod parse;
 pub mod types;
 
-pub use extract::{extract_effects, Env};
+pub use extract::{analyze, extract_effects, Analysis, Env};
 pub use parse::strip_quotes_and_heredocs;
 pub use types::{Class, Effect, Op, ProtectedKind, Target, Verdict, Why};

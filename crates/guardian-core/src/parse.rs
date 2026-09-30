@@ -136,6 +136,8 @@ struct Lexer {
     chars: Vec<char>,
     i: usize,
     toks: Vec<Tok>,
+    /// 解析の失敗（閉じない引用など）。
+    errors: Vec<String>,
     /// ヒアドキュメントの区切り待ち（本文スキップ用）。値は (区切り語, タブ除去)。
     pending_heredocs: Vec<(String, bool)>,
     /// 直前に語を出し終えた位置。`glued_left` の判定に使う。
@@ -152,6 +154,7 @@ impl Lexer {
             chars: input.chars().collect(),
             i: 0,
             toks: Vec::new(),
+            errors: Vec::new(),
             pending_heredocs: Vec::new(),
             prev_word_end: None,
             at_word_start: true,
@@ -217,12 +220,17 @@ impl Lexer {
                 '\'' => {
                     self.i += 1;
                     let mut s = String::new();
+                    let mut closed = false;
                     while let Some(ch) = self.peek(0) {
                         self.i += 1;
                         if ch == '\'' {
+                            closed = true;
                             break;
                         }
                         s.push(ch);
+                    }
+                    if !closed {
+                        self.errors.push("閉じない単引用符".to_string());
                     }
                     text.push_str(&s);
                     push_literal(&mut parts, &s);
@@ -233,23 +241,7 @@ impl Lexer {
                 }
                 '`' => {
                     self.i += 1;
-                    let mut s = String::new();
-                    while let Some(ch) = self.peek(0) {
-                        if ch == '`' {
-                            self.i += 1;
-                            break;
-                        }
-                        if ch == '\\' {
-                            self.i += 1;
-                            if let Some(next) = self.peek(0) {
-                                self.i += 1;
-                                s.push(next);
-                            }
-                            continue;
-                        }
-                        self.i += 1;
-                        s.push(ch);
-                    }
+                    let s = self.read_backtick();
                     text.push_str("$(");
                     text.push_str(&s);
                     text.push(')');
@@ -280,10 +272,12 @@ impl Lexer {
     }
 
     fn read_double_quoted(&mut self, parts: &mut Vec<Part>, text: &mut String) {
+        let mut closed = false;
         while let Some(c) = self.peek(0) {
             match c {
                 '"' => {
                     self.i += 1;
+                    closed = true;
                     break;
                 }
                 '\\' => {
@@ -309,15 +303,7 @@ impl Lexer {
                 '$' => self.read_dollar(parts, text),
                 '`' => {
                     self.i += 1;
-                    let mut s = String::new();
-                    while let Some(ch) = self.peek(0) {
-                        if ch == '`' {
-                            self.i += 1;
-                            break;
-                        }
-                        self.i += 1;
-                        s.push(ch);
-                    }
+                    let s = self.read_backtick();
                     text.push_str("$(");
                     text.push_str(&s);
                     text.push(')');
@@ -330,6 +316,36 @@ impl Lexer {
                 }
             }
         }
+        if !closed {
+            self.errors.push("閉じない二重引用符".to_string());
+        }
+    }
+
+    /// バッククォートの内側を読む。`self.i` は開きの直後。
+    fn read_backtick(&mut self) -> String {
+        let mut s = String::new();
+        let mut closed = false;
+        while let Some(ch) = self.peek(0) {
+            if ch == '`' {
+                self.i += 1;
+                closed = true;
+                break;
+            }
+            if ch == '\\' {
+                self.i += 1;
+                if let Some(next) = self.peek(0) {
+                    self.i += 1;
+                    s.push(next);
+                }
+                continue;
+            }
+            self.i += 1;
+            s.push(ch);
+        }
+        if !closed {
+            self.errors.push("閉じないバッククォート".to_string());
+        }
+        s
     }
 
     fn read_dollar(&mut self, parts: &mut Vec<Part>, text: &mut String) {
@@ -355,6 +371,9 @@ impl Lexer {
                         self.i += 1;
                         s.push(ch);
                     }
+                    if depth != 0 {
+                        self.errors.push("閉じない算術展開".to_string());
+                    }
                     text.push_str("$((");
                     text.push_str(&s);
                     text.push_str("))");
@@ -378,6 +397,9 @@ impl Lexer {
                         self.i += 1;
                         s.push(ch);
                     }
+                    if depth != 0 {
+                        self.errors.push("閉じないコマンド置換".to_string());
+                    }
                     text.push_str("$(");
                     text.push_str(&s);
                     text.push(')');
@@ -387,12 +409,17 @@ impl Lexer {
             Some('{') => {
                 self.i += 1;
                 let mut s = String::new();
+                let mut closed = false;
                 while let Some(ch) = self.peek(0) {
                     self.i += 1;
                     if ch == '}' {
+                        closed = true;
                         break;
                     }
                     s.push(ch);
+                }
+                if !closed {
+                    self.errors.push("閉じない変数展開".to_string());
                 }
                 text.push_str("${");
                 text.push_str(&s);
@@ -465,7 +492,7 @@ impl Lexer {
         }
     }
 
-    fn run(mut self) -> Vec<Tok> {
+    fn run(mut self) -> (Vec<Tok>, Vec<String>) {
         loop {
             let Some(c) = self.peek(0) else { break };
             match c {
@@ -532,11 +559,19 @@ impl Lexer {
                 }
             }
         }
-        self.toks
+        if !self.pending_heredocs.is_empty() {
+            self.errors.push("閉じないヒアドキュメント".to_string());
+        }
+        (self.toks, self.errors)
     }
 }
 
 pub fn tokenize(input: &str) -> Vec<Tok> {
+    tokenize_with_errors(input).0
+}
+
+/// 語と、解析の失敗を返す。
+pub fn tokenize_with_errors(input: &str) -> (Vec<Tok>, Vec<String>) {
     Lexer::new(input).run()
 }
 
@@ -759,15 +794,23 @@ impl Parser {
 
 /// スクリプトを解析する。
 pub fn parse_script(input: &str) -> ParsedScript {
-    let toks = tokenize(input);
+    parse_script_with_errors(input).0
+}
+
+/// スクリプトと、解析の失敗を返す。
+pub fn parse_script_with_errors(input: &str) -> (ParsedScript, Vec<String>) {
+    let (toks, errors) = tokenize_with_errors(input);
     let mut parser = Parser {
         toks,
         pos: 0,
         depth: 0,
     };
-    ParsedScript {
-        items: parser.parse_items(None),
-    }
+    (
+        ParsedScript {
+            items: parser.parse_items(None),
+        },
+        errors,
+    )
 }
 
 /// 引用とヒアドキュメントを外したコマンド本文。カスタムルールの照合に使う。
