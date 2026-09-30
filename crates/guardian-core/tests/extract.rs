@@ -224,7 +224,7 @@ fn req_001_command_substitution_is_read() {
     );
 }
 
-// @kotowari[REQ-001]
+// @kotowari[REQ-001, EX-010]
 #[test]
 fn req_001_sudo_and_doas_wrappers_are_read() {
     assert_eq!(
