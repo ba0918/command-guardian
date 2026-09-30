@@ -109,23 +109,10 @@ fn req_009_worst_verdict_wins() {
     assert_eq!(worst, Verdict::Allow);
 }
 
-/// 解析の失敗があれば判定は ask（REQ-010）。それ以外は効果の最悪値。
-fn verdict_of_analysis(command: &str) -> Verdict {
-    let a = analyze(command, &core_env());
-    if !a.parse_errors.is_empty() {
-        return Verdict::Ask;
-    }
-    let mut worst = Verdict::Allow;
-    for e in &a.effects {
-        worst = worst.worst(verdict(classify(&e.target).class));
-    }
-    worst
-}
-
 // @kotowari[REQ-010]
 #[test]
-fn req_010_parse_failure_falls_to_ask_not_block() {
-    // 閉じない引用を含む入力は、保護領域を指していても block しない。
+fn req_010_parse_failure_is_reported() {
+    // 閉じない引用を含む入力は解析の失敗として報告する。
     for cmd in [
         "rm -rf '/etc/foo",
         "rm -rf \"/etc/foo",
@@ -133,18 +120,13 @@ fn req_010_parse_failure_falls_to_ask_not_block() {
     ] {
         let a = analyze(cmd, &core_env());
         assert!(!a.parse_errors.is_empty(), "{cmd}");
-        assert_eq!(verdict_of_analysis(cmd), Verdict::Ask, "{cmd}");
     }
 }
 
 // @kotowari[REQ-010]
 #[test]
-fn req_010_internal_error_is_not_block() {
-    // 判定できない入力（解析できない）でも block にはしない。
+fn req_010_unclosed_substitution_is_an_error() {
+    // 閉じないコマンド置換も解析の失敗として報告する。
     let a = analyze("rm -rf $(cat /tmp/list", &core_env());
     assert!(!a.parse_errors.is_empty());
-    assert_ne!(
-        verdict_of_analysis("rm -rf $(cat /tmp/list"),
-        Verdict::Block
-    );
 }

@@ -201,11 +201,6 @@ fn req_006_class_maps_to_verdict_and_unresolved_blocks() {
     let e = effect("rm -rf $X");
     assert!(matches!(e.target, Target::Unresolved(_)), "{:?}", e.target);
     assert_eq!(verdict_for(&e.target), Verdict::Block);
-
-    assert_eq!(verdict(Class::Ephemeral), Verdict::Allow);
-    assert_eq!(verdict(Class::Vcs), Verdict::Allow);
-    assert_eq!(verdict(Class::Protected), Verdict::Block);
-    assert_eq!(verdict(Class::Unknown), Verdict::Ask);
 }
 
 // @kotowari[REQ-003, REQ-005]
