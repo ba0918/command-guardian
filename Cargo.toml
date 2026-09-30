@@ -1,0 +1,30 @@
+[workspace]
+members = [
+    "crates/guardian-core",
+    "crates/guardian-judge",
+    "crates/guardian-policy",
+]
+resolver = "2"
+
+[package]
+name = "hook-guardian"
+version = "0.1.0"
+edition = "2021"
+description = "危険な Bash コマンドをパスの意味論で判定するフック"
+license = "MIT"
+
+[[bin]]
+name = "hook-guardian"
+path = "src/main.rs"
+
+[dependencies]
+guardian-core = { path = "crates/guardian-core" }
+guardian-judge = { path = "crates/guardian-judge" }
+guardian-policy = { path = "crates/guardian-policy" }
+
+[workspace.dependencies]
+regex = "1.13"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "1.1"
+tempfile = "3"

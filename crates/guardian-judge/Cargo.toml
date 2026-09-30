@@ -1,0 +1,11 @@
+[package]
+name = "guardian-judge"
+version = "0.1.0"
+edition = "2021"
+description = "fs と git によるパスの分類"
+
+[dependencies]
+guardian-core = { path = "../guardian-core" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
