@@ -1,1 +1,3 @@
-/target
+# Agents
+.agents/worktrees/
+.agents/artifacts/
