@@ -3,9 +3,7 @@
 use crate::config::{self, Config};
 use crate::guard;
 use crate::message;
-use guardian_core::{
-    analyze, strip_quotes_and_heredocs, Class, Env, Op, ProtectedKind, Target, Verdict, Why,
-};
+use guardian_core::{analyze, Ask, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
 use guardian_judge::{GitRunner, Judge, JudgeEnv};
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -44,7 +42,10 @@ pub struct Report {
     pub rules: Vec<RuleReport>,
     pub warnings: Vec<String>,
     pub message: String,
-    pub parse_errors: Vec<String>,
+    /// 判定の理由。効果が無い ask でも残る（REQ-017・A13）。
+    pub reason: String,
+    /// 判定できない理由（REQ-038）。
+    pub parse_errors: Vec<Ask>,
 }
 
 struct CompiledRule {
@@ -145,30 +146,35 @@ impl Engine {
         }
 
         // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
-        let body = strip_quotes_and_heredocs(command);
         let mut rules = Vec::new();
-        for rule in &self.custom_rules {
-            if rule.regex.is_match(&body) {
-                rules.push(RuleReport {
-                    name: rule.name.clone(),
-                    reason: format!("カスタムルール「{}」", rule.name),
-                    verdict: rule.verdict,
-                });
+        if !self.custom_rules.is_empty() {
+            let body = guardian_parser::strip_quotes(command);
+            for rule in &self.custom_rules {
+                if rule.regex.is_match(&body) {
+                    rules.push(RuleReport {
+                        name: rule.name.clone(),
+                        reason: format!("カスタムルール「{}」", rule.name),
+                        verdict: rule.verdict,
+                    });
+                }
             }
         }
 
         // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
-        let invocations = guard::invocations(command);
-        for rule in &self.config.guard {
-            if invocations.iter().any(|inv| rule.matches(inv)) {
-                rules.push(RuleReport {
-                    name: rule.program.clone(),
-                    reason: rule.reason.clone(),
-                    verdict: rule.verdict,
-                });
+        if !self.config.guard.is_empty() {
+            let invocations = guard::invocations(command);
+            for rule in &self.config.guard {
+                if invocations.iter().any(|inv| rule.matches(inv)) {
+                    rules.push(RuleReport {
+                        name: rule.program.clone(),
+                        reason: rule.reason.clone(),
+                        verdict: rule.verdict,
+                    });
+                }
             }
         }
 
+        let asks = analysis.parse_errors;
         let mut verdict = Verdict::Allow;
         for e in &effects {
             verdict = verdict.worst(e.verdict);
@@ -176,18 +182,26 @@ impl Engine {
         for r in &rules {
             verdict = verdict.worst(r.verdict);
         }
-        let mut message = self.compose_message(&effects, &rules);
-        if !analysis.parse_errors.is_empty() {
-            verdict = Verdict::Ask;
-            message = parse_error_message();
+        // 構文解析由来の ask は最悪値で合成し、読めている block を上書きしない
+        // （REQ-009・REQ-038・A14）。
+        if !asks.is_empty() {
+            verdict = verdict.worst(Verdict::Ask);
         }
+        let effect_message = self.compose_message(&effects, &rules);
+        let message = if effect_message.is_empty() && !asks.is_empty() {
+            message::ask_message(&asks)
+        } else {
+            effect_message
+        };
+        let reason = compose_reason(&effects, &rules, &asks);
         Report {
             verdict,
             effects,
             rules,
             warnings: self.warnings.clone(),
             message,
-            parse_errors: analysis.parse_errors,
+            reason,
+            parse_errors: asks,
         }
     }
 
@@ -285,17 +299,7 @@ impl Engine {
     }
 
     fn compose_message(&self, effects: &[EffectReport], rules: &[RuleReport]) -> String {
-        let mut worst: Option<&EffectReport> = None;
-        for e in effects {
-            if e.verdict == Verdict::Allow {
-                continue;
-            }
-            worst = Some(match worst {
-                None => e,
-                Some(w) if e.verdict > w.verdict => e,
-                Some(w) => w,
-            });
-        }
+        let worst = worst_effect(effects);
         let bad_rules: Vec<&RuleReport> = rules
             .iter()
             .filter(|r| r.verdict != Verdict::Allow)
@@ -324,6 +328,37 @@ impl Engine {
     }
 }
 
-fn parse_error_message() -> String {
-    "解析できない入力です\n代替: リテラルのパスで指定し直してください".to_string()
+/// 最も重い非 allow の効果。
+fn worst_effect(effects: &[EffectReport]) -> Option<&EffectReport> {
+    let mut worst: Option<&EffectReport> = None;
+    for effect in effects {
+        if effect.verdict == Verdict::Allow {
+            continue;
+        }
+        worst = Some(match worst {
+            None => effect,
+            Some(current) if effect.verdict > current.verdict => effect,
+            Some(current) => current,
+        });
+    }
+    worst
+}
+
+/// JSON の最上位に出す短い理由（REQ-017・A13）。
+fn compose_reason(effects: &[EffectReport], rules: &[RuleReport], asks: &[Ask]) -> String {
+    if let Some(effect) = worst_effect(effects) {
+        if effect.verdict == Verdict::Block {
+            return message::reason_line(effect.class, &effect.why);
+        }
+    }
+    if !asks.is_empty() {
+        return message::ask_reason(asks);
+    }
+    if let Some(effect) = worst_effect(effects) {
+        return message::reason_line(effect.class, &effect.why);
+    }
+    if let Some(rule) = rules.iter().find(|rule| rule.verdict != Verdict::Allow) {
+        return rule.reason.clone();
+    }
+    String::new()
 }

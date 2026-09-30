@@ -1,6 +1,7 @@
 //! 非 allow の文面。「何を・なぜ・代替」を 2〜4 行で組み立てる。
 
-use guardian_core::{Class, Op, ProtectedKind, Target, Why};
+use guardian_core::{Ask, Class, Op, ProtectedKind, Target, Why};
+use guardian_parser::Failure;
 
 /// 対象を人が読める形にする。
 pub fn display_target(target: &Target) -> String {
@@ -97,4 +98,76 @@ pub fn non_allow_message(op: Op, target: &Target, class: Class, why: &Why) -> St
         format!("代替: {}", alternative_phrase(why)),
     ];
     lines.join("\n")
+}
+
+/// 操作とパスが無い ask の種類（REQ-011）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AskKind {
+    /// 構文を読めない。
+    Syntax,
+    /// 入力が大きすぎる。
+    TooLarge,
+    /// 読めないシェル。
+    Shell,
+}
+
+fn ask_kind(ask: &Ask) -> AskKind {
+    match ask {
+        Ask::Parse(Failure::TooLarge | Failure::TooDeep) => AskKind::TooLarge,
+        Ask::Parse(_) => AskKind::Syntax,
+        Ask::UnreadableProgram(_) | Ask::UnreadableShellBody(_) | Ask::UnreadableEval => {
+            AskKind::Syntax
+        }
+        Ask::UnsupportedShell(_) => AskKind::Shell,
+    }
+}
+
+/// 操作とパスが無い ask の理由を 1 行にする。
+pub fn ask_reason(asks: &[Ask]) -> String {
+    match asks.first() {
+        None => String::new(),
+        Some(ask) => match ask_kind(ask) {
+            AskKind::Syntax => "構文を読めないため判定できません".to_string(),
+            AskKind::TooLarge => "入力が大きすぎるため判定できません".to_string(),
+            AskKind::Shell => match ask {
+                Ask::UnsupportedShell(name) => format!("読めないシェルです: {name}"),
+                _ => "読めないシェルです".to_string(),
+            },
+        },
+    }
+}
+
+/// 操作とパスが無い ask の文面。理由に応じて 2〜4 行で組み立てる。
+pub fn ask_message(asks: &[Ask]) -> String {
+    let Some(first) = asks.first() else {
+        return String::new();
+    };
+    let lines = match ask_kind(first) {
+        AskKind::Syntax => vec![
+            "構文を読めないため判定できません".to_string(),
+            "理由: コマンドの構文を読み取れません".to_string(),
+            "代替: 当てはまる代替はありません".to_string(),
+        ],
+        AskKind::TooLarge => vec![
+            "入力が大きすぎるため判定できません".to_string(),
+            "理由: 構文解析の上限（1 MiB または 128 段）を超えました".to_string(),
+            "代替: 当てはまる代替はありません".to_string(),
+        ],
+        AskKind::Shell => {
+            let name = match first {
+                Ask::UnsupportedShell(name) => name.clone(),
+                _ => "知らないシェル".to_string(),
+            };
+            vec![
+                format!("読めないシェルです: {name}"),
+                "理由: 対象外のシェルの中身は読みません".to_string(),
+                "代替: 当てはまる代替はありません".to_string(),
+            ]
+        }
+    };
+    let mut text = lines.join("\n");
+    if asks.len() > 1 {
+        text.push_str(&format!("\nほかに {} 件の指摘があります", asks.len() - 1));
+    }
+    text
 }

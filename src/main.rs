@@ -177,6 +177,7 @@ fn print_json(report: &Report) {
         .collect();
     let json = serde_json::json!({
         "verdict": report.verdict.as_str(),
+        "reason": report.reason,
         "message": report.message,
         "effects": effects,
         "rules": rules,

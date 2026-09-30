@@ -1,7 +1,14 @@
 //! コマンド文字列から破壊的効果を取り出す。パスの解決もここで行う。
+//!
+//! 正規化した構文木だけを見て、すべての語・置換・リダイレクト・複合構文を
+//! 1 回ずつ訪問する（REQ-037）。読めなかった命令からは効果を取り出さない
+//! （REQ-038）。
 
-use crate::parse::{self, Item, Part, Pipeline, Redirect, SimpleCommand, Word};
 use crate::types::{Effect, Op, Target};
+use guardian_parser::{
+    basename, split_assignment, strip_wrapper, Command, Compound, Part, Pipeline, Redirect,
+    RedirectKind, RedirectTarget, Script, SimpleCommand, Substitution, Word,
+};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
@@ -85,270 +92,293 @@ pub fn extract_effects(command: &str, env: &Env) -> Vec<Effect> {
     analyze(command, env).effects
 }
 
-/// 判定の材料。効果と、解析の失敗。
+/// 判定の材料。効果と、判定できない理由。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Analysis {
     pub effects: Vec<Effect>,
-    pub parse_errors: Vec<String>,
+    pub parse_errors: Vec<Ask>,
 }
 
-/// コマンド文字列を解析して効果を取り出す。解析の失敗も返す。
+/// 効果を取り出せない理由。判定は ask に落ちる（REQ-038）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ask {
+    /// 構文解析の失敗。
+    Parse(guardian_parser::Failure),
+    /// プログラムの語がリテラルでない。
+    UnreadableProgram(String),
+    /// bash 系の `-c` の本文がリテラルでない。
+    UnreadableShellBody(String),
+    /// `eval` の本文がリテラルでない。
+    UnreadableEval,
+    /// 知っているが読まないシェルの起動（REQ-035）。
+    UnsupportedShell(String),
+}
+
+/// コマンド文字列を解析して効果を取り出す。判定できない理由も返す。
 pub fn analyze(command: &str, env: &Env) -> Analysis {
-    let (script, mut errors) = parse::parse_script_with_errors(command);
-    collect_subst_errors(&script.items, &mut errors, 0);
-    collect_unreadable_bodies(&script.items, &mut errors, 0);
+    let outcome = guardian_parser::parse(command);
     let mut ctx = Context::new(env);
-    let mut out = Vec::new();
-    extract_items(&script.items, &mut ctx, &mut out, 0);
+    let mut effects = Vec::new();
+    let mut asks: Vec<Ask> = outcome.failures.into_iter().map(Ask::Parse).collect();
+    extract_script(&outcome.script, &mut ctx, &mut effects, &mut asks, 0);
+    dedupe(&mut asks);
     Analysis {
-        effects: out,
-        parse_errors: errors,
+        effects,
+        parse_errors: asks,
     }
 }
 
-/// コマンド置換の内側の解析の失敗を集める。
-fn collect_subst_errors(items: &[Item], errors: &mut Vec<String>, depth: usize) {
-    if depth > 16 {
+fn dedupe(asks: &mut Vec<Ask>) {
+    let mut out: Vec<Ask> = Vec::new();
+    for ask in asks.drain(..) {
+        if !out.contains(&ask) {
+            out.push(ask);
+        }
+    }
+    *asks = out;
+}
+
+fn too_deep(asks: &mut Vec<Ask>) {
+    asks.push(Ask::Parse(guardian_parser::Failure::TooDeep));
+}
+
+fn extract_script(
+    script: &Script,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    if depth > guardian_parser::LIMIT_DEPTH {
+        too_deep(asks);
         return;
     }
-    let visit_word = |w: &Word, errors: &mut Vec<String>| {
-        for part in &w.parts {
-            if let Part::Subst(inner) = part {
-                let (script, mut inner_errors) = parse::parse_script_with_errors(inner);
-                errors.append(&mut inner_errors);
-                collect_subst_errors(&script.items, errors, depth + 1);
-            }
-        }
-    };
-    for item in items {
-        match item {
-            Item::Simple(p) => {
-                for cmd in &p.commands {
-                    for w in &cmd.words {
-                        visit_word(w, errors);
-                    }
-                    for r in &cmd.redirects {
-                        match r {
-                            Redirect::Out(w)
-                            | Redirect::Append(w)
-                            | Redirect::Clobber(w)
-                            | Redirect::In(w)
-                            | Redirect::Heredoc(w) => visit_word(w, errors),
-                        }
-                    }
-                }
-            }
-            Item::For { words, body, .. } => {
-                for w in words {
-                    visit_word(w, errors);
-                }
-                collect_subst_errors(body, errors, depth + 1);
-            }
+    for item in &script.items {
+        extract_pipeline(&item.first, ctx, out, asks, depth);
+        for (_, pipeline) in &item.rest {
+            extract_pipeline(pipeline, ctx, out, asks, depth);
         }
     }
 }
 
-/// 本文を読めないシェル起動と eval を集める。判定できない入力は ask に落とす（REQ-010）。
-fn collect_unreadable_bodies(items: &[Item], errors: &mut Vec<String>, depth: usize) {
-    if depth > 16 {
-        return;
-    }
-    for item in items {
-        match item {
-            Item::Simple(p) => {
-                for cmd in &p.commands {
-                    check_unreadable_command(cmd, errors, depth);
-                    for w in &cmd.words {
-                        visit_word_bodies(w, errors, depth);
-                    }
-                    for r in &cmd.redirects {
-                        let w = match r {
-                            Redirect::Out(w)
-                            | Redirect::Append(w)
-                            | Redirect::Clobber(w)
-                            | Redirect::In(w)
-                            | Redirect::Heredoc(w) => w,
-                        };
-                        visit_word_bodies(w, errors, depth);
-                    }
-                }
-            }
-            Item::For { words, body, .. } => {
-                for w in words {
-                    visit_word_bodies(w, errors, depth);
-                }
-                collect_unreadable_bodies(body, errors, depth + 1);
-            }
-        }
-    }
-}
-
-fn visit_word_bodies(w: &Word, errors: &mut Vec<String>, depth: usize) {
-    for part in &w.parts {
-        if let Part::Subst(inner) = part {
-            let script = parse::parse_script(inner);
-            collect_unreadable_bodies(&script.items, errors, depth + 1);
-        }
-    }
-}
-
-/// 1 つのコマンドの本文が読めるかを確かめる。読めないときは理由を足す。
-fn check_unreadable_command(cmd: &SimpleCommand, errors: &mut Vec<String>, depth: usize) {
-    let mut idx = 0;
-    while idx < cmd.words.len() && split_assignment(&cmd.words[idx]).is_some() {
-        idx += 1;
-    }
-    let mut words: &[Word] = &cmd.words[idx..];
-    while let Some(first) = words.first() {
-        let name = basename(&first.text);
-        if name == "sudo" || name == "doas" {
-            words = strip_wrapper(words, name);
-            continue;
-        }
-        break;
-    }
-    let Some(first) = words.first() else {
-        return;
-    };
-    // プログラムの語がリテラルでないと、何が実行されるかを読めない（REQ-010）。
-    if first.literal_value().is_none() {
-        errors.push(format!(
-            "コマンドを読めないため判定できません: {}",
-            first.text
-        ));
-        return;
-    }
-    let name = basename(&first.text);
-    let args = &words[1..];
-    match name {
-        "bash" | "sh" | "zsh" | "dash" | "ksh" => {
-            let Some(i) = shell_c_index(args) else {
-                return;
-            };
-            match args.get(i + 1).and_then(Word::literal_value) {
-                Some(inner) => {
-                    let script = parse::parse_script(&inner);
-                    collect_unreadable_bodies(&script.items, errors, depth + 1);
-                }
-                None => errors.push(format!(
-                    "シェルの本文を読めないため判定できません: {}",
-                    first.text
-                )),
-            }
-        }
-        "eval" => {
-            let mut pieces = Vec::new();
-            for w in args {
-                match w.literal_value() {
-                    Some(s) => pieces.push(s),
-                    None => {
-                        errors.push("eval の本文を読めないため判定できません".to_string());
-                        return;
-                    }
-                }
-            }
-            if !pieces.is_empty() {
-                let script = parse::parse_script(&pieces.join(" "));
-                collect_unreadable_bodies(&script.items, errors, depth + 1);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn extract_items(items: &[Item], ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
-    if depth > 16 {
-        return;
-    }
-    for item in items {
-        match item {
-            Item::Simple(p) => extract_pipeline(p, ctx, out, depth),
-            Item::For { var, words, body } => {
-                let mut values = Vec::new();
-                let mut all_literal = !words.is_empty();
-                for w in words {
-                    match resolve_word(w, ctx, out, depth) {
-                        Resolved::Path(p) | Resolved::Glob(p) => values.push(Value::Path(p)),
-                        Resolved::Mktemp => values.push(Value::Mktemp),
-                        _ => all_literal = false,
-                    }
-                }
-                if all_literal {
-                    for v in values {
-                        let mut child = ctx.clone();
-                        child.vars.insert(var.clone(), v);
-                        extract_items(body, &mut child, out, depth + 1);
-                    }
-                } else {
-                    let mut child = ctx.clone();
-                    child.vars.insert(var.clone(), Value::UnknownSource);
-                    extract_items(body, &mut child, out, depth + 1);
-                }
-            }
-        }
-    }
-}
-
-fn extract_pipeline(p: &Pipeline, ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
+fn extract_pipeline(
+    pipeline: &Pipeline,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
     let mut children_sources: Vec<(PathBuf, bool)> = Vec::new();
-    for cmd in &p.commands {
-        children_sources = extract_command(cmd, ctx, out, depth, children_sources);
+    for command in &pipeline.commands {
+        children_sources = extract_command(command, ctx, out, asks, depth, children_sources);
+    }
+}
+
+/// 1 つのコマンドを読み、効果を足す。次段の供給元（find の起点と
+/// 末尾スラッシュの有無）を返す。
+fn extract_command(
+    command: &Command,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+    children_sources: Vec<(PathBuf, bool)>,
+) -> Vec<(PathBuf, bool)> {
+    match command {
+        Command::Simple(simple) => extract_simple(simple, ctx, out, asks, depth, children_sources),
+        Command::Compound {
+            compound,
+            redirects,
+        } => {
+            extract_redirects(redirects, ctx, out, asks, depth);
+            extract_compound(compound, ctx, out, asks, depth);
+            Vec::new()
+        }
+        Command::Function(function) => {
+            extract_redirects(&function.redirects, ctx, out, asks, depth);
+            scan_word_substitutions(&function.name, ctx, out, asks, depth);
+            extract_compound(&function.body, ctx, out, asks, depth);
+            Vec::new()
+        }
+        Command::Test(test) => {
+            extract_redirects(&test.redirects, ctx, out, asks, depth);
+            for word in &test.words {
+                scan_word_substitutions(word, ctx, out, asks, depth);
+            }
+            Vec::new()
+        }
+    }
+}
+
+fn extract_compound(
+    compound: &Compound,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    if depth > guardian_parser::LIMIT_DEPTH {
+        too_deep(asks);
+        return;
+    }
+    match compound {
+        Compound::If {
+            condition,
+            then,
+            elses,
+        } => {
+            extract_script(condition, ctx, out, asks, depth);
+            extract_script(then, ctx, out, asks, depth);
+            for clause in elses {
+                if let Some(condition) = &clause.condition {
+                    extract_script(condition, ctx, out, asks, depth);
+                }
+                extract_script(&clause.body, ctx, out, asks, depth);
+            }
+        }
+        Compound::While {
+            condition, body, ..
+        } => {
+            extract_script(condition, ctx, out, asks, depth);
+            extract_script(body, ctx, out, asks, depth);
+        }
+        Compound::For { var, values, body } => {
+            extract_for(var, values, body, ctx, out, asks, depth);
+        }
+        Compound::ArithmeticFor { body, .. } => {
+            extract_script(body, ctx, out, asks, depth);
+        }
+        Compound::Case { value, arms } => {
+            scan_word_substitutions(value, ctx, out, asks, depth);
+            for arm in arms {
+                for pattern in &arm.patterns {
+                    scan_word_substitutions(pattern, ctx, out, asks, depth);
+                }
+                if let Some(body) = &arm.body {
+                    extract_script(body, ctx, out, asks, depth);
+                }
+            }
+        }
+        Compound::BraceGroup(script) | Compound::Subshell(script) => {
+            extract_script(script, ctx, out, asks, depth);
+        }
+        Compound::Arithmetic(_) => {}
+        Compound::Coprocess { name, body } => {
+            if let Some(name) = name {
+                scan_word_substitutions(name, ctx, out, asks, depth);
+            }
+            extract_command(body, ctx, out, asks, depth, Vec::new());
+        }
+    }
+}
+
+fn extract_for(
+    var: &str,
+    values: &[Word],
+    body: &Script,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    let mut resolved = Vec::new();
+    let mut all_literal = !values.is_empty();
+    for word in values {
+        match resolve_word(word, ctx, out, asks, depth) {
+            Resolved::Path(path) | Resolved::Glob(path) => resolved.push(Value::Path(path)),
+            Resolved::Mktemp => resolved.push(Value::Mktemp),
+            _ => all_literal = false,
+        }
+    }
+    if all_literal {
+        for value in resolved {
+            let mut child = ctx.clone();
+            child.vars.insert(var.to_string(), value);
+            extract_script(body, &mut child, out, asks, depth + 1);
+        }
+    } else {
+        let mut child = ctx.clone();
+        child.vars.insert(var.to_string(), Value::UnknownSource);
+        extract_script(body, &mut child, out, asks, depth + 1);
     }
 }
 
 /// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の起点と
 /// 末尾スラッシュの有無）を返す。
-fn extract_command(
-    cmd: &SimpleCommand,
+fn extract_simple(
+    simple: &SimpleCommand,
     ctx: &mut Context,
     out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
     depth: usize,
     children_sources: Vec<(PathBuf, bool)>,
 ) -> Vec<(PathBuf, bool)> {
-    let mut idx = 0;
+    let mut index = 0;
     let mut assignments = Vec::new();
-    while idx < cmd.words.len() {
-        match split_assignment(&cmd.words[idx]) {
+    while index < simple.words.len() {
+        match split_assignment(&simple.words[index]) {
             Some(pair) => {
                 assignments.push(pair);
-                idx += 1;
+                index += 1;
             }
             None => break,
         }
     }
-    if idx == cmd.words.len() {
+    if index == simple.words.len() {
         for (name, value) in assignments {
-            let v = resolve_value(&value, ctx, out, depth);
-            ctx.vars.insert(name, v);
+            let value = resolve_value(&value, ctx, out, asks, depth);
+            ctx.vars.insert(name, value);
         }
-        extract_redirects(cmd, ctx, out, depth);
+        extract_redirects(&simple.redirects, ctx, out, asks, depth);
+        extract_process_substitutions(simple, ctx, out, asks, depth);
         return Vec::new();
     }
 
-    let mut words: &[Word] = &cmd.words[idx..];
-    extract_redirects(cmd, ctx, out, depth);
+    extract_redirects(&simple.redirects, ctx, out, asks, depth);
+    extract_process_substitutions(simple, ctx, out, asks, depth);
 
-    // ラッパー（sudo / doas）と env の代入を外す。
-    while let Some(first) = words.first() {
-        let name = basename(&first.text);
-        if name == "sudo" || name == "doas" {
-            words = strip_wrapper(words, name);
-            continue;
-        }
-        break;
+    let rest = &simple.words[index..];
+    // ラッパー（sudo / doas）を外す。外した語（値付きオプションの値など）の
+    // 置換も読む（EX-047）。
+    let stripped = strip_wrapper(rest);
+    for word in &rest[..rest.len().saturating_sub(stripped.len())] {
+        scan_word_substitutions(word, ctx, out, asks, depth);
     }
-    let Some(first) = words.first() else {
+    let Some(program) = stripped.first() else {
         return Vec::new();
     };
-    let name = basename(&first.text);
-    let args = &words[1..];
+    if program.literal_value().is_none() {
+        asks.push(Ask::UnreadableProgram(program.text.clone()));
+        for word in stripped {
+            scan_word_substitutions(word, ctx, out, asks, depth);
+        }
+        return Vec::new();
+    }
+    let name = basename(&program.text);
+    let args = &stripped[1..];
+
+    // シェルの起動（REQ-035）。
+    match guardian_parser::shell_kind(name) {
+        guardian_parser::ShellKind::NonPosix => {
+            asks.push(Ask::UnsupportedShell(name.to_string()));
+            for word in stripped {
+                scan_word_substitutions(word, ctx, out, asks, depth);
+            }
+            return Vec::new();
+        }
+        guardian_parser::ShellKind::BashLike => {
+            extract_shell(args, ctx, out, asks, depth);
+            return Vec::new();
+        }
+        guardian_parser::ShellKind::Other => {}
+    }
 
     match name {
         "rm" | "rmdir" | "unlink" => {
             let (targets, skipped) = option_targets(args, &[]);
-            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            scan_skipped_substitutions(&skipped, ctx, out, asks, depth);
             for target in targets {
-                let res = resolve_word(target, ctx, out, depth);
+                let res = resolve_word(target, ctx, out, asks, depth);
                 out.push(Effect {
                     op: Op::Delete,
                     target: res.into_target(target),
@@ -358,9 +388,9 @@ fn extract_command(
         }
         "shred" => {
             let (targets, skipped) = option_targets(args, SHRED_VALUED);
-            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            scan_skipped_substitutions(&skipped, ctx, out, asks, depth);
             for target in targets {
-                let res = resolve_word(target, ctx, out, depth);
+                let res = resolve_word(target, ctx, out, asks, depth);
                 out.push(Effect {
                     op: Op::Delete,
                     target: res.into_target(target),
@@ -370,9 +400,9 @@ fn extract_command(
         }
         "truncate" => {
             let (targets, skipped) = option_targets(args, TRUNCATE_VALUED);
-            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            scan_skipped_substitutions(&skipped, ctx, out, asks, depth);
             for target in targets {
-                let res = resolve_word(target, ctx, out, depth);
+                let res = resolve_word(target, ctx, out, asks, depth);
                 out.push(Effect {
                     op: Op::Truncate,
                     target: res.into_target(target),
@@ -381,18 +411,18 @@ fn extract_command(
             Vec::new()
         }
         "dd" => {
-            for w in args {
-                let Some(value_word) = strip_prefix_word(w, "of=") else {
+            for word in args {
+                let Some(value_word) = strip_prefix_word(word, "of=") else {
                     // of= 以外の語（if= など）の中のコマンド置換も読む。
-                    scan_word_substitutions(w, ctx, out, depth);
+                    scan_word_substitutions(word, ctx, out, asks, depth);
                     continue;
                 };
                 if value_word.text.is_empty() || value_word.text == "-" {
                     continue;
                 }
-                let res = resolve_word(&value_word, ctx, out, depth);
+                let res = resolve_word(&value_word, ctx, out, asks, depth);
                 let op = match &res {
-                    Resolved::Path(p) if p.starts_with("/dev") => Op::Format,
+                    Resolved::Path(path) if path.starts_with("/dev") => Op::Format,
                     _ => Op::Truncate,
                 };
                 out.push(Effect {
@@ -409,9 +439,9 @@ fn extract_command(
                 &["-o", "-O", "-t", "--offset", "--types", "--output"]
             };
             let (targets, skipped) = option_targets(args, valued);
-            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            scan_skipped_substitutions(&skipped, ctx, out, asks, depth);
             for target in targets {
-                let res = resolve_word(target, ctx, out, depth);
+                let res = resolve_word(target, ctx, out, asks, depth);
                 out.push(Effect {
                     op: Op::Format,
                     target: res.into_target(target),
@@ -421,9 +451,9 @@ fn extract_command(
         }
         _ if name.starts_with("mkfs") => {
             let (targets, skipped) = option_targets(args, &["-t", "--type", "-L", "--label"]);
-            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            scan_skipped_substitutions(&skipped, ctx, out, asks, depth);
             for target in targets {
-                let res = resolve_word(target, ctx, out, depth);
+                let res = resolve_word(target, ctx, out, asks, depth);
                 out.push(Effect {
                     op: Op::Format,
                     target: res.into_target(target),
@@ -431,87 +461,166 @@ fn extract_command(
             }
             Vec::new()
         }
-        "find" => find_effects(args, ctx, out, depth),
+        "find" => find_effects(args, ctx, out, asks, depth),
         "xargs" => {
             xargs_effects(args, &children_sources, out);
-            scan_substitutions(args, ctx, out, depth);
-            Vec::new()
-        }
-        "bash" | "sh" | "zsh" | "dash" | "ksh" => {
-            if let Some(inner) = shell_c_string(args) {
-                let script = parse::parse_script(&inner);
-                let mut child = ctx.clone();
-                extract_items(&script.items, &mut child, out, depth + 1);
-            } else {
-                scan_substitutions(args, ctx, out, depth);
-            }
+            scan_substitutions(args, ctx, out, asks, depth);
             Vec::new()
         }
         "eval" => {
             let mut pieces = Vec::new();
-            for w in args {
-                let Some(value) = w.literal_value() else {
-                    return Vec::new();
-                };
-                pieces.push(value);
+            let mut all_literal = true;
+            for word in args {
+                match word.literal_value() {
+                    Some(value) => pieces.push(value),
+                    None => {
+                        all_literal = false;
+                        break;
+                    }
+                }
             }
-            if !pieces.is_empty() {
-                let script = parse::parse_script(&pieces.join(" "));
-                let mut child = ctx.clone();
-                extract_items(&script.items, &mut child, out, depth + 1);
+            if all_literal {
+                if !pieces.is_empty() {
+                    let inner = pieces.join(" ");
+                    extract_inner(&inner, ctx, out, asks, depth);
+                }
+            } else {
+                asks.push(Ask::UnreadableEval);
+                scan_substitutions(args, ctx, out, asks, depth);
             }
             Vec::new()
         }
         "cd" => {
-            update_cwd(args, ctx, out, depth);
+            update_cwd(args, ctx, out, asks, depth);
             Vec::new()
         }
         "export" | "local" | "declare" | "readonly" | "typeset" => {
-            for w in args {
-                if let Some((n, v)) = split_assignment(w) {
-                    let value = resolve_value(&v, ctx, out, depth);
-                    ctx.vars.insert(n, value);
+            for word in args {
+                match split_assignment(word) {
+                    Some((name, value)) => {
+                        let value = resolve_value(&value, ctx, out, asks, depth);
+                        ctx.vars.insert(name, value);
+                    }
+                    None => scan_word_substitutions(word, ctx, out, asks, depth),
                 }
             }
             Vec::new()
         }
         _ => {
-            scan_substitutions(args, ctx, out, depth);
+            scan_substitutions(args, ctx, out, asks, depth);
             Vec::new()
         }
     }
 }
 
+/// bash 系のシェル起動を読む（REQ-035）。`-c` の本体だけを読み直す。
+fn extract_shell(
+    args: &[Word],
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    match guardian_parser::shell_c_index(args) {
+        Some(index) => match args.get(index + 1) {
+            Some(body) => match body.literal_value() {
+                Some(inner) => {
+                    for (position, word) in args.iter().enumerate() {
+                        if position != index + 1 {
+                            scan_word_substitutions(word, ctx, out, asks, depth);
+                        }
+                    }
+                    extract_inner(&inner, ctx, out, asks, depth);
+                }
+                None => {
+                    asks.push(Ask::UnreadableShellBody(body.text.clone()));
+                    scan_substitutions(args, ctx, out, asks, depth);
+                }
+            },
+            None => scan_substitutions(args, ctx, out, asks, depth),
+        },
+        None => scan_substitutions(args, ctx, out, asks, depth),
+    }
+}
+
+/// 内側のコマンド文字列を読み直して効果を足す。
+fn extract_inner(
+    inner: &str,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    let outcome = guardian_parser::parse(inner);
+    for failure in outcome.failures {
+        asks.push(Ask::Parse(failure));
+    }
+    let mut child = ctx.clone();
+    extract_script(&outcome.script, &mut child, out, asks, depth + 1);
+}
+
 /// コマンド置換の内側だけを読む。既知のコマンドとして扱わない語に使う。
-fn scan_substitutions(args: &[Word], ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
-    for w in args {
-        scan_word_substitutions(w, ctx, out, depth);
+fn scan_substitutions(
+    args: &[Word],
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for word in args {
+        scan_word_substitutions(word, ctx, out, asks, depth);
     }
 }
 
 /// 対象から外した語（値付きオプションの値など）のコマンド置換だけを読む。
-/// 語そのものは対象にしない。
-fn scan_skipped_substitutions(words: &[&Word], ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
-    for w in words {
-        scan_word_substitutions(w, ctx, out, depth);
+fn scan_skipped_substitutions(
+    words: &[&Word],
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for word in words {
+        scan_word_substitutions(word, ctx, out, asks, depth);
     }
 }
 
 /// 1 つの語のコマンド置換の内側だけを読む。
-fn scan_word_substitutions(w: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
-    for part in &w.parts {
-        if let Part::Subst(inner) = part {
-            let script = parse::parse_script(inner);
-            let mut child = ctx.clone();
-            extract_items(&script.items, &mut child, out, depth + 1);
+fn scan_word_substitutions(
+    word: &Word,
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for part in &word.parts {
+        if let Part::Substitution(substitution) = part {
+            if let Some(script) = &substitution.body {
+                let mut child = ctx.clone();
+                extract_script(script, &mut child, out, asks, depth + 1);
+            }
         }
     }
 }
 
+/// プロセス置換の本体を読む。
+fn extract_process_substitutions(
+    simple: &SimpleCommand,
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for substitution in &simple.process_substitutions {
+        let mut child = ctx.clone();
+        extract_script(&substitution.body, &mut child, out, asks, depth + 1);
+    }
+}
+
 /// `of=...` のような前置きを外した語を作る。
-fn strip_prefix_word(w: &Word, prefix: &str) -> Option<Word> {
-    let first = match w.parts.first() {
-        Some(Part::Literal(s)) => s.as_str(),
+fn strip_prefix_word(word: &Word, prefix: &str) -> Option<Word> {
+    let first = match word.parts.first() {
+        Some(Part::Literal(text)) => text.as_str(),
         _ => return None,
     };
     let rest = first.strip_prefix(prefix)?;
@@ -519,22 +628,8 @@ fn strip_prefix_word(w: &Word, prefix: &str) -> Option<Word> {
     if !rest.is_empty() {
         parts.push(Part::Literal(rest.to_string()));
     }
-    parts.extend(w.parts[1..].iter().cloned());
-    let text: String = parts
-        .iter()
-        .map(|p| match p {
-            Part::Literal(s) => s.clone(),
-            Part::Var(n) => format!("${n}"),
-            Part::Subst(s) => format!("$({s})"),
-            Part::Opaque(s) => s.clone(),
-            Part::Glob(g) => g.clone(),
-        })
-        .collect();
-    Some(Word {
-        parts,
-        text,
-        has_glob: w.has_glob,
-    })
+    parts.extend(word.parts[1..].iter().cloned());
+    Some(Word::from_parts(parts))
 }
 
 const TRUNCATE_VALUED: &[&str] = &["-s", "--size", "-r", "--reference"];
@@ -549,29 +644,29 @@ fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> (Vec<&'a Word>, Vec<
     let mut skipped = Vec::new();
     let mut after_ddash = false;
     let mut skip_next = false;
-    for w in args {
+    for word in args {
         if skip_next {
             skip_next = false;
-            skipped.push(w);
+            skipped.push(word);
             continue;
         }
         if after_ddash {
-            targets.push(w);
+            targets.push(word);
             continue;
         }
-        if w.text == "--" {
+        if word.text == "--" {
             after_ddash = true;
             continue;
         }
-        if w.text.starts_with('-') && w.text != "-" {
-            let head = w.text.split('=').next().unwrap_or(&w.text);
-            if valued.contains(&head) && !w.text.contains('=') {
+        if word.text.starts_with('-') && word.text != "-" {
+            let head = word.text.split('=').next().unwrap_or(&word.text);
+            if valued.contains(&head) && !word.text.contains('=') {
                 skip_next = true;
             }
-            skipped.push(w);
+            skipped.push(word);
             continue;
         }
-        targets.push(w);
+        targets.push(word);
     }
     (targets, skipped)
 }
@@ -595,38 +690,38 @@ fn is_expression_word(text: &str) -> bool {
 fn find_starts(args: &[Word]) -> FindStarts<'_> {
     let mut starts = Vec::new();
     let mut after_ddash = false;
-    let mut i = 0;
-    while i < args.len() {
-        let t = &args[i].text;
+    let mut index = 0;
+    while index < args.len() {
+        let text = &args[index].text;
         if !after_ddash {
-            if t == "-L" || t == "-H" || t == "-P" {
-                i += 1;
+            if text == "-L" || text == "-H" || text == "-P" {
+                index += 1;
                 continue;
             }
-            if t == "-D" {
-                if args.get(i + 1).is_some_and(|w| w.text == "help") {
+            if text == "-D" {
+                if args.get(index + 1).is_some_and(|w| w.text == "help") {
                     return FindStarts::DebugHelp;
                 }
-                i += 2;
+                index += 2;
                 continue;
             }
             // -O の水準は -O3 のように続けて書く。次の語は消費しない。
-            if t.starts_with("-O") {
-                i += 1;
+            if text.starts_with("-O") {
+                index += 1;
                 continue;
             }
-            if t == "--" {
+            if text == "--" {
                 after_ddash = true;
-                i += 1;
+                index += 1;
                 continue;
             }
         }
-        if is_expression_word(t) {
+        if is_expression_word(text) {
             // 述語が先に来るときは起点なし（cwd）。
             break;
         }
-        starts.push(&args[i]);
-        i += 1;
+        starts.push(&args[index]);
+        index += 1;
     }
     FindStarts::Words(starts)
 }
@@ -635,51 +730,49 @@ fn find_effects(
     args: &[Word],
     ctx: &mut Context,
     out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
     depth: usize,
 ) -> Vec<(PathBuf, bool)> {
     let starts = find_starts(args);
     let start_words: &[&Word] = match &starts {
-        FindStarts::Words(w) => w,
+        FindStarts::Words(words) => words,
         FindStarts::DebugHelp => &[],
     };
     // 起点でない語（-name の値など）の中のコマンド置換も読む。絞り込みの値は
     // 対象にはしない。
-    for w in args {
-        if !start_words.iter().any(|s| std::ptr::eq(*s, w)) {
-            scan_word_substitutions(w, ctx, out, depth);
+    for word in args {
+        if !start_words.iter().any(|start| std::ptr::eq(*start, word)) {
+            scan_word_substitutions(word, ctx, out, asks, depth);
         }
     }
     let starts = match starts {
-        FindStarts::Words(w) => w,
+        FindStarts::Words(words) => words,
         // 探索しないので、削除の効果も次段への供給元もない。
         FindStarts::DebugHelp => return Vec::new(),
     };
     let mut has_delete = false;
-    let mut i = 0;
-    while i < args.len() {
-        let text = &args[i].text;
-        if text == "-delete" {
+    for (index, word) in args.iter().enumerate() {
+        if word.text == "-delete" {
             has_delete = true;
-        } else if text == "-exec" || text == "-execdir" {
-            if let Some(next) = args.get(i + 1) {
+        } else if word.text == "-exec" || word.text == "-execdir" {
+            if let Some(next) = args.get(index + 1) {
                 if basename(&next.text) == "rm" {
                     has_delete = true;
                 }
             }
         }
-        i += 1;
     }
     let mut sources = Vec::new();
     if starts.is_empty() {
-        let base_res = resolve_text(".", false, ctx);
-        if let Some(source) = find_source(base_res, false, has_delete, out) {
+        let base = resolve_text(".", false, ctx);
+        if let Some(source) = find_source(base, false, has_delete, out) {
             sources.push(source);
         }
     } else {
-        for w in starts {
-            let dereference = w.text.ends_with('/');
-            let base_res = resolve_word(w, ctx, out, depth);
-            if let Some(source) = find_source(base_res, dereference, has_delete, out) {
+        for word in starts {
+            let dereference = word.text.ends_with('/');
+            let base = resolve_word(word, ctx, out, asks, depth);
+            if let Some(source) = find_source(base, dereference, has_delete, out) {
                 sources.push(source);
             }
         }
@@ -696,13 +789,13 @@ fn find_source(
 ) -> Option<(PathBuf, bool)> {
     if has_delete {
         let target = match &res {
-            Resolved::Path(p) | Resolved::Glob(p) => Target::Children {
-                base: p.clone(),
+            Resolved::Path(path) | Resolved::Glob(path) => Target::Children {
+                base: path.clone(),
                 dereference,
             },
             Resolved::Mktemp => Target::Mktemp,
             Resolved::UnknownSource => Target::UnknownSource,
-            Resolved::Unresolved(t) => Target::Unresolved(t.clone()),
+            Resolved::Unresolved(text) => Target::Unresolved(text.clone()),
         };
         out.push(Effect {
             op: Op::Delete,
@@ -710,7 +803,7 @@ fn find_source(
         });
     }
     match res {
-        Resolved::Path(p) | Resolved::Glob(p) => Some((p, dereference)),
+        Resolved::Path(path) | Resolved::Glob(path) => Some((path, dereference)),
         _ => None,
     }
 }
@@ -737,28 +830,28 @@ const XARGS_VALUED: &[&str] = &[
 ];
 
 fn xargs_effects(args: &[Word], children_sources: &[(PathBuf, bool)], out: &mut Vec<Effect>) {
-    let mut i = 0;
+    let mut index = 0;
     let mut utility: Option<&Word> = None;
-    while i < args.len() {
-        let text = &args[i].text;
+    while index < args.len() {
+        let text = &args[index].text;
         if text == "--" {
-            utility = args.get(i + 1);
+            utility = args.get(index + 1);
             break;
         }
         if text.starts_with('-') && text != "-" {
             let head = text.split('=').next().unwrap_or(text);
             if XARGS_VALUED.contains(&head) && !text.contains('=') {
-                i += 2;
+                index += 2;
             } else {
-                i += 1;
+                index += 1;
             }
             continue;
         }
-        utility = Some(&args[i]);
+        utility = Some(&args[index]);
         break;
     }
-    let Some(u) = utility else { return };
-    if basename(&u.text) != "rm" {
+    let Some(utility) = utility else { return };
+    if basename(&utility.text) != "rm" {
         return;
     }
     // 引数中の対象は供給元から来る。供給元の子の集合ごとに効果を出す。
@@ -780,109 +873,124 @@ fn xargs_effects(args: &[Word], children_sources: &[(PathBuf, bool)], out: &mut 
     }
 }
 
-/// `-c` の位置を探す。見つからなければ None。
-fn shell_c_index(args: &[Word]) -> Option<usize> {
-    let mut i = 0;
-    while i < args.len() {
-        let t = &args[i].text;
-        let is_c =
-            t == "-c" || (t.starts_with('-') && !t.starts_with("--") && t[1..].contains('c'));
-        if is_c {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
-}
-
-fn shell_c_string(args: &[Word]) -> Option<String> {
-    let i = shell_c_index(args)?;
-    args.get(i + 1)?.literal_value()
-}
-
-fn update_cwd(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
-    let arg = args
+fn update_cwd(
+    args: &[Word],
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    let chosen = args
         .iter()
-        .find(|w| !w.text.starts_with('-') || w.text == "-");
-    match arg {
+        .position(|word| !word.text.starts_with('-') || word.text == "-");
+    match chosen {
         None => {
             // `cd` はホームへ。
-            if let Some(home) = &ctx.home {
-                ctx.cwd = Some(home.clone());
-            } else {
-                ctx.cwd = None;
+            ctx.cwd = ctx.home.clone();
+        }
+        Some(index) => {
+            // 値付きオプション（`-P` など）は読み飛ばさない。最初の非オプションの語。
+            let word = &args[index];
+            match resolve_word(word, ctx, out, asks, depth) {
+                Resolved::Path(path) => ctx.cwd = Some(path),
+                _ => ctx.cwd = None,
             }
         }
-        Some(w) => match resolve_word(w, ctx, out, depth) {
-            Resolved::Path(p) => ctx.cwd = Some(p),
-            _ => ctx.cwd = None,
-        },
+    }
+    for (index, word) in args.iter().enumerate() {
+        if Some(index) != chosen {
+            scan_word_substitutions(word, ctx, out, asks, depth);
+        }
     }
 }
 
-fn extract_redirects(cmd: &SimpleCommand, ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
-    for r in &cmd.redirects {
-        match r {
-            Redirect::Out(w) | Redirect::Clobber(w) => {
-                let res = resolve_word(w, ctx, out, depth);
-                out.push(Effect {
-                    op: Op::Truncate,
-                    target: res.into_target(w),
-                });
+fn extract_redirects(
+    redirects: &[Redirect],
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for redirect in redirects {
+        match &redirect.target {
+            RedirectTarget::Word(word) => match redirect.kind {
+                RedirectKind::Write
+                | RedirectKind::Clobber
+                | RedirectKind::OutputAndError(false) => {
+                    let res = resolve_word(word, ctx, out, asks, depth);
+                    out.push(Effect {
+                        op: Op::Truncate,
+                        target: res.into_target(word),
+                    });
+                }
+                _ => scan_word_substitutions(word, ctx, out, asks, depth),
+            },
+            RedirectTarget::Fd(_) => {}
+            RedirectTarget::ProcessSubstitution(substitution) => {
+                let mut child = ctx.clone();
+                extract_script(&substitution.body, &mut child, out, asks, depth + 1);
             }
-            Redirect::Append(_) | Redirect::In(_) | Redirect::Heredoc(_) => {}
+            RedirectTarget::HereDocument { doc, .. } => {
+                scan_word_substitutions(doc, ctx, out, asks, depth);
+            }
         }
     }
 }
 
 /// 語を解決する。コマンド置換の内側の効果もここで取り出す。
-fn resolve_word(word: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize) -> Resolved {
+fn resolve_word(
+    word: &Word,
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) -> Resolved {
     if word.parts.len() == 1 {
         match &word.parts[0] {
-            Part::Subst(inner) => {
-                return resolve_subst(inner, word, ctx, out, depth);
+            Part::Substitution(substitution) => {
+                return resolve_substitution(substitution, word, ctx, out, asks, depth);
             }
             Part::Var(name) => {
-                if let Some(v) = lookup_var(name, ctx) {
-                    return match v {
-                        Value::Path(p) => Resolved::Path(p),
+                if let Some(value) = lookup_var(name, ctx) {
+                    return match value {
+                        Value::Path(path) => Resolved::Path(path),
                         Value::Mktemp => Resolved::Mktemp,
                         Value::UnknownSource => Resolved::UnknownSource,
-                        Value::Unresolved(t) => Resolved::Unresolved(t),
+                        Value::Unresolved(text) => Resolved::Unresolved(text),
                     };
                 }
                 return Resolved::Unresolved(word.text.clone());
             }
             Part::Opaque(_) => return Resolved::Unresolved(word.text.clone()),
             Part::Glob(_) => {}
-            Part::Literal(s) => return resolve_text(s, false, ctx),
+            Part::Literal(text) | Part::Quoted(text) => return resolve_text(text, false, ctx),
         }
     }
 
     let mut text = String::new();
     let mut has_glob = word.has_glob;
     let mut mktemp_prefix = false;
-    for (i, part) in word.parts.iter().enumerate() {
+    for (index, part) in word.parts.iter().enumerate() {
         match part {
-            Part::Literal(s) => text.push_str(s),
+            Part::Literal(value) | Part::Quoted(value) => text.push_str(value),
             Part::Var(name) => match lookup_var(name, ctx) {
-                Some(Value::Path(p)) => text.push_str(&p.to_string_lossy()),
+                Some(Value::Path(path)) => text.push_str(&path.to_string_lossy()),
                 // 先頭が mktemp の作ったパスなら、続く部分はその配下。
-                Some(Value::Mktemp) if i == 0 => mktemp_prefix = true,
+                Some(Value::Mktemp) if index == 0 => mktemp_prefix = true,
                 _ => return Resolved::Unresolved(word.text.clone()),
             },
-            Part::Subst(inner) => {
-                let res = resolve_subst(inner, word, ctx, out, depth);
-                if matches!(res, Resolved::Mktemp) && i == 0 {
+            Part::Substitution(substitution) => {
+                let res = resolve_substitution(substitution, word, ctx, out, asks, depth);
+                if matches!(res, Resolved::Mktemp) && index == 0 {
                     mktemp_prefix = true;
                 } else {
                     return Resolved::Unresolved(word.text.clone());
                 }
             }
             Part::Opaque(_) => return Resolved::Unresolved(word.text.clone()),
-            Part::Glob(g) => {
+            Part::Glob(glob) => {
                 has_glob = true;
-                text.push_str(g);
+                text.push_str(glob);
             }
         }
     }
@@ -899,39 +1007,48 @@ fn resolve_word(word: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize)
     resolve_text(&text, has_glob, ctx)
 }
 
-fn resolve_subst(
-    inner: &str,
+fn resolve_substitution(
+    substitution: &Substitution,
     word: &Word,
     ctx: &Context,
     out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
     depth: usize,
 ) -> Resolved {
-    let script = parse::parse_script(inner);
+    let Some(script) = &substitution.body else {
+        return Resolved::Unresolved(word.text.clone());
+    };
     let mut child = ctx.clone();
-    extract_items(&script.items, &mut child, out, depth + 1);
-    if is_mktemp_script(&script.items) {
+    extract_script(script, &mut child, out, asks, depth + 1);
+    if is_mktemp_script(script) {
         Resolved::Mktemp
     } else {
         Resolved::Unresolved(word.text.clone())
     }
 }
 
-fn is_mktemp_script(items: &[Item]) -> bool {
-    let [Item::Simple(pipeline)] = items else {
+fn is_mktemp_script(script: &Script) -> bool {
+    let [item] = script.items.as_slice() else {
         return false;
     };
-    let [cmd] = pipeline.commands.as_slice() else {
+    if !item.rest.is_empty() {
+        return false;
+    }
+    let [command] = item.first.commands.as_slice() else {
         return false;
     };
-    let Some(first) = cmd.words.first() else {
+    let Command::Simple(simple) = command else {
+        return false;
+    };
+    let Some(first) = simple.words.first() else {
         return false;
     };
     basename(&first.text) == "mktemp"
 }
 
 fn lookup_var(name: &str, ctx: &Context) -> Option<Value> {
-    if let Some(v) = ctx.vars.get(name) {
-        return Some(v.clone());
+    if let Some(value) = ctx.vars.get(name) {
+        return Some(value.clone());
     }
     match name {
         "PWD" => ctx.cwd.clone().map(Value::Path),
@@ -945,12 +1062,12 @@ fn lookup_var(name: &str, ctx: &Context) -> Option<Value> {
 fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
     let expanded = if text == "~" {
         match &ctx.home {
-            Some(h) => h.to_string_lossy().to_string(),
+            Some(home) => home.to_string_lossy().to_string(),
             None => return Resolved::Unresolved(text.to_string()),
         }
     } else if let Some(rest) = text.strip_prefix("~/") {
         match &ctx.home {
-            Some(h) => h.join(rest).to_string_lossy().to_string(),
+            Some(home) => home.join(rest).to_string_lossy().to_string(),
             None => return Resolved::Unresolved(text.to_string()),
         }
     } else if text.starts_with('~') {
@@ -1013,9 +1130,9 @@ fn glob_base(text: &str) -> String {
     base
 }
 
-fn clean_path(p: &Path) -> PathBuf {
+fn clean_path(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
-    for comp in p.components() {
+    for comp in path.components() {
         match comp {
             Component::CurDir => {}
             Component::ParentDir => {
@@ -1033,121 +1150,18 @@ fn clean_path(p: &Path) -> PathBuf {
     out
 }
 
-fn split_assignment(w: &Word) -> Option<(String, Word)> {
-    let first = match w.parts.first() {
-        Some(Part::Literal(s)) => s.clone(),
-        _ => return None,
-    };
-    let eq = first.find('=')?;
-    if eq == 0 {
-        return None;
-    }
-    let name = &first[..eq];
-    if !name
-        .chars()
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
-        return None;
-    }
-    let rest = &first[eq + 1..];
-    let mut parts = Vec::new();
-    if !rest.is_empty() {
-        parts.push(Part::Literal(rest.to_string()));
-    }
-    parts.extend(w.parts[1..].iter().cloned());
-    let text: String = parts
-        .iter()
-        .map(|p| match p {
-            Part::Literal(s) => s.clone(),
-            Part::Var(n) => format!("${n}"),
-            Part::Subst(s) => format!("$({s})"),
-            Part::Opaque(s) => s.clone(),
-            Part::Glob(g) => g.clone(),
-        })
-        .collect();
-    Some((
-        name.to_string(),
-        Word {
-            parts,
-            text,
-            has_glob: w.has_glob,
-        },
-    ))
-}
-
-fn resolve_value(w: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize) -> Value {
-    match resolve_word(w, ctx, out, depth) {
-        Resolved::Path(p) => Value::Path(p),
-        Resolved::Glob(p) => Value::Path(p),
+fn resolve_value(
+    word: &Word,
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) -> Value {
+    match resolve_word(word, ctx, out, asks, depth) {
+        Resolved::Path(path) => Value::Path(path),
+        Resolved::Glob(path) => Value::Path(path),
         Resolved::Mktemp => Value::Mktemp,
         Resolved::UnknownSource => Value::UnknownSource,
-        Resolved::Unresolved(t) => Value::Unresolved(t),
+        Resolved::Unresolved(text) => Value::Unresolved(text),
     }
-}
-
-/// 語の basename。
-pub fn basename(text: &str) -> &str {
-    text.rsplit('/').next().unwrap_or(text)
-}
-
-/// ラッパーのオプションで値を取るもの。
-const SUDO_VALUED: &[&str] = &[
-    "-u",
-    "-g",
-    "-p",
-    "-C",
-    "-h",
-    "-r",
-    "-t",
-    "-U",
-    "-T",
-    "-R",
-    "-D",
-    "--user",
-    "--group",
-    "--prompt",
-    "--close-from",
-    "--host",
-    "--role",
-    "--type",
-    "--other-user",
-    "--command-timeout",
-    "--chdir",
-    "--chroot",
-];
-
-const DOAS_VALUED: &[&str] = &["-u", "-C", "-a"];
-
-fn strip_wrapper<'a>(words: &'a [Word], name: &str) -> &'a [Word] {
-    let valued = if name == "doas" {
-        DOAS_VALUED
-    } else {
-        SUDO_VALUED
-    };
-    let mut i = 1;
-    while i < words.len() {
-        let t = &words[i].text;
-        if t == "--" {
-            i += 1;
-            break;
-        }
-        if !t.starts_with('-') || t == "-" {
-            break;
-        }
-        let head = t.split('=').next().unwrap_or(t);
-        if valued.contains(&head) && !t.contains('=') {
-            i += 2;
-        } else {
-            i += 1;
-        }
-    }
-    // ラッパー越しの代入。
-    while i < words.len() && split_assignment(&words[i]).is_some() {
-        i += 1;
-    }
-    // 値付きオプションが末尾で値が無いときは、読み飛ばしが語を越える。
-    // 語の外を指さないように丸める。
-    &words[i.min(words.len())..]
 }

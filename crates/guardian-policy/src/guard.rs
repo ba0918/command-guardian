@@ -1,7 +1,9 @@
 //! コマンドの見張り（REQ-027〜REQ-034）。規則の形と語の照合を扱う。
 
-use guardian_core::parse::{self, Item, Part, Redirect, SimpleCommand, Word};
 use guardian_core::Verdict;
+use guardian_parser::{
+    self as parser, Command, Compound, Part, Redirect, Script, SimpleCommand, Word,
+};
 use regex::Regex;
 
 /// 1 つの語の照合。`/.../` は語全体への正規表現、それ以外は完全一致。
@@ -450,75 +452,160 @@ fn option_value_hit(name: &str, values: &[WordMatch], words: &[String]) -> bool 
 /// コマンド文字列から起動を集める。ラッパーと `bash -c`・`eval` の内側、
 /// コマンド置換の内側も展開する（REQ-044 の調査済みの範囲）。
 pub fn invocations(command: &str) -> Vec<Invocation> {
-    let script = parse::parse_script(command);
+    let outcome = parser::parse(command);
     let mut out = Vec::new();
-    walk_items(&script.items, &mut out, 0);
+    walk_script(&outcome.script, &mut out, 0);
     out
 }
 
-fn walk_items(items: &[Item], out: &mut Vec<Invocation>, depth: usize) {
+fn walk_script(script: &Script, out: &mut Vec<Invocation>, depth: usize) {
     if depth > 16 {
         return;
     }
-    for item in items {
-        match item {
-            Item::Simple(p) => {
-                for cmd in &p.commands {
-                    walk_command(cmd, out, depth);
-                }
-            }
-            Item::For { words, body, .. } => {
-                for w in words {
-                    walk_word_subst(w, out, depth);
-                }
-                walk_items(body, out, depth + 1);
+    for item in &script.items {
+        walk_pipeline(&item.first, out, depth);
+        for (_, pipeline) in &item.rest {
+            walk_pipeline(pipeline, out, depth);
+        }
+    }
+}
+
+fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut Vec<Invocation>, depth: usize) {
+    for command in &pipeline.commands {
+        walk_command(command, out, depth);
+    }
+}
+
+fn walk_command(command: &Command, out: &mut Vec<Invocation>, depth: usize) {
+    match command {
+        Command::Simple(simple) => walk_simple(simple, out, depth),
+        Command::Compound {
+            compound,
+            redirects,
+        } => {
+            walk_redirects(redirects, out, depth);
+            walk_compound(compound, out, depth);
+        }
+        Command::Function(function) => {
+            walk_redirects(&function.redirects, out, depth);
+            walk_word_subst(&function.name, out, depth);
+            walk_compound(&function.body, out, depth);
+        }
+        Command::Test(test) => {
+            walk_redirects(&test.redirects, out, depth);
+            for word in &test.words {
+                walk_word_subst(word, out, depth);
             }
         }
     }
 }
 
-fn walk_command(cmd: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) {
-    for w in &cmd.words {
-        walk_word_subst(w, out, depth);
+fn walk_redirects(redirects: &[Redirect], out: &mut Vec<Invocation>, depth: usize) {
+    for redirect in redirects {
+        match &redirect.target {
+            parser::RedirectTarget::Word(word) => walk_word_subst(word, out, depth),
+            parser::RedirectTarget::Fd(_) => {}
+            parser::RedirectTarget::ProcessSubstitution(substitution) => {
+                walk_script(&substitution.body, out, depth);
+            }
+            parser::RedirectTarget::HereDocument { doc, .. } => walk_word_subst(doc, out, depth),
+        }
     }
-    for r in &cmd.redirects {
-        let w = match r {
-            Redirect::Out(w)
-            | Redirect::Append(w)
-            | Redirect::Clobber(w)
-            | Redirect::In(w)
-            | Redirect::Heredoc(w) => w,
-        };
-        walk_word_subst(w, out, depth);
+}
+
+fn walk_compound(compound: &Compound, out: &mut Vec<Invocation>, depth: usize) {
+    match compound {
+        Compound::If {
+            condition,
+            then,
+            elses,
+        } => {
+            walk_script(condition, out, depth);
+            walk_script(then, out, depth);
+            for clause in elses {
+                if let Some(condition) = &clause.condition {
+                    walk_script(condition, out, depth);
+                }
+                walk_script(&clause.body, out, depth);
+            }
+        }
+        Compound::While {
+            condition, body, ..
+        } => {
+            walk_script(condition, out, depth);
+            walk_script(body, out, depth);
+        }
+        Compound::For { values, body, .. } => {
+            for word in values {
+                walk_word_subst(word, out, depth);
+            }
+            walk_script(body, out, depth);
+        }
+        Compound::ArithmeticFor { body, .. } => walk_script(body, out, depth),
+        Compound::Case { value, arms } => {
+            walk_word_subst(value, out, depth);
+            for arm in arms {
+                for pattern in &arm.patterns {
+                    walk_word_subst(pattern, out, depth);
+                }
+                if let Some(body) = &arm.body {
+                    walk_script(body, out, depth);
+                }
+            }
+        }
+        Compound::BraceGroup(script) | Compound::Subshell(script) => {
+            walk_script(script, out, depth)
+        }
+        Compound::Arithmetic(_) => {}
+        Compound::Coprocess { name, body } => {
+            if let Some(name) = name {
+                walk_word_subst(name, out, depth);
+            }
+            walk_command(body, out, depth);
+        }
+    }
+}
+
+fn walk_simple(simple: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) {
+    for word in &simple.words {
+        walk_word_subst(word, out, depth);
+    }
+    walk_redirects(&simple.redirects, out, depth);
+    for substitution in &simple.process_substitutions {
+        walk_script(&substitution.body, out, depth);
     }
 
-    let words: Vec<&Word> = cmd.words.iter().collect();
-    let mut i = 0;
+    let words: Vec<&Word> = simple.words.iter().collect();
+    let mut index = 0;
     let mut env_names = Vec::new();
-    while i < words.len() {
-        match assignment_name(words[i]) {
+    while index < words.len() {
+        match assignment_name(words[index]) {
             Some((name, value_word)) => {
                 env_names.push(name);
                 walk_word_subst(value_word, out, depth);
-                i += 1;
+                index += 1;
             }
             None => break,
         }
     }
     loop {
-        let Some(first) = words.get(i) else { return };
+        let Some(first) = words.get(index) else {
+            return;
+        };
         let name = basename(&first.text);
         if name == "sudo" || name == "doas" {
-            let (next, names) = strip_wrapper(&words, i, name);
+            let (next, names) = strip_wrapper(&words, index, name);
             env_names.extend(names);
-            i = next;
+            index = next;
         } else {
             break;
         }
     }
-    let Some(first) = words.get(i) else { return };
+    let Some(first) = words.get(index) else {
+        return;
+    };
     let program = basename(&first.text).to_string();
-    let args: Vec<&Word> = words[i + 1..].to_vec();
+    let args: Vec<&Word> = words[index + 1..].to_vec();
 
     if matches!(program.as_str(), "bash" | "sh" | "zsh" | "dash" | "ksh") {
         if let Some(inner) = shell_c_string(&args) {
@@ -547,14 +634,16 @@ fn walk_command(cmd: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) {
 }
 
 fn walk_inner(inner: &str, out: &mut Vec<Invocation>, depth: usize) {
-    let script = parse::parse_script(inner);
-    walk_items(&script.items, out, depth + 1);
+    let outcome = parser::parse(inner);
+    walk_script(&outcome.script, out, depth + 1);
 }
 
-fn walk_word_subst(w: &Word, out: &mut Vec<Invocation>, depth: usize) {
-    for part in &w.parts {
-        if let Part::Subst(inner) = part {
-            walk_inner(inner, out, depth);
+fn walk_word_subst(word: &Word, out: &mut Vec<Invocation>, depth: usize) {
+    for part in &word.parts {
+        if let Part::Substitution(substitution) = part {
+            if let Some(body) = &substitution.body {
+                walk_script(body, out, depth);
+            }
         }
     }
 }

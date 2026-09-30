@@ -416,6 +416,112 @@ fn req_005_traversal_above_the_root_is_clamped() {
     }
 }
 
+// @kotowari[EX-046]
+#[test]
+fn ex_046_a_non_posix_shell_asks() {
+    let home = temp_home();
+    let r = run(
+        &["check", "fish -c 'rm -rf /etc/x'", "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("読めないシェル"), "{}", r.stdout);
+}
+
+// @kotowari[EX-056]
+#[test]
+fn ex_056_a_wrapped_non_posix_shell_asks() {
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "sudo fish -c 'rm -rf /etc/x'",
+            "--cwd",
+            "/tmp/scratch",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("読めないシェル"), "{}", r.stdout);
+}
+
+// @kotowari[EX-049]
+#[test]
+fn ex_049_unreadable_syntax_asks() {
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "if true; then rm -rf /etc/x",
+            "--cwd",
+            "/tmp/scratch",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("構文を読めない"), "{}", r.stdout);
+}
+
+// @kotowari[REQ-009, REQ-038]
+#[test]
+fn req_009_a_readable_block_is_not_overwritten_by_a_parse_ask() {
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "rm -rf /etc/x; if true; then",
+            "--cwd",
+            "/tmp/scratch",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("block"), "{}", r.stdout);
+}
+
+// @kotowari[REQ-017, REQ-038]
+#[test]
+fn req_017_json_has_a_top_level_reason_for_a_parse_ask() {
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "if true; then",
+            "--cwd",
+            "/tmp/scratch",
+            "--format",
+            "json",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
+    assert_eq!(value["verdict"], "ask");
+    assert!(value["reason"].as_str().unwrap().contains("構文を読めない"));
+    assert!(value["effects"].as_array().unwrap().is_empty());
+}
+
+// @kotowari[REQ-017, REQ-038]
+#[test]
+fn req_017_json_reason_names_the_blocked_effect() {
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "rm -rf /etc/nginx",
+            "--cwd",
+            "/tmp/scratch",
+            "--format",
+            "json",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 2);
+    let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
+    assert_eq!(value["verdict"], "block");
+    assert!(value["reason"].as_str().unwrap().contains("protected"));
+}
+
 // @kotowari[REQ-002]
 #[test]
 fn req_002_other_user_tilde_paths_block() {
@@ -426,4 +532,15 @@ fn req_002_other_user_tilde_paths_block() {
         home.path(),
     );
     assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}
+
+// @kotowari[EX-055]
+#[test]
+fn ex_055_script_file_launch_allows() {
+    let home = temp_home();
+    let r = run(
+        &["check", "bash script.sh", "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }

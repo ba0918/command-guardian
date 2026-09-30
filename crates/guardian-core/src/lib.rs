@@ -1,10 +1,8 @@
-//! hook-guardian の core。シェル構文の解析、破壊的効果の抽出、パスの解決、
-//! 判定の共通の型を持つ。設定にも fs にも git にも依存しない。
+//! hook-guardian の core。正規化した構文木からの破壊的効果の抽出、パスの解決、
+//! 判定の共通の型を持つ。字句解析と構文解析は guardian-parser が担う。
 
 pub mod extract;
-pub mod parse;
 pub mod types;
 
-pub use extract::{analyze, extract_effects, Analysis, Env};
-pub use parse::strip_quotes_and_heredocs;
+pub use extract::{analyze, extract_effects, Analysis, Ask, Env};
 pub use types::{Class, Effect, Op, ProtectedKind, Target, Verdict, Why};

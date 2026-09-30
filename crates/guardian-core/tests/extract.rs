@@ -556,6 +556,51 @@ fn req_010_a_trailing_wrapper_option_is_not_a_command() {
     }
 }
 
+// @kotowari[EX-047]
+#[test]
+fn ex_047_substitution_in_a_wrapper_option_value_is_read() {
+    // 値を取るオプションの値の中のコマンド置換も読む。
+    assert_eq!(
+        effects("sudo -u \"$(rm -rf /etc/x)\" true"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/etc/x")
+        }]
+    );
+}
+
+// @kotowari[EX-048]
+#[test]
+fn ex_048_shell_c_body_is_read_as_nested_syntax() {
+    assert_eq!(
+        effects("bash -c 'rm -rf /etc/x'"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/etc/x")
+        }]
+    );
+}
+
+// @kotowari[EX-054]
+#[test]
+fn ex_054_bundled_c_body_is_read() {
+    assert_eq!(
+        effects("bash -lc 'rm -rf /etc/x'"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/etc/x")
+        }]
+    );
+}
+
+// @kotowari[EX-055]
+#[test]
+fn ex_055_script_file_launch_is_not_read() {
+    // 本体がコマンド文字列の外にある起動は読まない。
+    assert_eq!(effects("bash script.sh"), vec![]);
+    assert_eq!(effects("sh < file"), vec![]);
+}
+
 // @kotowari[REQ-008]
 #[test]
 fn req_008_find_with_multiple_start_points_feeds_xargs() {
