@@ -334,3 +334,20 @@ fn req_007_trailing_slash_dereferences_through_the_engine() {
     );
     assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_mktemp_descendants_allow() {
+    // mktemp が作ったパスの配下は一時領域として allow。
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "d=$(mktemp -d); rm -rf $d/*",
+            "--cwd",
+            "/tmp/scratch",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}

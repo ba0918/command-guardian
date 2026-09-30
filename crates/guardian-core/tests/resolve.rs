@@ -135,3 +135,21 @@ fn req_002_unresolvable_paths_are_distinguished() {
         vec![delete(Target::Unresolved("$X".to_string()))]
     );
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_paths_built_on_mktemp_resolve() {
+    assert_eq!(
+        effects("d=$(mktemp -d); rm -rf $d/*"),
+        vec![delete(Target::Mktemp)]
+    );
+    assert_eq!(
+        effects("d=$(mktemp -d); rm -rf $d/log"),
+        vec![delete(Target::Mktemp)]
+    );
+    // mktemp の外へ出る綴りは未解決のまま。
+    assert_eq!(
+        effects("d=$(mktemp -d); rm -rf $d/../x"),
+        vec![delete(Target::Unresolved("$d/../x".to_string()))]
+    );
+}

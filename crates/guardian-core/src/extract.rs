@@ -613,16 +613,23 @@ fn resolve_word(word: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize)
 
     let mut text = String::new();
     let mut has_glob = word.has_glob;
-    for part in &word.parts {
+    let mut mktemp_prefix = false;
+    for (i, part) in word.parts.iter().enumerate() {
         match part {
             Part::Literal(s) => text.push_str(s),
             Part::Var(name) => match lookup_var(name, ctx) {
                 Some(Value::Path(p)) => text.push_str(&p.to_string_lossy()),
+                // 先頭が mktemp の作ったパスなら、続く部分はその配下。
+                Some(Value::Mktemp) if i == 0 => mktemp_prefix = true,
                 _ => return Resolved::Unresolved(word.text.clone()),
             },
             Part::Subst(inner) => {
-                resolve_subst(inner, word, ctx, out, depth);
-                return Resolved::Unresolved(word.text.clone());
+                let res = resolve_subst(inner, word, ctx, out, depth);
+                if matches!(res, Resolved::Mktemp) && i == 0 {
+                    mktemp_prefix = true;
+                } else {
+                    return Resolved::Unresolved(word.text.clone());
+                }
             }
             Part::Opaque(_) => return Resolved::Unresolved(word.text.clone()),
             Part::Glob(g) => {
@@ -630,6 +637,16 @@ fn resolve_word(word: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize)
                 text.push_str(g);
             }
         }
+    }
+    if mktemp_prefix {
+        // `..` で mktemp の外へ出る綴りは解決しない。
+        if Path::new(&text)
+            .components()
+            .any(|c| c == Component::ParentDir)
+        {
+            return Resolved::Unresolved(word.text.clone());
+        }
+        return Resolved::Mktemp;
     }
     resolve_text(&text, has_glob, ctx)
 }
