@@ -5,4 +5,4 @@ pub mod engine;
 pub mod message;
 
 pub use config::{Config, CustomRule, Loaded};
-pub use engine::{EffectReport, Engine, EngineEnv, Report};
+pub use engine::{EffectReport, Engine, EngineEnv, Report, RuleReport};

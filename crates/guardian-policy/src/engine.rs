@@ -2,8 +2,11 @@
 
 use crate::config::{self, Config};
 use crate::message;
-use guardian_core::{analyze, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
+use guardian_core::{
+    analyze, strip_quotes_and_heredocs, Class, Env, Op, ProtectedKind, Target, Verdict, Why,
+};
 use guardian_judge::{GitRunner, Judge, JudgeEnv};
+use regex::Regex;
 use std::path::{Path, PathBuf};
 
 /// 判定に渡す環境。
@@ -24,14 +27,29 @@ pub struct EffectReport {
     pub verdict: Verdict,
 }
 
+/// 一致したルール。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuleReport {
+    pub name: String,
+    pub reason: String,
+    pub verdict: Verdict,
+}
+
 /// 1 つのコマンドの判定。
 #[derive(Debug, Clone)]
 pub struct Report {
     pub verdict: Verdict,
     pub effects: Vec<EffectReport>,
+    pub rules: Vec<RuleReport>,
     pub warnings: Vec<String>,
     pub message: String,
     pub parse_errors: Vec<String>,
+}
+
+struct CompiledRule {
+    name: String,
+    regex: Regex,
+    verdict: Verdict,
 }
 
 pub struct Engine {
@@ -39,6 +57,7 @@ pub struct Engine {
     env: EngineEnv,
     judge: Judge,
     warnings: Vec<String>,
+    custom_rules: Vec<CompiledRule>,
 }
 
 impl Engine {
@@ -79,11 +98,27 @@ impl Engine {
             Some(g) => Judge::with_git(judge_env, g),
             None => Judge::new(judge_env),
         };
+        let mut warnings = warnings;
+        let mut custom_rules = Vec::new();
+        for rule in &config.rules_custom {
+            match Regex::new(&rule.pattern) {
+                Ok(regex) => custom_rules.push(CompiledRule {
+                    name: rule.name.clone(),
+                    regex,
+                    verdict: rule.verdict,
+                }),
+                Err(e) => warnings.push(format!(
+                    "カスタムのルールの正規表現が不正なため無視します: {}: {e}",
+                    rule.name
+                )),
+            }
+        }
         Engine {
             config,
             env,
             judge,
             warnings,
+            custom_rules,
         }
     }
 
@@ -101,13 +136,34 @@ impl Engine {
         let analysis = analyze(command, &core_env);
         let mut effects = Vec::new();
         for e in &analysis.effects {
+            // 無効にした組み込みルールの効果は取り出さない（REQ-026）。
+            if self.config.rules_disable.iter().any(|r| r == e.op.name()) {
+                continue;
+            }
             effects.push(self.judge_effect(e.op, &e.target));
         }
+
+        // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
+        let body = strip_quotes_and_heredocs(command);
+        let mut rules = Vec::new();
+        for rule in &self.custom_rules {
+            if rule.regex.is_match(&body) {
+                rules.push(RuleReport {
+                    name: rule.name.clone(),
+                    reason: format!("カスタムルール「{}」", rule.name),
+                    verdict: rule.verdict,
+                });
+            }
+        }
+
         let mut verdict = Verdict::Allow;
         for e in &effects {
             verdict = verdict.worst(e.verdict);
         }
-        let mut message = self.compose_message(&effects);
+        for r in &rules {
+            verdict = verdict.worst(r.verdict);
+        }
+        let mut message = self.compose_message(&effects, &rules);
         if !analysis.parse_errors.is_empty() {
             verdict = Verdict::Ask;
             message = parse_error_message();
@@ -115,6 +171,7 @@ impl Engine {
         Report {
             verdict,
             effects,
+            rules,
             warnings: self.warnings.clone(),
             message,
             parse_errors: analysis.parse_errors,
@@ -195,7 +252,7 @@ impl Engine {
         None
     }
 
-    fn compose_message(&self, effects: &[EffectReport]) -> String {
+    fn compose_message(&self, effects: &[EffectReport], rules: &[RuleReport]) -> String {
         let mut worst: Option<&EffectReport> = None;
         for e in effects {
             if e.verdict == Verdict::Allow {
@@ -207,20 +264,31 @@ impl Engine {
                 Some(w) => w,
             });
         }
-        let Some(w) = worst else {
-            return String::new();
-        };
-        let text = message::non_allow_message(w.op, &w.target, w.class, &w.why);
-        let others = effects
+        let bad_rules: Vec<&RuleReport> = rules
             .iter()
-            .filter(|e| e.verdict != Verdict::Allow)
-            .count()
-            .saturating_sub(1);
-        if others > 0 {
-            format!("{text}\nほかに {others} 件の指摘があります")
-        } else {
-            text
+            .filter(|r| r.verdict != Verdict::Allow)
+            .collect();
+        if let Some(w) = worst {
+            let text = message::non_allow_message(w.op, &w.target, w.class, &w.why);
+            let others = effects
+                .iter()
+                .filter(|e| e.verdict != Verdict::Allow)
+                .count()
+                .saturating_sub(1)
+                + bad_rules.len();
+            if others > 0 {
+                return format!("{text}\nほかに {others} 件の指摘があります");
+            }
+            return text;
         }
+        if let Some(r) = bad_rules.first() {
+            let mut text = format!("{}\n判定: {}", r.reason, r.verdict);
+            if bad_rules.len() > 1 {
+                text = format!("{text}\nほかに {} 件の指摘があります", bad_rules.len() - 1);
+            }
+            return text;
+        }
+        String::new()
     }
 }
 

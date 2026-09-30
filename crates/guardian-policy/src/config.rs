@@ -121,7 +121,21 @@ pub fn load(
                     .any(|t| same_path(t, file_dir) || same_path(t, &base));
                 if is_trusted {
                     warnings.extend(layer.warnings.iter().cloned());
-                    merge(&mut config, &layer);
+                    // allow を返すカスタムのルールは利用者設定でのみ有効（REQ-026）。
+                    let mut filtered = layer.clone();
+                    let mut kept = Vec::new();
+                    for rule in filtered.rules_custom.drain(..) {
+                        if rule.verdict == Verdict::Allow {
+                            warnings.push(format!(
+                                "allow を返すカスタムのルールは利用者設定でのみ有効なため無視します: {}",
+                                rule.name
+                            ));
+                        } else {
+                            kept.push(rule);
+                        }
+                    }
+                    filtered.rules_custom = kept;
+                    merge(&mut config, &filtered);
                 } else {
                     warnings.extend(restrict_project(&mut config, &layer));
                 }
