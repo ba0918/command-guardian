@@ -42,10 +42,10 @@
 ### REQ-038: 読めないときは ask
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-01-parser.md#A2, docs/decision/records/2026-10-01-parser.md#A7, docs/decision/records/2026-10-01-parser.md#A14
+- source: docs/decision/records/2026-10-01-parser.md#A2, docs/decision/records/2026-10-01-parser.md#A7, docs/decision/records/2026-10-01-parser.md#A11, docs/decision/records/2026-10-01-parser.md#A14, docs/decision/records/2026-10-01-parser.md#A20
 - verification: unit
 
-構文解析が失敗したとき、ERROR ノードか MISSING ノードがあるとき、知らないノードの形に出会ったとき、置換の再帰読みの途中で読めなくなったとき、hook-guardian は ask の判定を出す。この ask はほかの効果の判定と合成し、より重い判定（block）があればそれが勝つ。
+構文解析が失敗したとき、知らないノードの形に出会ったとき、置換の再帰読みの途中で読めなくなったとき、hook-guardian は ask の判定を出す。解析が失敗した命令からは効果を取り出さない。この ask はほかの効果の判定と合成し、より重い判定（block）があればそれが勝つ。
 
 ### REQ-039: 入力の上限
 
