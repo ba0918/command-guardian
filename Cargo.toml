@@ -2,6 +2,7 @@
 members = [
     "crates/guardian-core",
     "crates/guardian-judge",
+    "crates/guardian-parser",
     "crates/guardian-policy",
 ]
 resolver = "2"
@@ -27,6 +28,7 @@ serde_json = { workspace = true }
 tempfile = { workspace = true }
 
 [workspace.dependencies]
+brush-parser = "=0.4.0"
 regex = "1.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
