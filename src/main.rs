@@ -1,8 +1,9 @@
 //! hook-guardian の実行ファイル。`check` と `hook` の 2 つのコマンドを持つ。
 
+mod hook;
+
 use guardian_core::Verdict;
 use guardian_policy::{message, Engine, EngineEnv, Report};
-use std::io::Read;
 use std::path::PathBuf;
 
 fn main() {
@@ -13,7 +14,7 @@ fn main() {
 fn run(args: &[String]) -> i32 {
     match args.first().map(|s| s.as_str()) {
         Some("check") => cmd_check(&args[1..]),
-        Some("hook") => cmd_hook(&args[1..]),
+        Some("hook") => hook::run(&args[1..]),
         Some(other) => {
             eprintln!("知らないコマンドです: {other}");
             eprintln!("使い方: hook-guardian <check|hook> ...");
@@ -175,12 +176,4 @@ fn print_json(report: &Report) {
         "rules": rules,
     });
     println!("{json}");
-}
-
-fn cmd_hook(_args: &[String]) -> i32 {
-    let mut input = String::new();
-    if std::io::stdin().read_to_string(&mut input).is_err() {
-        return 0;
-    }
-    0
 }
