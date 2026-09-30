@@ -53,6 +53,7 @@ pub enum OpTok {
     Append,
     Clobber,
     In,
+    InOut,
     Heredoc,
     HeredocDash,
     LParen,
@@ -545,6 +546,8 @@ impl Lexer {
                             self.push_op(OpTok::Heredoc, 2);
                             self.expect_heredoc = Some(false);
                         }
+                    } else if self.peek(1) == Some('>') {
+                        self.push_op(OpTok::InOut, 2);
                     } else {
                         self.push_op(OpTok::In, 1);
                     }
@@ -767,7 +770,13 @@ impl Parser {
                     let next_is_redirect = matches!(
                         self.toks.get(self.pos + 1).map(|t| (&t.kind, t.glued_left)),
                         Some((
-                            TokKind::Op(OpTok::Out | OpTok::Append | OpTok::Clobber | OpTok::In),
+                            TokKind::Op(
+                                OpTok::Out
+                                    | OpTok::Append
+                                    | OpTok::Clobber
+                                    | OpTok::In
+                                    | OpTok::InOut
+                            ),
                             true
                         ))
                     );
@@ -802,7 +811,9 @@ impl Parser {
                         cmd.redirects.push(r);
                     }
                 }
-                Some(TokKind::Op(OpTok::In | OpTok::Heredoc | OpTok::HeredocDash)) => {
+                Some(TokKind::Op(
+                    OpTok::In | OpTok::InOut | OpTok::Heredoc | OpTok::HeredocDash,
+                )) => {
                     let op = match self.peek().map(|t| &t.kind) {
                         Some(TokKind::Op(o)) => *o,
                         _ => unreachable!(),
@@ -811,7 +822,7 @@ impl Parser {
                     if let Some(TokKind::Word(w)) = self.peek().map(|t| t.kind.clone()) {
                         self.advance();
                         cmd.redirects.push(match op {
-                            OpTok::In => Redirect::In(w),
+                            OpTok::In | OpTok::InOut => Redirect::In(w),
                             _ => Redirect::Heredoc(w),
                         });
                     }
@@ -863,6 +874,7 @@ pub fn strip_quotes_and_heredocs(input: &str) -> String {
                 OpTok::Append => ">>".to_string(),
                 OpTok::Clobber => ">|".to_string(),
                 OpTok::In => "<".to_string(),
+                OpTok::InOut => "<>".to_string(),
                 OpTok::Heredoc => "<<".to_string(),
                 OpTok::HeredocDash => "<<-".to_string(),
                 OpTok::LParen => "(".to_string(),

@@ -509,6 +509,21 @@ fn req_001_substitution_in_a_dd_argument_is_read() {
     );
 }
 
+// @kotowari[REQ-001]
+#[test]
+fn req_001_inout_redirect_is_not_truncate() {
+    // <> は読み書きの両方向のリダイレクトで、切り詰めではない。
+    assert_eq!(effects("echo x <> /etc/x"), vec![]);
+    // >| は切り詰めのまま。
+    assert_eq!(
+        effects("echo x >| /etc/x"),
+        vec![Effect {
+            op: Op::Truncate,
+            target: path("/etc/x")
+        }]
+    );
+}
+
 // @kotowari[REQ-005]
 #[test]
 fn req_005_parent_dir_at_the_root_is_clamped() {
