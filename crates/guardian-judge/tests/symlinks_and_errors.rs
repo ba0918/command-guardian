@@ -2,7 +2,7 @@
 
 use guardian_core::{analyze, extract_effects, Class, Env, Target, Verdict, Why};
 use guardian_judge::{Classification, Judge, JudgeEnv};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn core_env() -> Env {
     Env {
