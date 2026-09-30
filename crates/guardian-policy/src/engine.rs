@@ -1,1 +1,229 @@
-//! 判定の入口。S8 以降で実装する。
+//! 判定の入口。設定を読み、効果ごとに分類と判定を出し、合成する。
+
+use crate::config::{self, Config};
+use crate::message;
+use guardian_core::{analyze, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
+use guardian_judge::{GitRunner, Judge, JudgeEnv};
+use std::path::{Path, PathBuf};
+
+/// 判定に渡す環境。
+#[derive(Debug, Clone)]
+pub struct EngineEnv {
+    pub home: Option<PathBuf>,
+    pub tmpdir: Option<PathBuf>,
+    pub cwd: PathBuf,
+}
+
+/// 効果ごとの判定。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectReport {
+    pub op: Op,
+    pub target: Target,
+    pub class: Class,
+    pub why: Why,
+    pub verdict: Verdict,
+}
+
+/// 1 つのコマンドの判定。
+#[derive(Debug, Clone)]
+pub struct Report {
+    pub verdict: Verdict,
+    pub effects: Vec<EffectReport>,
+    pub warnings: Vec<String>,
+    pub message: String,
+    pub parse_errors: Vec<String>,
+}
+
+pub struct Engine {
+    config: Config,
+    env: EngineEnv,
+    judge: Judge,
+    warnings: Vec<String>,
+}
+
+impl Engine {
+    /// 設定を読み込んで作る。
+    pub fn load(user_config: Option<&Path>, env: EngineEnv) -> Engine {
+        let loaded = config::load(
+            user_config,
+            &env.cwd,
+            env.home.as_deref(),
+            env.tmpdir.as_deref(),
+        );
+        Engine::build(loaded.config, env, loaded.warnings, None)
+    }
+
+    /// 設定をそのまま渡して作る。
+    pub fn new(config: Config, env: EngineEnv) -> Engine {
+        Engine::build(config, env, Vec::new(), None)
+    }
+
+    /// git の起動を差し替えて作る（テスト用）。
+    pub fn with_git(config: Config, env: EngineEnv, git: Box<dyn GitRunner>) -> Engine {
+        Engine::build(config, env, Vec::new(), Some(git))
+    }
+
+    fn build(
+        config: Config,
+        env: EngineEnv,
+        warnings: Vec<String>,
+        git: Option<Box<dyn GitRunner>>,
+    ) -> Engine {
+        let judge_env = JudgeEnv {
+            home: env.home.clone(),
+            tmpdir: env.tmpdir.clone(),
+            cwd: Some(env.cwd.clone()),
+            git_enabled: config.git_enabled,
+        };
+        let judge = match git {
+            Some(g) => Judge::with_git(judge_env, g),
+            None => Judge::new(judge_env),
+        };
+        Engine {
+            config,
+            env,
+            judge,
+            warnings,
+        }
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// コマンド文字列を判定する。
+    pub fn check(&self, command: &str) -> Report {
+        let core_env = Env {
+            home: self.env.home.clone(),
+            tmpdir: self.env.tmpdir.clone(),
+            cwd: Some(self.env.cwd.clone()),
+        };
+        let analysis = analyze(command, &core_env);
+        let mut effects = Vec::new();
+        for e in &analysis.effects {
+            effects.push(self.judge_effect(e.op, &e.target));
+        }
+        let mut verdict = Verdict::Allow;
+        for e in &effects {
+            verdict = verdict.worst(e.verdict);
+        }
+        let mut message = self.compose_message(&effects);
+        if !analysis.parse_errors.is_empty() {
+            verdict = Verdict::Ask;
+            message = parse_error_message();
+        }
+        Report {
+            verdict,
+            effects,
+            warnings: self.warnings.clone(),
+            message,
+            parse_errors: analysis.parse_errors,
+        }
+    }
+
+    fn judge_effect(&self, op: Op, target: &Target) -> EffectReport {
+        let (class, why, verdict) = self.judge_target(target);
+        EffectReport {
+            op,
+            target: target.clone(),
+            class,
+            why,
+            verdict,
+        }
+    }
+
+    fn judge_target(&self, target: &Target) -> (Class, Why, Verdict) {
+        match target {
+            Target::Unresolved(text) => (
+                Class::Unknown,
+                Why::Unresolved(text.clone()),
+                Verdict::Block,
+            ),
+            Target::Mktemp => (Class::Ephemeral, Why::Mktemp, Verdict::Allow),
+            Target::UnknownSource => (Class::Unknown, Why::UnknownSource, Verdict::Ask),
+            _ => {
+                if let Some(overridden) = self.apply_roots(target) {
+                    return overridden;
+                }
+                let c = match target {
+                    Target::Path { path, dereference } => {
+                        self.judge.classify_path(path, *dereference)
+                    }
+                    Target::GlobBase(base) => self.judge.classify_path(base, false),
+                    Target::Children(base) => self.judge.classify_children(base),
+                    _ => unreachable!(),
+                };
+                let verdict = match c.class {
+                    Class::Ephemeral | Class::Vcs => Verdict::Allow,
+                    Class::Protected => Verdict::Block,
+                    Class::Unknown => match c.why {
+                        // git の失敗は block にしない（REQ-010）。
+                        Why::GitFailed => Verdict::Ask,
+                        _ => self.config.unknown_verdict,
+                    },
+                };
+                (c.class, c.why, verdict)
+            }
+        }
+    }
+
+    /// 設定の保護ルートと許可ルートを先に当てる。
+    fn apply_roots(&self, target: &Target) -> Option<(Class, Why, Verdict)> {
+        let (path, children) = match target {
+            Target::Path { path, .. } => (path.as_path(), false),
+            Target::GlobBase(base) => (base.as_path(), false),
+            Target::Children(base) => (base.as_path(), true),
+            _ => return None,
+        };
+        for root in &self.config.protected_roots {
+            if path.starts_with(root) {
+                return Some((
+                    Class::Protected,
+                    Why::Protected(ProtectedKind::ConfiguredRoot),
+                    Verdict::Block,
+                ));
+            }
+        }
+        for root in &self.config.allowed_roots {
+            if path == root && !children {
+                continue;
+            }
+            if path.starts_with(root) {
+                return Some((Class::Ephemeral, Why::Ephemeral, Verdict::Allow));
+            }
+        }
+        None
+    }
+
+    fn compose_message(&self, effects: &[EffectReport]) -> String {
+        let mut worst: Option<&EffectReport> = None;
+        for e in effects {
+            if e.verdict == Verdict::Allow {
+                continue;
+            }
+            worst = Some(match worst {
+                None => e,
+                Some(w) if e.verdict > w.verdict => e,
+                Some(w) => w,
+            });
+        }
+        let Some(w) = worst else {
+            return String::new();
+        };
+        let text = message::non_allow_message(w.op, &w.target, w.class, &w.why);
+        let others = effects
+            .iter()
+            .filter(|e| e.verdict != Verdict::Allow)
+            .count()
+            .saturating_sub(1);
+        if others > 0 {
+            format!("{text}\nほかに {others} 件の指摘があります")
+        } else {
+            text
+        }
+    }
+}
+
+fn parse_error_message() -> String {
+    "解析できない入力です\n代替: リテラルのパスで指定し直してください".to_string()
+}
