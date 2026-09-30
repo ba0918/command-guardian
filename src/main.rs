@@ -1,6 +1,7 @@
 //! hook-guardian の実行ファイル。`check` と `hook` の 2 つのコマンドを持つ。
 
 mod hook;
+mod log;
 
 use guardian_core::Verdict;
 use guardian_policy::{message, Engine, EngineEnv, Report};

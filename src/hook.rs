@@ -34,6 +34,11 @@ pub fn run(args: &[String]) -> i32 {
         Err(_) => return 0,
     };
     let report = engine.check(&input.command);
+    // 影実行ではフックとして何も返さず、判定をログに残す（REQ-018）。
+    if !engine.config().enforce {
+        let _ = crate::log::write_shadow(&report, &input.command);
+        return 0;
+    }
     if let Some(decision) = decision(agent, report.verdict, input.permission_mode.as_deref()) {
         let output = serde_json::json!({
             "hookSpecificOutput": {
