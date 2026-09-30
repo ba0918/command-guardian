@@ -18,11 +18,22 @@ fn bin() -> &'static str {
 
 /// HOME と XDG_CONFIG_HOME を分けて渡してフックを起動する。
 fn run_hook(args: &[&str], input: &str, home: &Path, xdg: &Path) -> Run {
+    run_hook_env(
+        args,
+        input,
+        home.to_str().unwrap(),
+        xdg.to_str().unwrap(),
+        "/tmp",
+    )
+}
+
+/// 環境変数をそのまま渡してフックを起動する（空文字列の検証に使う）。
+fn run_hook_env(args: &[&str], input: &str, home: &str, xdg: &str, tmpdir: &str) -> Run {
     let mut child = Command::new(bin())
         .args(args)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", xdg)
-        .env("TMPDIR", "/tmp")
+        .env("TMPDIR", tmpdir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -272,4 +283,20 @@ fn req_024_non_bash_input_returns_nothing() {
         assert_eq!(r.code, 0);
         assert!(r.stdout.trim().is_empty(), "{agent}: {}", r.stdout);
     }
+}
+
+// @kotowari[REQ-006]
+#[test]
+fn req_006_empty_tmpdir_still_denies_protected_paths() {
+    // TMPDIR が空文字列でも保護領域の削除は deny のまま。
+    let r = run_hook_env(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        "",
+        "",
+        "",
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    let value = envelope(&r.stdout);
+    assert_eq!(value["hookSpecificOutput"]["permissionDecision"], "deny");
 }

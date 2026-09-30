@@ -116,8 +116,8 @@ fn parse_check(args: &[String]) -> Result<CheckArgs, String> {
 
 /// 環境から読み込んだ engine。失敗したら終了コード。
 fn build_engine(cwd: PathBuf) -> Result<Engine, i32> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let tmpdir = std::env::var_os("TMPDIR").map(PathBuf::from);
+    let home = env_path("HOME");
+    let tmpdir = env_path("TMPDIR");
     let user_config = user_config_path();
     Ok(Engine::load(
         user_config.as_deref(),
@@ -125,12 +125,17 @@ fn build_engine(cwd: PathBuf) -> Result<Engine, i32> {
     ))
 }
 
+/// 空文字列は「無い」として扱う。空のパスはすべてのパスに一致してしまう。
+fn env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
 fn user_config_path() -> Option<PathBuf> {
     guardian_policy::config::user_config_path(
-        std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .as_deref(),
-        std::env::var_os("HOME").map(PathBuf::from).as_deref(),
+        env_path("XDG_CONFIG_HOME").as_deref(),
+        env_path("HOME").as_deref(),
     )
 }
 

@@ -32,9 +32,12 @@ impl Config {
     pub fn builtin(tmpdir: Option<&Path>) -> Config {
         let mut allowed = vec![PathBuf::from("/tmp"), PathBuf::from("/var/tmp")];
         if let Some(t) = tmpdir {
-            let t = t.to_path_buf();
-            if !allowed.contains(&t) {
-                allowed.push(t);
+            // 空のルートはすべてのパスに一致してしまうため足さない。
+            if !t.as_os_str().is_empty() {
+                let t = t.to_path_buf();
+                if !allowed.contains(&t) {
+                    allowed.push(t);
+                }
             }
         }
         Config {
@@ -75,12 +78,13 @@ pub struct Loaded {
     pub project_config: Option<PathBuf>,
 }
 
-/// 利用者設定のパスを決める（REQ-013）。
+/// 利用者設定のパスを決める（REQ-013）。空の `XDG_CONFIG_HOME` は「無い」として扱う。
 pub fn user_config_path(xdg_config_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
-    if let Some(x) = xdg_config_home {
+    if let Some(x) = xdg_config_home.filter(|p| !p.as_os_str().is_empty()) {
         return Some(x.join("hook-guardian/config.toml"));
     }
-    home.map(|h| h.join(".config/hook-guardian/config.toml"))
+    home.filter(|h| !h.as_os_str().is_empty())
+        .map(|h| h.join(".config/hook-guardian/config.toml"))
 }
 
 /// 3 層の設定を読み込む。

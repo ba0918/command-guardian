@@ -8,10 +8,14 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// ログのパス。`XDG_STATE_HOME` が無いときは `~/.local/state` の下。
+/// 空文字列は「無い」として扱う。空のパスは cwd 相対になってしまう。
 pub fn shadow_log_path(xdg_state_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
-    let base = match xdg_state_home {
+    let state = xdg_state_home.filter(|p| !p.as_os_str().is_empty());
+    let base = match state {
         Some(state) => state.to_path_buf(),
-        None => home?.join(".local/state"),
+        None => home
+            .filter(|h| !h.as_os_str().is_empty())?
+            .join(".local/state"),
     };
     Some(base.join("hook-guardian/shadow.log"))
 }

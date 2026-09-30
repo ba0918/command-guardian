@@ -15,9 +15,14 @@ pub struct Env {
 
 impl Env {
     pub fn from_process() -> Env {
+        // 空文字列は「無い」として扱う。空のパスはすべてのパスに一致してしまう。
         Env {
-            home: std::env::var_os("HOME").map(PathBuf::from),
-            tmpdir: std::env::var_os("TMPDIR").map(PathBuf::from),
+            home: std::env::var_os("HOME")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from),
+            tmpdir: std::env::var_os("TMPDIR")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from),
             cwd: std::env::current_dir().ok(),
         }
     }

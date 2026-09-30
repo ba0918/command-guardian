@@ -33,6 +33,21 @@ fn run_with_home(args: &[&str], home: &Path, xdg: &Path) -> Run {
     }
 }
 
+/// 環境変数をそのまま渡して起動する（空文字列の検証に使う）。
+fn run_env(args: &[&str], envs: &[(&str, &str)]) -> Run {
+    let mut cmd = Command::new(bin());
+    cmd.args(args);
+    for (key, value) in envs {
+        cmd.env(key, value);
+    }
+    let out = cmd.output().unwrap();
+    Run {
+        code: out.status.code().unwrap_or(-1),
+        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+    }
+}
+
 fn temp_home() -> tempfile::TempDir {
     tempfile::Builder::new()
         .prefix("hook-guardian-home-")
@@ -206,4 +221,28 @@ fn req_017_bad_format_is_a_failure() {
     let home = temp_home();
     let r = run(&["check", "true", "--format", "yaml"], home.path());
     assert_eq!(r.code, 3);
+}
+
+// @kotowari[REQ-006]
+#[test]
+fn req_006_empty_tmpdir_does_not_allow_every_path() {
+    // TMPDIR が空文字列のとき、空の許可ルートを足してはならない。
+    let r = run_env(
+        &["check", "rm -rf /etc/nginx", "--cwd", "/tmp/scratch"],
+        &[("HOME", ""), ("XDG_CONFIG_HOME", ""), ("TMPDIR", "")],
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("block"), "{}", r.stdout);
+}
+
+// @kotowari[REQ-005]
+#[test]
+fn req_005_empty_home_keeps_other_homes_protected() {
+    // HOME が空文字列のとき、/home 配下はほかの利用者のホームとして保護する。
+    let r = run_env(
+        &["check", "rm -rf /home/other/x", "--cwd", "/tmp/scratch"],
+        &[("HOME", ""), ("XDG_CONFIG_HOME", ""), ("TMPDIR", "/tmp")],
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("block"), "{}", r.stdout);
 }

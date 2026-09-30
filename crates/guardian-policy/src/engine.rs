@@ -246,6 +246,9 @@ impl Engine {
             _ => return None,
         };
         for root in &self.config.protected_roots {
+            if root.as_os_str().is_empty() {
+                continue;
+            }
             if path.starts_with(root) {
                 return Some((
                     Class::Protected,
@@ -255,6 +258,10 @@ impl Engine {
             }
         }
         for root in &self.config.allowed_roots {
+            // 空のルートはすべてのパスに一致してしまうため当てない。
+            if root.as_os_str().is_empty() {
+                continue;
+            }
             if path == root && !children {
                 continue;
             }

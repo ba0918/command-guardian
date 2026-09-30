@@ -73,7 +73,8 @@ impl Judge {
     fn ephemeral_roots(&self) -> Vec<PathBuf> {
         let mut roots = vec![PathBuf::from("/tmp"), PathBuf::from("/var/tmp")];
         if let Some(t) = &self.env.tmpdir {
-            if !roots.contains(t) {
+            // 空のルートはすべてのパスに一致してしまうため足さない。
+            if !t.as_os_str().is_empty() && !roots.contains(t) {
                 roots.push(t.clone());
             }
         }
@@ -129,7 +130,7 @@ impl Judge {
 
         if !children {
             if let Some(home) = &self.env.home {
-                if path == home {
+                if !home.as_os_str().is_empty() && path == home {
                     return Classification::new(
                         Class::Protected,
                         Why::Protected(ProtectedKind::Home),
@@ -183,7 +184,8 @@ impl Judge {
         let under_home = Path::new("/home");
         if path.starts_with(under_home) {
             if let Some(home) = &self.env.home {
-                if path == home || path.starts_with(home) {
+                // 空のホームは「無い」として扱う。すべてのパスが空で始まってしまう。
+                if !home.as_os_str().is_empty() && (path == home || path.starts_with(home)) {
                     return false;
                 }
             }

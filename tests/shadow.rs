@@ -196,3 +196,39 @@ fn req_018_check_still_prints_the_verdict_in_shadow() {
     assert!(r.stdout.contains("block"), "{}", r.stdout);
     assert!(!state.path().join("hook-guardian").exists());
 }
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_empty_state_home_falls_back_to_home_local_state() {
+    // XDG_STATE_HOME が空文字列のときは ~/.local/state に書き、cwd 相対には書かない。
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let scratch = temp_dir("hook-guardian-shadow-cwd-");
+    write_shadow_config(xdg.path());
+    let input = bash_input("rm -rf /etc/nginx", "/tmp/scratch");
+    let mut child = Command::new(bin())
+        .args(["hook", "--agent", "claude"])
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", xdg.path())
+        .env("XDG_STATE_HOME", "")
+        .env("TMPDIR", "/tmp")
+        .current_dir(scratch.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(home
+        .path()
+        .join(".local/state/hook-guardian/shadow.log")
+        .is_file());
+    assert!(!scratch.path().join("hook-guardian/shadow.log").exists());
+}
