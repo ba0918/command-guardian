@@ -1,6 +1,7 @@
 //! 設定のファイルと層。組み込み・利用者・プロジェクトの 3 層を読み、マージする。
 //! プロジェクトの層は、信頼されていなければ締める方向の変更だけを反映する。
 
+use crate::guard::{self, GuardRule};
 use guardian_core::Verdict;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,7 @@ pub struct Config {
     pub unknown_verdict: Verdict,
     pub rules_disable: Vec<String>,
     pub rules_custom: Vec<CustomRule>,
+    pub guard: Vec<GuardRule>,
     pub git_enabled: bool,
     pub enforce: bool,
     pub trusted_projects: Vec<PathBuf>,
@@ -41,6 +43,7 @@ impl Config {
             unknown_verdict: Verdict::Ask,
             rules_disable: Vec::new(),
             rules_custom: Vec::new(),
+            guard: Vec::new(),
             git_enabled: true,
             enforce: true,
             trusted_projects: Vec::new(),
@@ -56,6 +59,7 @@ struct Layer {
     unknown_verdict: Option<Verdict>,
     rules_disable: Vec<String>,
     rules_custom: Vec<CustomRule>,
+    guard: Vec<GuardRule>,
     git_enabled: Option<bool>,
     enforce: Option<bool>,
     trusted_projects: Vec<PathBuf>,
@@ -208,6 +212,7 @@ fn read_layer(path: &Path, base: &Path, home: Option<&Path>) -> Result<Layer, St
         &mut layer.warnings,
     );
     read_custom_rules(root, &mut layer.rules_custom, &mut layer.warnings);
+    layer.guard = guard::parse_guards(root, &mut layer.warnings);
     layer.git_enabled = read_bool(root, "git", "enabled", &mut layer.warnings);
     layer.enforce = read_bool(root, "mode", "enforce", &mut layer.warnings);
     read_path_list(
@@ -421,6 +426,7 @@ fn restrict_project(config: &mut Config, layer: &Layer) -> Vec<String> {
             _ => {}
         }
     }
+    config.guard.extend(layer.guard.iter().cloned());
     for rule in &layer.rules_custom {
         if rule.verdict == Verdict::Allow {
             warnings.push(format!(

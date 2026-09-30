@@ -2,7 +2,9 @@
 
 pub mod config;
 pub mod engine;
+pub mod guard;
 pub mod message;
 
 pub use config::{Config, CustomRule, Loaded};
 pub use engine::{EffectReport, Engine, EngineEnv, Report, RuleReport};
+pub use guard::{GuardRule, Invocation};

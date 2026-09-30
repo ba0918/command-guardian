@@ -1,6 +1,7 @@
 //! 判定の入口。設定を読み、効果ごとに分類と判定を出し、合成する。
 
 use crate::config::{self, Config};
+use crate::guard;
 use crate::message;
 use guardian_core::{
     analyze, strip_quotes_and_heredocs, Class, Env, Op, ProtectedKind, Target, Verdict, Why,
@@ -151,6 +152,18 @@ impl Engine {
                 rules.push(RuleReport {
                     name: rule.name.clone(),
                     reason: format!("カスタムルール「{}」", rule.name),
+                    verdict: rule.verdict,
+                });
+            }
+        }
+
+        // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
+        let invocations = guard::invocations(command);
+        for rule in &self.config.guard {
+            if invocations.iter().any(|inv| rule.matches(inv)) {
+                rules.push(RuleReport {
+                    name: rule.program.clone(),
+                    reason: rule.reason.clone(),
                     verdict: rule.verdict,
                 });
             }
