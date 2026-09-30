@@ -34,6 +34,9 @@ pub fn run(args: &[String]) -> i32 {
         Err(_) => return 0,
     };
     let report = engine.check(&input.command);
+    for w in &report.warnings {
+        eprintln!("警告: {w}");
+    }
     // 影実行ではフックとして何も返さず、判定をログに残す（REQ-018）。
     if !engine.config().enforce {
         let _ = crate::log::write_shadow(&report, &input.command);

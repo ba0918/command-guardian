@@ -306,3 +306,23 @@ fn req_006_empty_tmpdir_still_denies_protected_paths() {
     let value = envelope(&r.stdout);
     assert_eq!(value["hookSpecificOutput"]["permissionDecision"], "deny");
 }
+
+// @kotowari[REQ-015]
+#[test]
+fn req_015_hook_warns_when_the_user_config_is_broken() {
+    // 壊れた利用者設定では check と同じくフックも警告を stderr に出す。
+    let home = temp_dir("hook-guardian-hook-home-");
+    let xdg = temp_dir("hook-guardian-hook-xdg-");
+    let config = xdg.path().join("hook-guardian/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "これは TOML ではない [ paths\n").unwrap();
+    let r = run_hook(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm -rf /tmp/scratch/x", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+    );
+    assert_eq!(r.code, 0);
+    assert!(r.stderr.contains("警告"), "{}", r.stderr);
+    assert!(r.stderr.contains("利用者設定"), "{}", r.stderr);
+}
