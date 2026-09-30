@@ -282,21 +282,21 @@ fn extract_items(items: &[Item], ctx: &mut Context, out: &mut Vec<Effect>, depth
 }
 
 fn extract_pipeline(p: &Pipeline, ctx: &mut Context, out: &mut Vec<Effect>, depth: usize) {
-    let mut children_source: Option<(PathBuf, bool)> = None;
+    let mut children_sources: Vec<(PathBuf, bool)> = Vec::new();
     for cmd in &p.commands {
-        children_source = extract_command(cmd, ctx, out, depth, children_source);
+        children_sources = extract_command(cmd, ctx, out, depth, children_sources);
     }
 }
 
-/// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の base と
+/// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の起点と
 /// 末尾スラッシュの有無）を返す。
 fn extract_command(
     cmd: &SimpleCommand,
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
-    children_source: Option<(PathBuf, bool)>,
-) -> Option<(PathBuf, bool)> {
+    children_sources: Vec<(PathBuf, bool)>,
+) -> Vec<(PathBuf, bool)> {
     let mut idx = 0;
     let mut assignments = Vec::new();
     while idx < cmd.words.len() {
@@ -314,7 +314,7 @@ fn extract_command(
             ctx.vars.insert(name, v);
         }
         extract_redirects(cmd, ctx, out, depth);
-        return None;
+        return Vec::new();
     }
 
     let mut words: &[Word] = &cmd.words[idx..];
@@ -329,7 +329,9 @@ fn extract_command(
         }
         break;
     }
-    let first = words.first()?;
+    let Some(first) = words.first() else {
+        return Vec::new();
+    };
     let name = basename(&first.text);
     let args = &words[1..];
 
@@ -342,7 +344,7 @@ fn extract_command(
                     target: res.into_target(target),
                 });
             }
-            None
+            Vec::new()
         }
         "shred" => {
             for target in option_targets(args, SHRED_VALUED) {
@@ -352,7 +354,7 @@ fn extract_command(
                     target: res.into_target(target),
                 });
             }
-            None
+            Vec::new()
         }
         "truncate" => {
             for target in option_targets(args, TRUNCATE_VALUED) {
@@ -362,7 +364,7 @@ fn extract_command(
                     target: res.into_target(target),
                 });
             }
-            None
+            Vec::new()
         }
         "dd" => {
             for w in args {
@@ -382,7 +384,7 @@ fn extract_command(
                     target: res.into_target(&value_word),
                 });
             }
-            None
+            Vec::new()
         }
         "mkfs" | "wipefs" => {
             let valued: &[&str] = if name == "mkfs" {
@@ -397,7 +399,7 @@ fn extract_command(
                     target: res.into_target(target),
                 });
             }
-            None
+            Vec::new()
         }
         _ if name.starts_with("mkfs") => {
             for target in option_targets(args, &["-t", "--type", "-L", "--label"]) {
@@ -407,13 +409,13 @@ fn extract_command(
                     target: res.into_target(target),
                 });
             }
-            None
+            Vec::new()
         }
         "find" => find_effects(args, ctx, out, depth),
         "xargs" => {
-            xargs_effects(args, children_source.clone(), ctx, out, depth);
+            xargs_effects(args, &children_sources, out);
             scan_substitutions(args, ctx, out, depth);
-            None
+            Vec::new()
         }
         "bash" | "sh" | "zsh" | "dash" | "ksh" => {
             if let Some(inner) = shell_c_string(args) {
@@ -423,23 +425,26 @@ fn extract_command(
             } else {
                 scan_substitutions(args, ctx, out, depth);
             }
-            None
+            Vec::new()
         }
         "eval" => {
             let mut pieces = Vec::new();
             for w in args {
-                pieces.push(w.literal_value()?);
+                let Some(value) = w.literal_value() else {
+                    return Vec::new();
+                };
+                pieces.push(value);
             }
             if !pieces.is_empty() {
                 let script = parse::parse_script(&pieces.join(" "));
                 let mut child = ctx.clone();
                 extract_items(&script.items, &mut child, out, depth + 1);
             }
-            None
+            Vec::new()
         }
         "cd" => {
             update_cwd(args, ctx, out, depth);
-            None
+            Vec::new()
         }
         "export" | "local" | "declare" | "readonly" | "typeset" => {
             for w in args {
@@ -448,11 +453,11 @@ fn extract_command(
                     ctx.vars.insert(n, value);
                 }
             }
-            None
+            Vec::new()
         }
         _ => {
             scan_substitutions(args, ctx, out, depth);
-            None
+            Vec::new()
         }
     }
 }
@@ -535,50 +540,58 @@ fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
 }
 
 /// find の起点の読み取り結果。
-enum FindBase<'a> {
-    /// 起点の語。
-    Word(&'a Word),
-    /// 起点が先に来ないときの既定の "."。
-    Cwd,
+enum FindStarts<'a> {
+    /// 起点の語。述語の前ならいくつでも並ぶ。
+    Words(Vec<&'a Word>),
     /// `-D help`。find はデバッグ用の一覧を出すだけで探索しない。
     DebugHelp,
 }
 
+/// 述語（式）の先頭になる語か。`-x`、`(`、`!` のいずれか。`-` だけは起点。
+fn is_expression_word(text: &str) -> bool {
+    text == "(" || text == "!" || (text.starts_with('-') && text != "-")
+}
+
 /// find の起点。先頭の全体オプションだけを読み飛ばし、述語が先に来るときは
-/// 起点なし（cwd）とする。
-fn find_base(args: &[Word]) -> FindBase<'_> {
+/// 起点なし（cwd）とする。`--` は全体オプションの読み取りの終わりだけを告げる
+/// ので、その次の語も起点と述語の判定に掛ける。
+fn find_starts(args: &[Word]) -> FindStarts<'_> {
+    let mut starts = Vec::new();
+    let mut after_ddash = false;
     let mut i = 0;
     while i < args.len() {
         let t = &args[i].text;
-        if t == "-L" || t == "-H" || t == "-P" {
-            i += 1;
-            continue;
-        }
-        if t == "-D" {
-            if args.get(i + 1).is_some_and(|w| w.text == "help") {
-                return FindBase::DebugHelp;
+        if !after_ddash {
+            if t == "-L" || t == "-H" || t == "-P" {
+                i += 1;
+                continue;
             }
-            i += 2;
-            continue;
+            if t == "-D" {
+                if args.get(i + 1).is_some_and(|w| w.text == "help") {
+                    return FindStarts::DebugHelp;
+                }
+                i += 2;
+                continue;
+            }
+            // -O の水準は -O3 のように続けて書く。次の語は消費しない。
+            if t.starts_with("-O") {
+                i += 1;
+                continue;
+            }
+            if t == "--" {
+                after_ddash = true;
+                i += 1;
+                continue;
+            }
         }
-        // -O の水準は -O3 のように続けて書く。次の語は消費しない。
-        if t.starts_with("-O") {
-            i += 1;
-            continue;
-        }
-        if t == "--" {
-            return match args.get(i + 1) {
-                Some(w) => FindBase::Word(w),
-                None => FindBase::Cwd,
-            };
-        }
-        if t.starts_with('-') && t != "-" {
+        if is_expression_word(t) {
             // 述語が先に来るときは起点なし（cwd）。
-            return FindBase::Cwd;
+            break;
         }
-        return FindBase::Word(&args[i]);
+        starts.push(&args[i]);
+        i += 1;
     }
-    FindBase::Cwd
+    FindStarts::Words(starts)
 }
 
 fn find_effects(
@@ -586,17 +599,11 @@ fn find_effects(
     ctx: &mut Context,
     out: &mut Vec<Effect>,
     depth: usize,
-) -> Option<(PathBuf, bool)> {
-    let base_word = match find_base(args) {
-        FindBase::Word(w) => Some(w),
-        FindBase::Cwd => None,
+) -> Vec<(PathBuf, bool)> {
+    let starts = match find_starts(args) {
+        FindStarts::Words(w) => w,
         // 探索しないので、削除の効果も次段への供給元もない。
-        FindBase::DebugHelp => return None,
-    };
-    let dereference = base_word.is_some_and(|w| w.text.ends_with('/'));
-    let base_res = match base_word {
-        Some(w) => resolve_word(w, ctx, out, depth),
-        None => resolve_text(".", false, ctx),
+        FindStarts::DebugHelp => return Vec::new(),
     };
     let mut has_delete = false;
     let mut i = 0;
@@ -613,26 +620,50 @@ fn find_effects(
         }
         i += 1;
     }
-    let base_path = match &base_res {
-        Resolved::Path(p) | Resolved::Glob(p) => Some((p.clone(), dereference)),
-        _ => None,
-    };
+    let mut sources = Vec::new();
+    if starts.is_empty() {
+        let base_res = resolve_text(".", false, ctx);
+        if let Some(source) = find_source(base_res, false, has_delete, out) {
+            sources.push(source);
+        }
+    } else {
+        for w in starts {
+            let dereference = w.text.ends_with('/');
+            let base_res = resolve_word(w, ctx, out, depth);
+            if let Some(source) = find_source(base_res, dereference, has_delete, out) {
+                sources.push(source);
+            }
+        }
+    }
+    sources
+}
+
+/// 起点の子の削除の効果を足し、次段への供給元（起点と末尾スラッシュの有無）を返す。
+fn find_source(
+    res: Resolved,
+    dereference: bool,
+    has_delete: bool,
+    out: &mut Vec<Effect>,
+) -> Option<(PathBuf, bool)> {
     if has_delete {
-        let target = match base_res {
+        let target = match &res {
             Resolved::Path(p) | Resolved::Glob(p) => Target::Children {
-                base: p,
+                base: p.clone(),
                 dereference,
             },
             Resolved::Mktemp => Target::Mktemp,
             Resolved::UnknownSource => Target::UnknownSource,
-            Resolved::Unresolved(t) => Target::Unresolved(t),
+            Resolved::Unresolved(t) => Target::Unresolved(t.clone()),
         };
         out.push(Effect {
             op: Op::Delete,
             target,
         });
     }
-    base_path
+    match res {
+        Resolved::Path(p) | Resolved::Glob(p) => Some((p, dereference)),
+        _ => None,
+    }
 }
 
 const XARGS_VALUED: &[&str] = &[
@@ -656,13 +687,7 @@ const XARGS_VALUED: &[&str] = &[
     "--max-procs",
 ];
 
-fn xargs_effects(
-    args: &[Word],
-    children_source: Option<(PathBuf, bool)>,
-    ctx: &mut Context,
-    out: &mut Vec<Effect>,
-    depth: usize,
-) {
+fn xargs_effects(args: &[Word], children_sources: &[(PathBuf, bool)], out: &mut Vec<Effect>) {
     let mut i = 0;
     let mut utility: Option<&Word> = None;
     while i < args.len() {
@@ -687,16 +712,23 @@ fn xargs_effects(
     if basename(&u.text) != "rm" {
         return;
     }
-    // 引数中の対象は供給元から来る。供給元が分かればその子、分からなければ unknown。
-    let target = match children_source {
-        Some((base, dereference)) => Target::Children { base, dereference },
-        None => Target::UnknownSource,
-    };
-    let _ = (ctx, depth);
-    out.push(Effect {
-        op: Op::Delete,
-        target,
-    });
+    // 引数中の対象は供給元から来る。供給元の子の集合ごとに効果を出す。
+    if children_sources.is_empty() {
+        out.push(Effect {
+            op: Op::Delete,
+            target: Target::UnknownSource,
+        });
+        return;
+    }
+    for (base, dereference) in children_sources {
+        out.push(Effect {
+            op: Op::Delete,
+            target: Target::Children {
+                base: base.clone(),
+                dereference: *dereference,
+            },
+        });
+    }
 }
 
 /// `-c` の位置を探す。見つからなければ None。

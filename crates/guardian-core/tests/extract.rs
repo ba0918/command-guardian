@@ -385,3 +385,78 @@ fn req_008_find_debug_help_does_not_search() {
     // -D help はデバッグ一覧を出して終わるので、-delete が付いていても削除しない。
     assert_eq!(effects("find -D help /etc -delete"), vec![]);
 }
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_after_dashdash_uses_cwd() {
+    // `--` は全体オプションの終わりだけを告げる。その次の語が述語の始まり
+    // （-x、(、!）なら、起点は既定の "." になる。
+    for cmd in [
+        "find -- -delete",
+        "find -- -name x -delete",
+        "find -- ! -name x -delete",
+        "find -- '(' -name x ')' -delete",
+    ] {
+        assert_eq!(
+            effects(cmd),
+            vec![Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/home/you/work/repo"),
+                    dereference: false,
+                },
+            }],
+            "{cmd}"
+        );
+    }
+}
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_with_multiple_start_points_takes_each_children() {
+    // 述語の前の語はいくつでも起点になる。起点ごとの子が対象になる。
+    assert_eq!(
+        effects("find /tmp/scratch /etc -delete"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/tmp/scratch"),
+                    dereference: false,
+                },
+            },
+            Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/etc"),
+                    dereference: false,
+                },
+            },
+        ]
+    );
+}
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_with_multiple_start_points_feeds_xargs() {
+    // パイプの供給元にも起点の数だけの子の集合が流れる。
+    assert_eq!(
+        effects("find /tmp/scratch /etc -type f | xargs rm -f"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/tmp/scratch"),
+                    dereference: false,
+                },
+            },
+            Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/etc"),
+                    dereference: false,
+                },
+            },
+        ]
+    );
+}

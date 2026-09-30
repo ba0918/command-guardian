@@ -120,3 +120,24 @@ fn req_008_find_into_protected_areas_blocks() {
         Verdict::Block
     );
 }
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_after_dashdash_in_dirty_worktree_asks() {
+    // `--` の次の -delete は述語で、起点は作業ディレクトリ。作業ツリーに
+    // 未コミットの変更があるので、その子の削除は ask になる。
+    let f = fixture();
+    std::fs::write(f.root.join("src/a.rs"), "fn a() { changed }\n").unwrap();
+    assert_eq!(worst_verdict(&f.root, "find -- -delete"), Verdict::Ask);
+}
+
+// @kotowari[REQ-008, REQ-009]
+#[test]
+fn req_009_find_with_multiple_start_points_blocks_for_the_heaviest() {
+    // 起点が複数あるときは、それぞれの子を分類し、最も重い判定を返す。
+    let f = fixture();
+    assert_eq!(
+        worst_verdict(&f.root, "find /tmp /usr/lib -delete"),
+        Verdict::Block
+    );
+}
