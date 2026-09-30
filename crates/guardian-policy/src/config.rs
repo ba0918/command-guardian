@@ -397,6 +397,7 @@ fn merge(config: &mut Config, layer: &Layer) {
     config
         .rules_custom
         .extend(layer.rules_custom.iter().cloned());
+    config.guard.extend(layer.guard.iter().cloned());
     if let Some(b) = layer.git_enabled {
         config.git_enabled = b;
     }

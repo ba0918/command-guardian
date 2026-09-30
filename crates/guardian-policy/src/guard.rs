@@ -79,6 +79,25 @@ pub struct Invocation {
 }
 
 /// 設定の `commands.guard` を読む（REQ-027）。
+///
+/// 見本:
+///
+/// ```toml
+/// # push は確認する
+/// [[commands.guard]]
+/// program = "git"
+/// reason = "push はほかのブランチに影響します。内容を確かめてください"
+/// verdict = "ask"
+/// deny = [["push"]]
+///
+/// # -c alias.* でのすり抜けを止める
+/// [[commands.guard]]
+/// program = "git"
+/// reason = "別名で push を定義して実行することはできません"
+/// verdict = "block"
+/// options-with-value = ["-c", "--config-env"]
+/// deny-option-values = { "-c" = ["/alias[.].*/"], "--config-env" = ["/alias[.].*/"] }
+/// ```
 pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<GuardRule> {
     let Some(value) = root.get("commands").and_then(|c| c.get("guard")) else {
         return Vec::new();
@@ -99,7 +118,64 @@ pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<Guard
             Err(e) => warnings.push(format!("見張りの規則を無効にします（{name}）: {e}")),
         }
     }
+    validate_examples(&mut rules, warnings);
     rules
+}
+
+/// `examples.deny` が一致し、`examples.allow` が一致しないことを確かめる（REQ-034）。
+fn validate_examples(rules: &mut Vec<GuardRule>, warnings: &mut Vec<String>) {
+    rules.retain(|rule| {
+        if rule.examples_deny.is_empty() && rule.examples_allow.is_empty() {
+            return true;
+        }
+        for example in &rule.examples_deny {
+            match example_matches(rule, example) {
+                Ok(true) => {}
+                Ok(false) => {
+                    warnings.push(format!(
+                        "見張りの規則を無効にします（{}）: examples.deny に一致しない例がある: {example}",
+                        rule.program
+                    ));
+                    return false;
+                }
+                Err(e) => {
+                    warnings.push(format!(
+                        "見張りの規則を無効にします（{}）: {e}: {example}",
+                        rule.program
+                    ));
+                    return false;
+                }
+            }
+        }
+        for example in &rule.examples_allow {
+            match example_matches(rule, example) {
+                Ok(false) => {}
+                Ok(true) => {
+                    warnings.push(format!(
+                        "見張りの規則を無効にします（{}）: examples.allow に一致する例がある: {example}",
+                        rule.program
+                    ));
+                    return false;
+                }
+                Err(e) => {
+                    warnings.push(format!(
+                        "見張りの規則を無効にします（{}）: {e}: {example}",
+                        rule.program
+                    ));
+                    return false;
+                }
+            }
+        }
+        true
+    });
+}
+
+fn example_matches(rule: &GuardRule, example: &str) -> Result<bool, String> {
+    let invs = invocations(example);
+    match invs.as_slice() {
+        [inv] => Ok(rule.matches(inv)),
+        _ => Err("例を 1 つの起動として読めない".to_string()),
+    }
 }
 
 /// テスト用に TOML の文書から読む。
