@@ -354,3 +354,34 @@ fn req_008_find_without_a_start_point_uses_cwd() {
         }]
     );
 }
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_start_point_after_leading_options() {
+    for cmd in [
+        "find -- /etc -delete",
+        "find -L -- /etc -delete",
+        "find -O3 /etc -delete",
+        // -D の値は起点ではない。
+        "find -D search /etc -delete",
+    ] {
+        assert_eq!(
+            effects(cmd),
+            vec![Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/etc"),
+                    dereference: false,
+                },
+            }],
+            "{cmd}"
+        );
+    }
+}
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_find_debug_help_does_not_search() {
+    // -D help はデバッグ一覧を出して終わるので、-delete が付いていても削除しない。
+    assert_eq!(effects("find -D help /etc -delete"), vec![]);
+}

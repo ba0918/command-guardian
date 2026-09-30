@@ -534,9 +534,19 @@ fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
     targets
 }
 
-/// find の起点の語。先頭の全体オプションだけを読み飛ばし、述語が先に来るときは
+/// find の起点の読み取り結果。
+enum FindBase<'a> {
+    /// 起点の語。
+    Word(&'a Word),
+    /// 起点が先に来ないときの既定の "."。
+    Cwd,
+    /// `-D help`。find はデバッグ用の一覧を出すだけで探索しない。
+    DebugHelp,
+}
+
+/// find の起点。先頭の全体オプションだけを読み飛ばし、述語が先に来るときは
 /// 起点なし（cwd）とする。
-fn find_base_word(args: &[Word]) -> Option<&Word> {
+fn find_base(args: &[Word]) -> FindBase<'_> {
     let mut i = 0;
     while i < args.len() {
         let t = &args[i].text;
@@ -544,17 +554,31 @@ fn find_base_word(args: &[Word]) -> Option<&Word> {
             i += 1;
             continue;
         }
-        if t == "-D" || t == "-O" {
+        if t == "-D" {
+            if args.get(i + 1).is_some_and(|w| w.text == "help") {
+                return FindBase::DebugHelp;
+            }
             i += 2;
             continue;
         }
+        // -O の水準は -O3 のように続けて書く。次の語は消費しない。
+        if t.starts_with("-O") {
+            i += 1;
+            continue;
+        }
+        if t == "--" {
+            return match args.get(i + 1) {
+                Some(w) => FindBase::Word(w),
+                None => FindBase::Cwd,
+            };
+        }
         if t.starts_with('-') && t != "-" {
             // 述語が先に来るときは起点なし（cwd）。
-            return None;
+            return FindBase::Cwd;
         }
-        return Some(&args[i]);
+        return FindBase::Word(&args[i]);
     }
-    None
+    FindBase::Cwd
 }
 
 fn find_effects(
@@ -563,7 +587,12 @@ fn find_effects(
     out: &mut Vec<Effect>,
     depth: usize,
 ) -> Option<(PathBuf, bool)> {
-    let base_word = find_base_word(args);
+    let base_word = match find_base(args) {
+        FindBase::Word(w) => Some(w),
+        FindBase::Cwd => None,
+        // 探索しないので、削除の効果も次段への供給元もない。
+        FindBase::DebugHelp => return None,
+    };
     let dereference = base_word.is_some_and(|w| w.text.ends_with('/'));
     let base_res = match base_word {
         Some(w) => resolve_word(w, ctx, out, depth),
