@@ -32,3 +32,7 @@ not read it again; read every other rule this table routes to the work as usual.
 
 Project-specific context — what this repository is, how to build and test it, and the
 conventions that apply only here — lives in `PROJECT.md`. Read it before making changes.
+
+## kotowari
+
+This project manages its specification as an IR (`docs/ir/`).
