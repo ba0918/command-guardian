@@ -375,6 +375,18 @@ fn req_010_unreadable_shell_and_eval_bodies_ask() {
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
 
+// @kotowari[REQ-010, REQ-017]
+#[test]
+fn req_017_command_after_a_bare_wrapper_option_is_still_judged() {
+    // 値付きオプションが末尾のラッパーで解析が止まらず、次のコマンドを判定する。
+    let home = temp_home();
+    let r = run(
+        &["check", "sudo -u; rm -rf /etc/x", "--cwd", "/tmp/scratch"],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+}
+
 // @kotowari[REQ-002]
 #[test]
 fn req_002_other_user_tilde_paths_block() {

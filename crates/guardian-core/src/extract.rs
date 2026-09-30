@@ -1098,5 +1098,7 @@ fn strip_wrapper<'a>(words: &'a [Word], name: &str) -> &'a [Word] {
     while i < words.len() && split_assignment(&words[i]).is_some() {
         i += 1;
     }
-    &words[i..]
+    // 値付きオプションが末尾で値が無いときは、読み飛ばしが語を越える。
+    // 語の外を指さないように丸める。
+    &words[i.min(words.len())..]
 }

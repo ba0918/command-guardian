@@ -291,6 +291,21 @@ fn req_024_non_bash_input_returns_nothing() {
     }
 }
 
+// @kotowari[REQ-010]
+#[test]
+fn req_010_hook_does_not_fail_on_a_bare_wrapper_option() {
+    // 値付きオプションが末尾のラッパーでも、フックは判定を出さずに 0 で終わる。
+    let home = temp_dir("hook-guardian-hook-home-");
+    let r = run_hook(
+        &["hook", "--agent", "claude"],
+        &bash_input("doas -a", "/tmp/scratch"),
+        home.path(),
+        &home.path().join(".config"),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.trim().is_empty(), "{}", r.stdout);
+}
+
 // @kotowari[REQ-006]
 #[test]
 fn req_006_empty_tmpdir_still_denies_protected_paths() {

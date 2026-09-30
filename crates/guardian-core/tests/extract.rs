@@ -436,6 +436,22 @@ fn req_008_find_with_multiple_start_points_takes_each_children() {
     );
 }
 
+// @kotowari[REQ-010]
+#[test]
+fn req_010_a_trailing_wrapper_option_is_not_a_command() {
+    // 値の無い値付きオプションが末尾でも、panic せず効果なしになる。
+    for cmd in [
+        "sudo -u",
+        "sudo -p",
+        "sudo --user",
+        "sudo -g",
+        "doas -a",
+        "doas -C",
+    ] {
+        assert_eq!(effects(cmd), vec![], "{cmd}");
+    }
+}
+
 // @kotowari[REQ-008]
 #[test]
 fn req_008_find_with_multiple_start_points_feeds_xargs() {
