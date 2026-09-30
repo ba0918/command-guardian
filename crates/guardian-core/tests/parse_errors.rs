@@ -13,6 +13,18 @@ fn env() -> Env {
 
 // @kotowari[REQ-010]
 #[test]
+fn req_010_non_literal_program_word_is_unreadable() {
+    // プログラムの語がリテラルでないと、何が実行されるか読めない。
+    for cmd in ["CMD=rm; $CMD -rf /etc/x", "$(echo rm) -rf /etc/x"] {
+        let a = analyze(cmd, &env());
+        assert!(!a.parse_errors.is_empty(), "{cmd}");
+    }
+    // リテラルのプログラムはそのまま読める。
+    assert!(analyze("rm -rf /etc/x", &env()).parse_errors.is_empty());
+}
+
+// @kotowari[REQ-010]
+#[test]
 fn req_010_unterminated_quotes_are_parse_errors() {
     for cmd in [
         "rm -rf '/etc/foo",

@@ -210,6 +210,14 @@ fn check_unreadable_command(cmd: &SimpleCommand, errors: &mut Vec<String>, depth
     let Some(first) = words.first() else {
         return;
     };
+    // プログラムの語がリテラルでないと、何が実行されるかを読めない（REQ-010）。
+    if first.literal_value().is_none() {
+        errors.push(format!(
+            "コマンドを読めないため判定できません: {}",
+            first.text
+        ));
+        return;
+    }
     let name = basename(&first.text);
     let args = &words[1..];
     match name {

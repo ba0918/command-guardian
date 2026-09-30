@@ -387,6 +387,18 @@ fn req_017_command_after_a_bare_wrapper_option_is_still_judged() {
     assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
 
+// @kotowari[REQ-010]
+#[test]
+fn req_010_unreadable_program_word_asks() {
+    // プログラムの語がリテラルでないコマンドは判定できないので ask。
+    let home = temp_home();
+    for cmd in ["CMD=rm; $CMD -rf /etc/x", "$(echo rm) -rf /etc/x"] {
+        let r = run(&["check", cmd, "--cwd", "/tmp/scratch"], home.path());
+        assert_eq!(r.code, 1, "{cmd}: stdout {} stderr {}", r.stdout, r.stderr);
+        assert!(r.stdout.contains("ask"), "{cmd}: {}", r.stdout);
+    }
+}
+
 // @kotowari[REQ-002]
 #[test]
 fn req_002_other_user_tilde_paths_block() {
