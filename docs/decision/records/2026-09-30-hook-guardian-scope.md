@@ -17,6 +17,7 @@ Position: 承認の材料を提示し、利用者が承認した（コミット�
 - A2 実装は Cargo の workspace で `crates/guardian-core`、`crates/guardian-judge`、`crates/guardian-policy` の 3 crate に分け、判定機とポリシーを分離する。各 crate の責務境界は第 2 ラウンドで決める。
   - why: 判定の意味論（judge）と設定（policy）を分けると、判定を設定から独立してテストできる
   - decided_by: 利用者
+  - superseded_by: [A6 (parser)](./2026-10-01-parser.md#A6)
 - A3 判定の語彙は allow / ask / block の 3 値とし、確信が持てないときの既定は ask にする。block は「消えると戻せないうえ危険と確信できる対象」だけに残す。
   - why: 判定不能を一律ブロックする現行方針が誤ブロックの主因。ask はその場の許可ダイアログで通せるので作業が止まらない
   - decided_by: 利用者（推奨を採用）
@@ -42,6 +43,7 @@ Position: 承認の材料を提示し、利用者が承認した（コミット�
 - A10 crate の責務は次のとおり。core はシェル構文の解析・破壊的効果の抽出・パス解決・共通の型を持ち、設定に依存しない。judge は fs と git からパスを 4 分類し、設定を読まず、そのパスが作業ツリー内のときだけ git を起動する。policy は 3 層設定の読み込み・分類から判定への対応・ルートの追加・判定の合成を担う。バイナリは CLI とフックの口を提供する。
   - why: 判定の意味論を設定から独立させると、実測コーパスをそのままテストに使える
   - decided_by: 利用者（推奨を採用）
+  - superseded_by: [A6 (parser)](./2026-10-01-parser.md#A6)
 - A11 判定の単位は効果（操作・パス・再帰の有無）とし、M1 が扱う効果は delete / format / truncate の 3 つとする。リダイレクト `>` による切り詰めは truncate として扱う。
   - why: パスを壊す操作は rm だけではない。効果に正規化すると同じパス判定を全操作で共有できる
   - decided_by: 利用者（推奨を採用）
