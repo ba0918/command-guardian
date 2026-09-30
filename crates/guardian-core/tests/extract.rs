@@ -436,6 +436,79 @@ fn req_008_find_with_multiple_start_points_takes_each_children() {
     );
 }
 
+// @kotowari[REQ-001]
+#[test]
+fn req_001_substitution_in_an_option_value_is_read() {
+    // 値付きオプションの値になっているコマンド置換も読む。値そのものは対象にしない。
+    assert_eq!(
+        effects("shred -n \"$(rm -rf /etc/x)\" /tmp/y"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            },
+            Effect {
+                op: Op::Delete,
+                target: path("/tmp/y")
+            }
+        ]
+    );
+    assert_eq!(
+        effects("truncate -s \"$(rm -rf /etc/x)\" /tmp/y"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            },
+            Effect {
+                op: Op::Truncate,
+                target: path("/tmp/y")
+            }
+        ]
+    );
+}
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_substitution_in_a_find_argument_is_read() {
+    // 起点でない find の引数の中のコマンド置換も読む。絞り込みの値は対象にしない。
+    assert_eq!(
+        effects("find /tmp/scratch -name \"$(rm -rf /etc/x)\" -delete"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            },
+            Effect {
+                op: Op::Delete,
+                target: Target::Children {
+                    base: PathBuf::from("/tmp/scratch"),
+                    dereference: false,
+                },
+            }
+        ]
+    );
+}
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_substitution_in_a_dd_argument_is_read() {
+    // of= 以外の dd の引数の中のコマンド置換も読む。
+    assert_eq!(
+        effects("dd if=$(rm -rf /etc/x) of=/tmp/y"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            },
+            Effect {
+                op: Op::Truncate,
+                target: path("/tmp/y")
+            }
+        ]
+    );
+}
+
 // @kotowari[REQ-010]
 #[test]
 fn req_010_a_trailing_wrapper_option_is_not_a_command() {

@@ -337,7 +337,9 @@ fn extract_command(
 
     match name {
         "rm" | "rmdir" | "unlink" => {
-            for target in option_targets(args, &[]) {
+            let (targets, skipped) = option_targets(args, &[]);
+            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            for target in targets {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Delete,
@@ -347,7 +349,9 @@ fn extract_command(
             Vec::new()
         }
         "shred" => {
-            for target in option_targets(args, SHRED_VALUED) {
+            let (targets, skipped) = option_targets(args, SHRED_VALUED);
+            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            for target in targets {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Delete,
@@ -357,7 +361,9 @@ fn extract_command(
             Vec::new()
         }
         "truncate" => {
-            for target in option_targets(args, TRUNCATE_VALUED) {
+            let (targets, skipped) = option_targets(args, TRUNCATE_VALUED);
+            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            for target in targets {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Truncate,
@@ -369,6 +375,8 @@ fn extract_command(
         "dd" => {
             for w in args {
                 let Some(value_word) = strip_prefix_word(w, "of=") else {
+                    // of= 以外の語（if= など）の中のコマンド置換も読む。
+                    scan_word_substitutions(w, ctx, out, depth);
                     continue;
                 };
                 if value_word.text.is_empty() || value_word.text == "-" {
@@ -392,7 +400,9 @@ fn extract_command(
             } else {
                 &["-o", "-O", "-t", "--offset", "--types", "--output"]
             };
-            for target in option_targets(args, valued) {
+            let (targets, skipped) = option_targets(args, valued);
+            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            for target in targets {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Format,
@@ -402,7 +412,9 @@ fn extract_command(
             Vec::new()
         }
         _ if name.starts_with("mkfs") => {
-            for target in option_targets(args, &["-t", "--type", "-L", "--label"]) {
+            let (targets, skipped) = option_targets(args, &["-t", "--type", "-L", "--label"]);
+            scan_skipped_substitutions(&skipped, ctx, out, depth);
+            for target in targets {
                 let res = resolve_word(target, ctx, out, depth);
                 out.push(Effect {
                     op: Op::Format,
@@ -465,12 +477,25 @@ fn extract_command(
 /// コマンド置換の内側だけを読む。既知のコマンドとして扱わない語に使う。
 fn scan_substitutions(args: &[Word], ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
     for w in args {
-        for part in &w.parts {
-            if let Part::Subst(inner) = part {
-                let script = parse::parse_script(inner);
-                let mut child = ctx.clone();
-                extract_items(&script.items, &mut child, out, depth + 1);
-            }
+        scan_word_substitutions(w, ctx, out, depth);
+    }
+}
+
+/// 対象から外した語（値付きオプションの値など）のコマンド置換だけを読む。
+/// 語そのものは対象にしない。
+fn scan_skipped_substitutions(words: &[&Word], ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
+    for w in words {
+        scan_word_substitutions(w, ctx, out, depth);
+    }
+}
+
+/// 1 つの語のコマンド置換の内側だけを読む。
+fn scan_word_substitutions(w: &Word, ctx: &Context, out: &mut Vec<Effect>, depth: usize) {
+    for part in &w.parts {
+        if let Part::Subst(inner) = part {
+            let script = parse::parse_script(inner);
+            let mut child = ctx.clone();
+            extract_items(&script.items, &mut child, out, depth + 1);
         }
     }
 }
@@ -509,14 +534,17 @@ const TRUNCATE_VALUED: &[&str] = &["-s", "--size", "-r", "--reference"];
 /// shred の値付きオプション。値は削除の対象ではない。
 const SHRED_VALUED: &[&str] = &["-n", "--iterations", "-s", "--size", "--random-source"];
 
-/// 効果の対象を、`-` で始まる語を読み飛ばして集める。
-fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
+/// 効果の対象を、`-` で始まる語を読み飛ばして集める。対象から外した語も返す
+/// （値付きオプションの値など。対象にはしないが、コマンド置換は読む）。
+fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> (Vec<&'a Word>, Vec<&'a Word>) {
     let mut targets = Vec::new();
+    let mut skipped = Vec::new();
     let mut after_ddash = false;
     let mut skip_next = false;
     for w in args {
         if skip_next {
             skip_next = false;
+            skipped.push(w);
             continue;
         }
         if after_ddash {
@@ -532,11 +560,12 @@ fn option_targets<'a>(args: &'a [Word], valued: &[&str]) -> Vec<&'a Word> {
             if valued.contains(&head) && !w.text.contains('=') {
                 skip_next = true;
             }
+            skipped.push(w);
             continue;
         }
         targets.push(w);
     }
-    targets
+    (targets, skipped)
 }
 
 /// find の起点の読み取り結果。
@@ -600,7 +629,19 @@ fn find_effects(
     out: &mut Vec<Effect>,
     depth: usize,
 ) -> Vec<(PathBuf, bool)> {
-    let starts = match find_starts(args) {
+    let starts = find_starts(args);
+    let start_words: &[&Word] = match &starts {
+        FindStarts::Words(w) => w,
+        FindStarts::DebugHelp => &[],
+    };
+    // 起点でない語（-name の値など）の中のコマンド置換も読む。絞り込みの値は
+    // 対象にはしない。
+    for w in args {
+        if !start_words.iter().any(|s| std::ptr::eq(*s, w)) {
+            scan_word_substitutions(w, ctx, out, depth);
+        }
+    }
+    let starts = match starts {
         FindStarts::Words(w) => w,
         // 探索しないので、削除の効果も次段への供給元もない。
         FindStarts::DebugHelp => return Vec::new(),
