@@ -433,7 +433,9 @@ fn walk_command(cmd: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) {
         let Some(first) = words.get(i) else { return };
         let name = basename(&first.text);
         if name == "sudo" || name == "doas" {
-            i = strip_wrapper(&words, i, name);
+            let (next, names) = strip_wrapper(&words, i, name);
+            env_names.extend(names);
+            i = next;
         } else {
             break;
         }
@@ -507,7 +509,7 @@ const SUDO_VALUED: &[&str] = &[
 ];
 const DOAS_VALUED: &[&str] = &["-u", "-C", "-a"];
 
-fn strip_wrapper(words: &[&Word], mut i: usize, name: &str) -> usize {
+fn strip_wrapper(words: &[&Word], mut i: usize, name: &str) -> (usize, Vec<String>) {
     let valued = if name == "doas" {
         DOAS_VALUED
     } else {
@@ -530,10 +532,17 @@ fn strip_wrapper(words: &[&Word], mut i: usize, name: &str) -> usize {
             i += 1;
         }
     }
-    while i < words.len() && assignment_name(words[i]).is_some() {
-        i += 1;
+    let mut env_names = Vec::new();
+    while i < words.len() {
+        match assignment_name(words[i]) {
+            Some((n, _)) => {
+                env_names.push(n);
+                i += 1;
+            }
+            None => break,
+        }
     }
-    i
+    (i, env_names)
 }
 
 fn shell_c_string(args: &[&Word]) -> Option<String> {
