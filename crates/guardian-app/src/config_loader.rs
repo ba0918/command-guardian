@@ -120,6 +120,9 @@ pub fn validate_examples(
                     session.parse(input)
                 });
                 let error = match facts.invocations.as_slice() {
+                    _ if !facts.diagnostics.is_empty() => {
+                        "an example contains analysis diagnostics"
+                    }
                     [inv] if rule.matches(inv) == deny => continue,
                     [_] if deny => "an examples.deny entry does not match",
                     [_] => "an examples.allow entry matches",

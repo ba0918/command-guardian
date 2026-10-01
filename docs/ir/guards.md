@@ -63,10 +63,12 @@
 ### REQ-034: 例の検証と、壊れた規則の扱い
 
 - kind: event_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A45, docs/decision/records/2026-09-30-hook-guardian-scope.md#A48
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A45, docs/decision/records/2026-09-30-hook-guardian-scope.md#A48, docs/decision/records/2026-10-02-guard-example-diagnostics.md#A1
 - verification: unit
 
 設定を読み込むとき、"examples.deny" の各例がその規則で一致し、"examples.allow" の各例が一致しないことを確かめる。例は、シェルと同じ引用の規則で語に分け、先頭の "NAME=value" を環境として読む。合わない例、壊れた正規表現、形の誤りがある規則は、その規則だけを無効にして警告を出す。設定の全体は、組み込みの既定で続ける。
+
+例のトップレベルまたは内側の意味解析に診断があるときは、回復した起動が一致しても、その規則だけを無効化して警告する。診断のない例の一致判定と他の規則は維持する。
 
 ## Properties
 

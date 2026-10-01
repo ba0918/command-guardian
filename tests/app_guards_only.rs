@@ -167,6 +167,30 @@ examples = { deny = ["GIT_CONFIG_COUNT=1 git push"], allow = ["git push"] }
     assert!(matches(&rs, "GIT_CONFIG_COUNT=1 git push"));
 }
 
+// @kotowari[REQ-034]
+#[test]
+fn req_034_diagnostics_in_outer_or_nested_examples_disable_only_that_rule() {
+    for example in ["git push; if true; then", "eval 'git push &&'"] {
+        let (rs, warnings) = rules(&format!(
+            r#"
+[[commands.guard]]
+program = "git"
+reason = "invalid example"
+deny = [["push"]]
+examples = {{ deny = ["{example}"] }}
+[[commands.guard]]
+program = "git"
+reason = "valid example"
+deny = [["push"]]
+examples = {{ deny = ["git push"], allow = ["git status"] }}
+"#
+        ));
+        assert_eq!(rs.len(), 1, "{example}");
+        assert_eq!(rs[0].reason, "valid example");
+        assert_eq!(warnings.len(), 1);
+    }
+}
+
 // @kotowari[REQ-033, EX-037]
 #[test]
 fn req_033_matched_rule_joins_composition_with_reason() {
