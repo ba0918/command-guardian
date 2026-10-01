@@ -253,168 +253,757 @@ fn in_parser_thread<T: Send>(f: impl FnOnce() -> T + Send) -> Option<T> {
 
 /// 字句解析の前に、構文と置換の入れ子の深さの上限を測る（REQ-039）。
 ///
-/// 引用・コメント・エスケープを読み飛ばし、括弧・波括弧・バッククォートと
-/// 制御構造の語を数える。数え漏らすと OSS パーサが再帰でプロセスを落とすため、
-/// 少なく見積もらない側に倒す。
+/// 引用とエスケープは正確に読み、`#`・here-doc・`case` のように解釈の揺れる
+/// 位置に出会ったら、そこから先は「開きだけを数える」側へ切り替える。
+/// 少なく見積もると OSS パーサの再帰でプロセスが落ちる（スタックオーバー
+/// フローは捕まえられない）が、多く見積もっても ask に倒れるだけで済む。
 fn depth_over_limit(input: &str) -> bool {
-    const NORMAL: char = 'n';
-    const DOUBLE: char = 'd';
-    const SINGLE: char = 's';
-    const BACKTICK: char = 'b';
+    const NORMAL: u8 = 0;
+    const DOUBLE: u8 = 1;
+    const SINGLE: u8 = 2;
+    const BACKTICK: u8 = 3;
+    const ANSI_C: u8 = 4;
 
-    /// 開いている入れ子の種類。`)` は `(` だけを、`}` は `{` だけを閉じる。
+    /// 開いている入れ子の種類。
     #[derive(Clone, Copy, PartialEq, Eq)]
-    enum Ctx {
-        Paren,
-        Brace,
+    enum Nest {
+        /// `( ... )` のサブシェル。
+        Subshell,
+        /// `$( ... )` のコマンド置換。
+        Substitution,
+        /// `(( ... ))` の算術。
+        Arithmetic,
+        /// `$[ ... ]` の算術。
+        ArithmeticBracket,
+        /// `${ ... }` のパラメータ展開。
+        Parameter,
+        /// `{ ...; }` のグループ。
+        Group,
+        /// `{a,b}` の語。
+        WordBrace,
+        /// `[[ ... ]]`。
+        Test,
+        /// `<( ... )`・`>( ... )` と拡張 glob。
+        Process,
+        /// バッククォートの本体。
+        Backquote,
+        /// スクリプト全体。
+        Root,
+    }
+
+    impl Nest {
+        /// この入れ子の中の `#` がコメントになり得るか。
+        fn allows_comment(self) -> bool {
+            matches!(
+                self,
+                Nest::Root
+                    | Nest::Subshell
+                    | Nest::Substitution
+                    | Nest::Group
+                    | Nest::Process
+                    | Nest::Backquote
+            )
+        }
+
+        /// `)` が閉じる種類か。
+        fn closed_by_paren(self) -> bool {
+            matches!(
+                self,
+                Nest::Subshell | Nest::Substitution | Nest::Arithmetic | Nest::Process
+            )
+        }
+
+        /// この入れ子を閉じた後ろにコマンドが続くか。語の一部
+        /// （`$(...)`・`${...}`・`{a,b}`・`<( ... )`）では続かない。
+        fn command_follows(self) -> bool {
+            matches!(
+                self,
+                Nest::Subshell | Nest::Arithmetic | Nest::Group | Nest::Test
+            )
+        }
+    }
+
+    /// 深さを増やす予約語。
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Keyword {
+        If,
+        Loop,
+        /// `case`。`patterns` は枝の位置（`in` の後ろ）か。`mark` は枝を
+        /// 開いたときの入れ子の数で、枝の中の `)` が外を閉じない印。
+        Case {
+            patterns: bool,
+            mark: usize,
+        },
+    }
+
+    /// `<<` の後ろの 1 つの here-doc。
+    struct HereDoc {
+        delimiter: String,
+        strip_tabs: bool,
+        expand: bool,
+    }
+
+    /// `<<` の後ろの区切りの語を読む（区切り、タブを除くか、展開するか）。
+    fn here_doc_delimiter(chars: &[char], index: &mut usize) -> Option<(String, bool, bool)> {
+        let mut i = *index;
+        let mut strip_tabs = false;
+        if chars.get(i) == Some(&'-') {
+            strip_tabs = true;
+            i += 1;
+        }
+        while matches!(chars.get(i), Some(' ' | '\t')) {
+            i += 1;
+        }
+        let mut delimiter = String::new();
+        let mut quoted = false;
+        let mut any = false;
+        while i < chars.len() {
+            match chars[i] {
+                ' ' | '\t' | '\n' | ';' | '&' | '|' | '(' | ')' | '<' | '>' => break,
+                '\\' => {
+                    quoted = true;
+                    i += 1;
+                    if let Some(&next) = chars.get(i) {
+                        delimiter.push(next);
+                        i += 1;
+                        any = true;
+                    }
+                }
+                '\'' => {
+                    quoted = true;
+                    i += 1;
+                    while i < chars.len() && chars[i] != '\'' {
+                        delimiter.push(chars[i]);
+                        i += 1;
+                    }
+                    i += 1;
+                    any = true;
+                }
+                '"' => {
+                    quoted = true;
+                    i += 1;
+                    while i < chars.len() && chars[i] != '"' {
+                        if chars[i] == '\\' && i + 1 < chars.len() {
+                            i += 1;
+                        }
+                        delimiter.push(chars[i]);
+                        i += 1;
+                    }
+                    i += 1;
+                    any = true;
+                }
+                c => {
+                    delimiter.push(c);
+                    i += 1;
+                    any = true;
+                }
+            }
+        }
+        if !any {
+            return None;
+        }
+        *index = i;
+        Some((delimiter, strip_tabs, !quoted))
+    }
+
+    /// here-doc の本体を区切りの行まで読み飛ばし、本体の中の展開の開きの
+    /// 数の最大を返す（本体では `$(`・`${`・`$[`・バッククォートだけが効く）。
+    fn skip_here_docs(chars: &[char], index: &mut usize, docs: &mut Vec<HereDoc>) -> usize {
+        let mut i = *index;
+        let mut max = 0usize;
+        for doc in docs.drain(..) {
+            let mut count = 0usize;
+            loop {
+                let start = i;
+                while i < chars.len() && chars[i] != '\n' {
+                    if doc.expand
+                        && (chars[i] == '`'
+                            || (chars[i] == '$'
+                                && matches!(chars.get(i + 1), Some('(' | '{' | '['))))
+                    {
+                        count += 1;
+                    }
+                    i += 1;
+                }
+                let end = i;
+                let mut content = start;
+                if doc.strip_tabs {
+                    while content < end && chars[content] == '\t' {
+                        content += 1;
+                    }
+                }
+                let line: String = chars[content..end].iter().collect();
+                if line == doc.delimiter {
+                    if i < chars.len() {
+                        i += 1;
+                    }
+                    break;
+                }
+                if i >= chars.len() {
+                    break;
+                }
+                i += 1;
+            }
+            max = max.max(count);
+        }
+        *index = i;
+        max
+    }
+
+    struct Frame {
+        nest: Nest,
+        /// この入れ子の中で開いた予約語。
+        keywords: Vec<Keyword>,
+        /// 二重引用の中から開いたときは、閉じるときに引用へ戻る。
+        restore_quote: bool,
+    }
+
+    fn opener(word: &str) -> Option<Keyword> {
+        match word {
+            "if" => Some(Keyword::If),
+            "while" | "until" | "for" | "select" => Some(Keyword::Loop),
+            _ => None,
+        }
+    }
+
+    fn closer(word: &str) -> Option<Keyword> {
+        match word {
+            "fi" => Some(Keyword::If),
+            "done" => Some(Keyword::Loop),
+            _ => None,
+        }
     }
 
     let chars: Vec<char> = input.chars().collect();
-    let mut states = vec![NORMAL];
-    let mut stack: Vec<Ctx> = Vec::new();
-    let mut sub_marks: Vec<usize> = Vec::new();
+    let mut modes: Vec<u8> = vec![NORMAL];
+    let mut frames: Vec<Frame> = vec![Frame {
+        nest: Nest::Root,
+        keywords: Vec::new(),
+        restore_quote: false,
+    }];
     let mut keywords = 0usize;
     let mut peak = 0usize;
-    let mut at_word_start = true;
+    let mut at_command_start = true;
+    // 予約語の閉じは、`;` か改行の直後にだけ閉じとして認められる。
+    let mut after_separator = true;
+    let mut last: Option<char> = None;
+    let mut last_non_ws: Option<char> = None;
+    // 行の終わりから始まる here-doc の本体。
+    let mut here_docs: Vec<HereDoc> = Vec::new();
+    // バッククォートの本体で開いたものを、閉じるときに捨てるための印。
+    let mut backquote_frames: Vec<usize> = Vec::new();
+    let mut backquote_keywords: Vec<usize> = Vec::new();
     let mut index = 0;
-    let bump = |depth: usize, keywords: usize, peak: &mut usize| {
-        let value = depth + keywords;
-        if value > *peak {
-            *peak = value;
-        }
-        value > LIMIT_DEPTH
-    };
+
+    macro_rules! depth {
+        () => {
+            (frames.len() - 1) + keywords
+        };
+    }
+    macro_rules! bump {
+        () => {
+            if depth!() > peak {
+                peak = depth!();
+            }
+            if peak > LIMIT_DEPTH {
+                return true;
+            }
+        };
+    }
+    macro_rules! pop_frame {
+        () => {{
+            let frame = frames.pop().unwrap();
+            keywords -= frame.keywords.len();
+            if frame.restore_quote {
+                modes.pop();
+            }
+            frame.nest
+        }};
+    }
+    /// ここから先は開きだけを数える。解釈の揺れる字面に出会ったときの逃げ道。
+    macro_rules! count_openers_only {
+        () => {{
+            let mut count = depth!();
+            while index < chars.len() {
+                let c = chars[index];
+                match c {
+                    '(' | '{' | '`' => {
+                        count += 1;
+                        index += 1;
+                    }
+                    '$' if chars.get(index + 1) == Some(&'[') => {
+                        count += 1;
+                        index += 2;
+                    }
+                    _ if is_word_char(c) => {
+                        let word = word_at(&chars, &mut index);
+                        if opener(&word).is_some() {
+                            count += 1;
+                        }
+                    }
+                    _ => index += 1,
+                }
+                if count > LIMIT_DEPTH {
+                    return true;
+                }
+            }
+            return false;
+        }};
+    }
+
     while index < chars.len() {
         let c = chars[index];
-        let state = *states.last().unwrap_or(&NORMAL);
-        match state {
+        let prev = last;
+        let prev_non_ws = last_non_ws;
+        let prev_separator = after_separator;
+        last = Some(c);
+        if !c.is_whitespace() {
+            last_non_ws = Some(c);
+            after_separator = false;
+        }
+        match *modes.last().unwrap_or(&NORMAL) {
             SINGLE => {
                 if c == '\'' {
-                    states.pop();
+                    modes.pop();
+                    at_command_start = false;
                 }
                 index += 1;
             }
-            BACKTICK => {
-                if c == '\\' {
-                    index += 2;
-                    continue;
-                }
-                if c == '`' {
-                    states.pop();
+            ANSI_C => match c {
+                '\\' => index += 2,
+                '\'' => {
+                    modes.pop();
                     index += 1;
-                    continue;
+                    at_command_start = false;
                 }
-                if c == '$' && chars.get(index + 1) == Some(&'(') {
-                    stack.push(Ctx::Paren);
-                    sub_marks.push(stack.len());
-                    states.push(NORMAL);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
+                _ => index += 1,
+            },
+            BACKTICK => match c {
+                '\\' => index += 2,
+                '`' => {
+                    modes.pop();
+                    frames.truncate(backquote_frames.pop().unwrap_or(0));
+                    if let Some(saved) = backquote_keywords.pop() {
+                        keywords = saved;
                     }
-                    index += 2;
-                    continue;
+                    index += 1;
+                    at_command_start = false;
                 }
-                if is_word_char(c) {
+                '(' | '{' => {
+                    frames.push(Frame {
+                        nest: Nest::Substitution,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    index += 1;
+                    bump!();
+                }
+                '[' if prev == Some('$') => {
+                    frames.push(Frame {
+                        nest: Nest::ArithmeticBracket,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    index += 1;
+                    bump!();
+                }
+                _ if is_word_char(c) => {
                     let word = word_at(&chars, &mut index);
-                    count_keyword(&word, &mut keywords);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
+                    last = chars.get(index - 1).copied();
+                    if opener(&word).is_some() {
+                        keywords += 1;
+                        bump!();
                     }
-                    continue;
                 }
-                index += 1;
-            }
+                _ => index += 1,
+            },
             DOUBLE => match c {
                 '\\' => index += 2,
                 '"' => {
-                    states.pop();
+                    modes.pop();
                     index += 1;
+                    at_command_start = false;
                 }
-                '$' if chars.get(index + 1) == Some(&'(') => {
-                    stack.push(Ctx::Paren);
-                    sub_marks.push(stack.len());
-                    states.push(NORMAL);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
-                    }
-                    index += 2;
+                '(' if prev == Some('$') => {
+                    frames.push(Frame {
+                        nest: Nest::Substitution,
+                        keywords: Vec::new(),
+                        restore_quote: true,
+                    });
+                    modes.push(NORMAL);
+                    index += 1;
+                    bump!();
+                }
+                '{' if prev == Some('$') => {
+                    frames.push(Frame {
+                        nest: Nest::Parameter,
+                        keywords: Vec::new(),
+                        restore_quote: true,
+                    });
+                    modes.push(NORMAL);
+                    index += 1;
+                    bump!();
+                }
+                '[' if prev == Some('$') => {
+                    frames.push(Frame {
+                        nest: Nest::ArithmeticBracket,
+                        keywords: Vec::new(),
+                        restore_quote: true,
+                    });
+                    modes.push(NORMAL);
+                    index += 1;
+                    bump!();
                 }
                 '`' => {
-                    states.push(BACKTICK);
+                    frames.push(Frame {
+                        nest: Nest::Backquote,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    backquote_frames.push(frames.len() - 1);
+                    backquote_keywords.push(keywords);
+                    modes.push(BACKTICK);
                     index += 1;
+                    at_command_start = false;
+                    bump!();
                 }
                 _ => index += 1,
             },
             _ => match c {
                 '\\' => {
                     index += 2;
-                    at_word_start = false;
+                    at_command_start = false;
                 }
                 '\'' => {
-                    states.push(SINGLE);
+                    // `$'...'` の中だけ `\` が次の字を escape する。
+                    modes.push(if prev == Some('$') { ANSI_C } else { SINGLE });
                     index += 1;
-                    at_word_start = false;
+                    at_command_start = false;
                 }
                 '"' => {
-                    states.push(DOUBLE);
+                    modes.push(DOUBLE);
                     index += 1;
-                    at_word_start = false;
+                    at_command_start = false;
                 }
                 '`' => {
-                    states.push(BACKTICK);
+                    frames.push(Frame {
+                        nest: Nest::Backquote,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    backquote_frames.push(frames.len() - 1);
+                    backquote_keywords.push(keywords);
+                    modes.push(BACKTICK);
                     index += 1;
-                    at_word_start = false;
+                    at_command_start = false;
+                    bump!();
                 }
-                '#' if at_word_start => {
-                    while index < chars.len() && chars[index] != '\n' {
+                '#' => {
+                    // 語の途中の `#` はコメントにならない。引用の外で語の
+                    // 切れ目にだけ、確かめられる位置のコメントを読み飛ばす。
+                    let candidate = match prev {
+                        None => true,
+                        Some(p) if p.is_whitespace() => {
+                            !matches!(prev_non_ws, Some('<' | '>' | '&' | '|'))
+                        }
+                        Some(';') => true,
+                        _ => false,
+                    };
+                    let code = match prev {
+                        Some(p) if is_word_char(p) || p == '$' || p == '\'' || p == '"' => true,
+                        _ => matches!(
+                            frames.last().map(|f| f.nest),
+                            Some(Nest::Parameter | Nest::Arithmetic | Nest::ArithmeticBracket)
+                        ),
+                    };
+                    if code {
                         index += 1;
+                        at_command_start = false;
+                    } else if candidate && frames.last().is_some_and(|f| f.nest.allows_comment()) {
+                        while index < chars.len() && chars[index] != '\n' {
+                            index += 1;
+                        }
+                        at_command_start = true;
+                    } else {
+                        count_openers_only!();
                     }
                 }
                 '(' => {
-                    stack.push(Ctx::Paren);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
-                    }
+                    let nest = if prev == Some('$') {
+                        Nest::Substitution
+                    } else if prev == Some('(') || chars.get(index + 1) == Some(&'(') {
+                        Nest::Arithmetic
+                    } else if matches!(prev, Some('<' | '>' | '!' | '@' | '?' | '*' | '+')) {
+                        Nest::Process
+                    } else {
+                        Nest::Subshell
+                    };
+                    frames.push(Frame {
+                        nest,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
                     index += 1;
-                    at_word_start = true;
-                }
-                '{' => {
-                    stack.push(Ctx::Brace);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
-                    }
-                    index += 1;
-                    at_word_start = true;
+                    at_command_start = true;
+                    bump!();
                 }
                 ')' => {
-                    // `)` は `(` を閉じる。`${...}` の中の `)` は閉じない。
-                    if stack.last() == Some(&Ctx::Paren) {
-                        if sub_marks.last() == Some(&stack.len()) {
-                            sub_marks.pop();
-                            states.pop();
-                        }
-                        stack.pop();
+                    // `case` の枝を閉じる `)` は、枝の外の入れ子を閉じない。
+                    let case_pattern = frames.last().is_some_and(|f| {
+                        f.keywords.iter().rev().any(|k| {
+                            matches!(k, Keyword::Case { patterns: true, mark } if frames.len() <= *mark)
+                        })
+                    });
+                    if case_pattern {
+                        index += 1;
+                    } else if frames.last().is_some_and(|f| f.nest.closed_by_paren()) {
+                        at_command_start = pop_frame!().command_follows();
+                        index += 1;
+                        bump!();
+                    } else {
+                        // 対になる開きが無い `)` は、こちらの読み方が
+                        // ずれている印。ここから開きだけを数える。
+                        count_openers_only!();
                     }
+                }
+                '{' => {
+                    let nest = if prev == Some('$') {
+                        Nest::Parameter
+                    } else if chars.get(index + 1).is_some_and(|c| c.is_whitespace()) {
+                        Nest::Group
+                    } else {
+                        Nest::WordBrace
+                    };
+                    frames.push(Frame {
+                        nest,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
                     index += 1;
-                    at_word_start = true;
+                    at_command_start = nest == Nest::Group;
+                    bump!();
                 }
                 '}' => {
-                    if stack.last() == Some(&Ctx::Brace) {
-                        stack.pop();
+                    if frames.last().is_some_and(|f| {
+                        matches!(f.nest, Nest::Group | Nest::WordBrace | Nest::Parameter)
+                    }) {
+                        at_command_start = pop_frame!().command_follows();
+                    } else {
+                        count_openers_only!();
                     }
                     index += 1;
-                    at_word_start = true;
+                    bump!();
+                }
+                '[' if prev == Some('$') => {
+                    frames.push(Frame {
+                        nest: Nest::ArithmeticBracket,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    index += 1;
+                    at_command_start = false;
+                    bump!();
+                }
+                '[' if chars.get(index + 1) == Some(&'[') => {
+                    frames.push(Frame {
+                        nest: Nest::Test,
+                        keywords: Vec::new(),
+                        restore_quote: false,
+                    });
+                    index += 2;
+                    at_command_start = true;
+                    bump!();
+                }
+                '[' => {
+                    index += 1;
+                    at_command_start = false;
+                }
+                ']' if chars.get(index + 1) == Some(&']')
+                    && frames.last().is_some_and(|f| f.nest == Nest::Test) =>
+                {
+                    let _ = pop_frame!();
+                    index += 2;
+                    at_command_start = true;
+                    bump!();
+                }
+                ']' => {
+                    if frames
+                        .last()
+                        .is_some_and(|f| f.nest == Nest::ArithmeticBracket)
+                    {
+                        let _ = pop_frame!();
+                    }
+                    at_command_start = false;
+                    index += 1;
+                    bump!();
+                }
+                '<' => {
+                    if chars.get(index + 1) == Some(&'<') {
+                        if chars.get(index + 2) == Some(&'<') {
+                            // here-string（`<<<`）。
+                            index += 3;
+                        } else if frames.last().is_some_and(|f| f.nest == Nest::Arithmetic) {
+                            // 算術の中の左シフト。
+                            index += 2;
+                        } else {
+                            let mut cursor = index + 2;
+                            match here_doc_delimiter(&chars, &mut cursor) {
+                                Some((delimiter, strip_tabs, expand)) => {
+                                    here_docs.push(HereDoc {
+                                        delimiter,
+                                        strip_tabs,
+                                        expand,
+                                    });
+                                    index = cursor;
+                                }
+                                None => count_openers_only!(),
+                            }
+                        }
+                    } else {
+                        index += 1;
+                    }
+                    at_command_start = false;
+                }
+                '>' => {
+                    index += 1;
+                    if chars.get(index) == Some(&'>') {
+                        index += 1;
+                    }
+                    at_command_start = false;
+                }
+                '$' => {
+                    index += 1;
+                    at_command_start = false;
+                }
+                ';' | '\n' => {
+                    index += 1;
+                    at_command_start = true;
+                    after_separator = true;
+                    if c == '\n' && !here_docs.is_empty() {
+                        let base = depth!();
+                        let count = skip_here_docs(&chars, &mut index, &mut here_docs);
+                        if base + count > LIMIT_DEPTH {
+                            return true;
+                        }
+                        last = Some('\n');
+                        last_non_ws = None;
+                    }
+                }
+                '&' => {
+                    index += 1;
+                    if chars.get(index) == Some(&'&') {
+                        index += 1;
+                    }
+                    at_command_start = true;
+                }
+                '|' => {
+                    index += 1;
+                    if chars.get(index) == Some(&'|') {
+                        index += 1;
+                    }
+                    at_command_start = true;
+                }
+                '!' => {
+                    index += 1;
+                    at_command_start = true;
                 }
                 _ if is_word_char(c) => {
                     let word = word_at(&chars, &mut index);
-                    count_keyword(&word, &mut keywords);
-                    if bump(stack.len(), keywords, &mut peak) {
-                        return true;
+                    last = chars.get(index - 1).copied();
+                    let command_like = frames.last().is_some_and(|f| f.nest.allows_comment());
+                    let in_case_value = command_like
+                        && word == "in"
+                        && frames.last().is_some_and(|f| {
+                            matches!(
+                                f.keywords.last(),
+                                Some(Keyword::Case {
+                                    patterns: false,
+                                    ..
+                                })
+                            )
+                        });
+                    if in_case_value {
+                        // `case` の値の後ろの `in` から枝が始まる。
+                        let len = frames.len();
+                        if let Some(Keyword::Case { patterns, mark }) =
+                            frames.last_mut().unwrap().keywords.last_mut()
+                        {
+                            *patterns = true;
+                            *mark = len;
+                        }
+                        at_command_start = false;
+                    } else if command_like && at_command_start {
+                        match word.as_str() {
+                            "if" => {
+                                frames.last_mut().unwrap().keywords.push(Keyword::If);
+                                keywords += 1;
+                                at_command_start = true;
+                                bump!();
+                            }
+                            "while" | "until" | "for" | "select" => {
+                                frames.last_mut().unwrap().keywords.push(Keyword::Loop);
+                                keywords += 1;
+                                at_command_start = !matches!(word.as_str(), "for" | "select");
+                                bump!();
+                            }
+                            "fi" | "done" => {
+                                let want = closer(&word).unwrap();
+                                if !prev_separator {
+                                    // 区切りの直後にだけ、閉じの予約語は
+                                    // 閉じとして認められる。
+                                    count_openers_only!();
+                                }
+                                let frame = frames.last_mut().unwrap();
+                                if frame.keywords.last() == Some(&want) {
+                                    frame.keywords.pop();
+                                    keywords -= 1;
+                                    at_command_start = true;
+                                    bump!();
+                                } else {
+                                    // 対になる開きが無い予約語は読み方のずれ。
+                                    count_openers_only!();
+                                }
+                            }
+                            "case" => {
+                                let mark = frames.len();
+                                frames.last_mut().unwrap().keywords.push(Keyword::Case {
+                                    patterns: false,
+                                    mark,
+                                });
+                                keywords += 1;
+                                at_command_start = false;
+                                bump!();
+                            }
+                            "esac" => {
+                                if !prev_separator {
+                                    count_openers_only!();
+                                }
+                                let frame = frames.last_mut().unwrap();
+                                if matches!(frame.keywords.last(), Some(Keyword::Case { .. })) {
+                                    frame.keywords.pop();
+                                    keywords -= 1;
+                                    at_command_start = true;
+                                    bump!();
+                                } else {
+                                    // 対になる `case` が無い。
+                                    count_openers_only!();
+                                }
+                            }
+                            "then" | "do" | "else" | "elif" => {
+                                at_command_start = true;
+                            }
+                            _ => {
+                                at_command_start = false;
+                            }
+                        }
+                    } else {
+                        at_command_start = false;
                     }
-                    at_word_start = false;
                 }
                 _ => {
-                    at_word_start = c.is_whitespace() || matches!(c, ';' | '&' | '|');
+                    if !c.is_whitespace() {
+                        at_command_start = false;
+                    }
                     index += 1;
                 }
             },
@@ -429,14 +1018,6 @@ fn word_at(chars: &[char], index: &mut usize) -> String {
         *index += 1;
     }
     chars[start..*index].iter().collect()
-}
-
-fn count_keyword(word: &str, keywords: &mut usize) {
-    match word {
-        "if" | "while" | "until" | "for" | "case" => *keywords += 1,
-        "fi" | "done" | "esac" => *keywords = keywords.saturating_sub(1),
-        _ => {}
-    }
 }
 
 fn is_word_char(c: char) -> bool {
