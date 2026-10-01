@@ -50,8 +50,15 @@ pub fn load(
     let mut warnings = Vec::new();
     let mut config = Config::builtin(tmpdir);
     let user = match user_config {
-        Some(path) if path.exists() => {
-            match read_layer(path, path.parent().unwrap_or(Path::new("/")), home, session) {
+        Some(path) => {
+            let result = match path.try_exists() {
+                Ok(false) => Ok(Layer::default()),
+                Ok(true) => {
+                    read_layer(path, path.parent().unwrap_or(Path::new("/")), home, session)
+                }
+                Err(error) => Err(format!("{}: {error}", path.display())),
+            };
+            match result {
                 Ok(layer) => layer,
                 Err(e) => {
                     warnings.push(format!(
