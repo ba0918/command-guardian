@@ -46,14 +46,20 @@ fn req_010_unterminated_quotes_are_parse_errors() {
 // @kotowari[REQ-039]
 #[test]
 fn req_039_limit_failures_become_blocks() {
-    // 上限の超過と、隔離した子の異常終了（panic を含む）は block の原因。
+    // 上限の超過と、入力に帰せる子の死（Limit）は block の原因。
     for failure in [
         guardian_parser::Failure::TooLarge,
         guardian_parser::Failure::TooDeep,
-        guardian_parser::Failure::Panic,
         guardian_parser::Failure::Limit,
     ] {
         assert!(Ask::Parse(failure.clone()).is_limit(), "{failure:?}");
+    }
+    // 自分に帰せる死（panic、起動とプロトコルの失敗）は ask のまま（REQ-039・A23）。
+    for failure in [
+        guardian_parser::Failure::Panic,
+        guardian_parser::Failure::Internal,
+    ] {
+        assert!(!Ask::Parse(failure.clone()).is_limit(), "{failure:?}");
     }
     // 上限の内側で読めないものは ask のまま。
     assert!(!Ask::Parse(guardian_parser::Failure::Syntax).is_limit());

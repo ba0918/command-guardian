@@ -240,3 +240,15 @@ fn req_039_ambiguous_spellings_do_not_turn_ordinary_scripts_into_asks() {
     let code = verdict_code(&allow, home.path());
     assert_eq!(code, 0, "allow になる: {}", label(&allow));
 }
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_a_child_death_from_the_input_blocks() {
+    // 入力に帰せる死（解析の子のスタックオーバーフロー）は block のまま
+    // （REQ-039・A23）。子が読める深さに収まっても、深さの走査が止めて block に
+    // なるため、どちらの経路でも block になる。
+    let home = temp_home();
+    let input = format!("echo $(( {}1{} ))", "(".repeat(50_000), ")".repeat(50_000));
+    let code = verdict_code(&input, home.path());
+    assert_eq!(code, 2, "入力に帰せる死は block になる: {}", label(&input));
+}

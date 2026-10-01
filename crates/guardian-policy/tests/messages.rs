@@ -1,7 +1,8 @@
 //! S7: 非 allow の文面（REQ-011）。
 
-use guardian_core::{extract_effects, Class, Env, Op, ProtectedKind, Target, Why};
-use guardian_policy::message::non_allow_message;
+use guardian_core::{extract_effects, Ask, Class, Env, Op, ProtectedKind, Target, Why};
+use guardian_parser::Failure;
+use guardian_policy::message::{ask_message, ask_reason, non_allow_message};
 use std::path::PathBuf;
 
 fn env() -> Env {
@@ -100,5 +101,25 @@ fn req_011_messages_fit_two_to_four_lines_for_every_target_shape() {
             let ls = lines(&text);
             assert!((2..=4).contains(&ls.len()), "{text}");
         }
+    }
+}
+
+// @kotowari[REQ-011, REQ-039]
+#[test]
+fn req_011_self_caused_deaths_ask_with_the_internal_reason() {
+    // 自分に帰せる死（panic、起動とプロトコルの失敗）の ask は、block ではなく
+    // 理由に判定の内部で失敗した を出す（REQ-011・REQ-039・A23）。
+    for failure in [Failure::Panic, Failure::Internal] {
+        let asks = vec![Ask::Parse(failure.clone())];
+        assert!(!asks[0].is_limit(), "{failure:?}");
+        let reason = ask_reason(&asks);
+        assert!(
+            reason.contains("判定の内部で失敗した"),
+            "{failure:?}: {reason}"
+        );
+        let text = ask_message(&asks);
+        assert!(text.contains("判定の内部で失敗した"), "{failure:?}: {text}");
+        let ls = lines(&text);
+        assert!((2..=4).contains(&ls.len()), "{failure:?}: {text}");
     }
 }

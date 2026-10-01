@@ -115,15 +115,15 @@ pub enum Ask {
 }
 
 impl Ask {
-    /// 上限の超過か、隔離した子の異常終了か（REQ-039）。判定は block になる。
-    /// 上限の内側で読めないものは ask のまま（REQ-038・REQ-010）。
+    /// 上限の超過か、入力に帰せる子の死か（REQ-039）。判定は block になる。
+    /// 上限の内側で読めないものと、自分に帰せる死（panic、起動とプロトコルの
+    /// 失敗）は ask のまま（REQ-038・REQ-010・A23）。
     pub fn is_limit(&self) -> bool {
         matches!(
             self,
             Ask::Parse(
                 guardian_parser::Failure::TooLarge
                     | guardian_parser::Failure::TooDeep
-                    | guardian_parser::Failure::Panic
                     | guardian_parser::Failure::Limit
             )
         )

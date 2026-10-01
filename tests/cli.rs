@@ -544,3 +544,67 @@ fn ex_055_script_file_launch_allows() {
     );
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
 }
+
+// @kotowari[REQ-039, REQ-011]
+#[test]
+fn req_039_a_parser_panic_asks_with_the_internal_reason() {
+    // 入力がパーサを panic させたとき（自分に帰せる死）は block ではなく ask に
+    // なり、理由に判定の内部で失敗した が出る（REQ-039・REQ-011・A23）。
+    // `~+<数>` の数が usize を超えると、採用したパーサが panic する。
+    let home = temp_home();
+    let r = run(
+        &[
+            "check",
+            "echo ~+99999999999999999999999999",
+            "--cwd",
+            "/tmp/scratch",
+            "--format",
+            "json",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
+    assert_eq!(value["verdict"], "ask");
+    assert!(
+        value["reason"]
+            .as_str()
+            .unwrap()
+            .contains("判定の内部で失敗した"),
+        "{}",
+        value["reason"]
+    );
+}
+
+// @kotowari[REQ-039, REQ-011]
+#[test]
+fn req_039_a_worker_that_cannot_start_asks_with_the_internal_reason() {
+    // 解析の子を起こせないとき（自分に帰せる失敗）は block ではなく ask になり、
+    // 理由に判定の内部で失敗した が出る（REQ-039・REQ-011・A23）。ファイル
+    // 記述子を 4 に絞ると、子に繋ぐソケットを作れず起動が失敗する。
+    let home = temp_home();
+    let script = format!(
+        "ulimit -n 4; exec '{}' check true --cwd /tmp/scratch --format json",
+        bin()
+    );
+    let out = Command::new("sh")
+        .arg("-c")
+        .arg(&script)
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path().join(".config"))
+        .env("TMPDIR", "/tmp")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1), "stdout: {stdout}");
+    let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(value["verdict"], "ask");
+    assert!(
+        value["reason"]
+            .as_str()
+            .unwrap()
+            .contains("判定の内部で失敗した"),
+        "{}",
+        value["reason"]
+    );
+}

@@ -3,8 +3,10 @@
 //! （REQ-036）。
 //!
 //! - 入力由来の解析は隔離した子プロセス（同じ実行ファイル、スタックの上限つき）で
-//!   行う。子の異常終了（スタックオーバーフローを含む）と時間の上限の超過は
-//!   block の原因（Failure::Limit）に落とし、判定は必ず返る（REQ-039）。
+//!   行う。子の死は原因で分け（REQ-039・A23）、入力に帰せる死（スタック
+//!   オーバーフロー、時間の上限の超過）と上限の超過は Failure::Limit（block）、
+//!   自分に帰せる死（panic、起動とプロトコルの失敗、帰せない死）は
+//!   Failure::Panic・Failure::Internal（ask）に落とし、判定は必ず返る。
 //! - サイズは構文解析の前に測る。置換の再帰読みは累計で測る（REQ-039）。
 //! - 深さは、正規化した構文木が保つ入れ子（複合構文と置換の再帰）を成功後の走査で
 //!   測る。構文木では平坦な断片になる再帰読み（パラメータ展開と算術式）と `[[ ]]`
@@ -57,9 +59,13 @@ pub enum Failure {
     Syntax,
     /// 知らない形のノードに出会った。
     UnknownNode(String),
-    /// 構文解析が panic した。
+    /// 構文解析が panic した（子が捕まえて報告したもの）。
     Panic,
-    /// 隔離した子の異常終了か、判定の上限（回数・時間）の超過。
+    /// 自分に帰せる失敗。隔離した子を起動できない、応答を読めない、死を入力に
+    /// 帰せないのいずれか（REQ-039・A23）。
+    Internal,
+    /// 入力に帰せる子の死（スタックオーバーフロー、時間の上限の超過）か、
+    /// 判定の上限（回数・時間）の超過。
     Limit,
 }
 
@@ -86,11 +92,13 @@ pub fn parse(input: &str) -> Outcome {
     if input.len() > LIMIT_BYTES {
         return Outcome::failure(Failure::TooLarge);
     }
-    // 子の異常終了（スタックオーバーフローを含む）・panic・時間の上限の超過は
-    // すべて block の原因（Failure::Limit）に落とす（REQ-039）。
+    // 子の死は原因で分ける（REQ-039・A23）。入力に帰せる死（スタック
+    // オーバーフロー、時間の上限の超過）と上限の超過は Limit（block）、
+    // 自分に帰せる失敗（起動・プロトコルの失敗、panic、帰せない死）は
+    // Internal（ask）に落とす。
     match worker::request_parse(input) {
-        Some(outcome) => outcome,
-        None => Outcome::failure(Failure::Limit),
+        Ok(outcome) => outcome,
+        Err(failure) => Outcome::failure(failure),
     }
 }
 

@@ -2,25 +2,27 @@
 //!
 //! 親は同じ実行ファイルを子として 1 度だけ起動し、stdin に繋いだソケットで
 //! 要求と応答をやり取りする。子はスタックの上限つきのスレッドで解析し、親が
-//! ソケットを閉じるまで働き続ける。子の異常終了と時間の上限の超過は block の
-//! 原因（Failure::Limit）に落とし、判定は必ず返す。1 回の判定で行うやり取りの
-//! 回数と時間には予算を設ける（REQ-039）。
+//! ソケットを閉じるまで働き続ける。子の死は原因で分ける（REQ-039・A23）:
+//! 入力に帰せる死（スタックオーバーフロー、時間の上限の超過）と上限の超過は
+//! Failure::Limit（block）、自分に帰せる死（panic、起動とプロトコルの失敗、
+//! 帰せない死）は Failure::Internal（ask）。1 回の判定で行うやり取りの回数と
+//! 時間には予算を設ける（REQ-039）。
 
 use crate::budget;
 use crate::wire::{self, Response};
-use crate::Outcome;
+use crate::{Failure, Outcome};
 use std::io::{Read, Write};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::net::UnixStream;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::{Mutex, Once};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// 子として起動されたことを示す環境変数。値は使い捨ての nonce。
 const WORKER_ENV: &str = "HOOK_GUARDIAN_PARSER_WORKER";
 
 /// 子の解析スレッドのスタック。上限つきにする。深すぎる入力は子ごと落ちるが、
-/// 親はそれを ask に落とす。
+/// 親はそれを入力に帰せる死として block にする（REQ-039・A23）。
 pub(crate) const CHILD_STACK_BYTES: usize = 8 * 1024 * 1024;
 
 /// 子の応答を待つ時間。代表的な入力は数ミリ秒で返るため、これは病的な入力だけに
@@ -35,6 +37,18 @@ const WORKER_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// 子が「解析を始められる」印に使うバイト。
 const READY_MARKER: u8 = 0xff;
+
+/// 子の死を確かめるときに待つ幅。ソケットの終わりを見てからプロセスの状態が
+/// 見えるまでの隙間を埋める。
+const DEATH_GRACE: Duration = Duration::from_millis(100);
+
+/// スタックオーバーフローで子が落ちるときのシグナル（Linux の値。libc には
+/// 依存しない）。SIGABRT は Rust の実行時がスタックオーバーフローを検出した
+/// ときに使う。
+const SIGILL: i32 = 4;
+const SIGABRT: i32 = 6;
+const SIGBUS: i32 = 7;
+const SIGSEGV: i32 = 11;
 
 /// 枠の本体の上限。壊れた枠で巨大な領域を取らないための歯止め。
 const MAX_FRAME_BYTES: usize = 256 * 1024 * 1024;
@@ -146,26 +160,38 @@ fn write_response(socket: &mut UnixStream, nonce: &[u8; 16], body: &[u8]) -> std
     socket.write_all(&frame)
 }
 
-/// 親側: 解析を子に依頼する。予算切れ・子の異常終了・時間切れ・壊れた応答は None。
-pub(crate) fn request_parse(input: &str) -> Option<Outcome> {
-    match exchange(wire::MODE_PARSE, input)? {
-        Response::Parsed { failures, script } => Some(Outcome {
+/// 親側: 解析を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
+pub(crate) fn request_parse(input: &str) -> Result<Outcome, Failure> {
+    match exchange(wire::MODE_PARSE, input) {
+        Ok(Response::Parsed { failures, script }) => Ok(Outcome {
             script: script.unwrap_or_default(),
             failures,
         }),
-        Response::Stripped(_) => None,
+        Ok(Response::Stripped(_)) => Err(Failure::Internal),
+        Err(ExchangeError::Limit) => Err(Failure::Limit),
+        Err(ExchangeError::Internal) => Err(Failure::Internal),
     }
 }
 
 /// 親側: 引用を外した本文を子に依頼する。
 pub(crate) fn request_strip_quotes(input: &str) -> Option<String> {
-    match exchange(wire::MODE_STRIP_QUOTES, input)? {
-        Response::Stripped(text) => Some(text),
-        Response::Parsed { .. } => None,
+    match exchange(wire::MODE_STRIP_QUOTES, input) {
+        Ok(Response::Stripped(text)) => Some(text),
+        _ => None,
     }
 }
 
-fn exchange(mode: u8, input: &str) -> Option<Response> {
+/// やり取りが失敗した帰属（REQ-039・A23）。
+pub(crate) enum ExchangeError {
+    /// 上限の超過か、入力に帰せる死（スタックオーバーフロー、時間の上限の
+    /// 超過）。判定は block（Failure::Limit）。
+    Limit,
+    /// 自分に帰せる失敗（起動・書き込み・プロトコルの失敗、帰せない死）。
+    /// 判定は ask（Failure::Internal）。
+    Internal,
+}
+
+fn exchange(mode: u8, input: &str) -> Result<Response, ExchangeError> {
     // 判定の予算を先に確かめる（REQ-039）。構文解析の回数は構文解析だけが
     // 消費し、引用の除去は時間の上限だけを見る。
     let allowed = if mode == wire::MODE_PARSE {
@@ -174,7 +200,7 @@ fn exchange(mode: u8, input: &str) -> Option<Response> {
         budget::within_time()
     };
     if !allowed {
-        return None;
+        return Err(ExchangeError::Limit);
     }
     let mut guard = WORKER
         .lock()
@@ -182,16 +208,69 @@ fn exchange(mode: u8, input: &str) -> Option<Response> {
     if guard.is_none() {
         *guard = spawn_worker();
     }
-    let worker = guard.as_mut()?;
-    let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input);
-    if result.is_none() {
-        // 子が死んだか時間切れ。次の要求のために始末する。
-        if let Some(mut dead) = guard.take() {
-            let _ = dead.child.kill();
-            let _ = dead.child.wait();
+    let Some(worker) = guard.as_mut() else {
+        // 子を起こせないのは自分に帰せる失敗（A23）。
+        return Err(ExchangeError::Internal);
+    };
+    let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input)
+        .map_err(|interrupted| classify(interrupted, &mut worker.child));
+    match result {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            // 子が死んだか時間切れ。次の要求のために始末する。
+            if let Some(mut dead) = guard.take() {
+                let _ = dead.child.kill();
+                let _ = dead.child.wait();
+            }
+            Err(error)
         }
     }
-    result
+}
+
+/// やり取りが途中で終わった形。死の帰属を決める材料（REQ-039・A23）。
+enum Interrupted {
+    /// 要求の書き込みに失敗した。
+    Write,
+    /// 応答の読み取りが時間切れになった。
+    Timeout,
+    /// 応答が途中で終わったか、壊れていた。
+    Protocol,
+}
+
+/// やり取りの失敗を、子の終わり方で帰属する（REQ-039・A23）。
+fn classify(interrupted: Interrupted, child: &mut Child) -> ExchangeError {
+    match interrupted {
+        // 読み取りの時間切れは親が子を止める。時間の上限の超過は入力に帰せる。
+        Interrupted::Timeout => ExchangeError::Limit,
+        // 書き込みとプロトコルの失敗は、子の終わり方を確かめてから決める。
+        Interrupted::Write | Interrupted::Protocol => match wait_for_exit(child) {
+            Some(status) => status_error(status),
+            None => ExchangeError::Internal,
+        },
+    }
+}
+
+/// 子が終わっていればその終わり方を返す。ソケットの終わりを見てから状態が
+/// 見えるまでの隙間を短い間だけ待つ。
+fn wait_for_exit(child: &mut Child) -> Option<ExitStatus> {
+    let deadline = Instant::now() + DEATH_GRACE;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Some(status),
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(1)),
+            _ => return None,
+        }
+    }
+}
+
+/// 入力に帰せる死（スタックオーバーフロー）は block、それ以外の死は ask
+/// （REQ-039・A23）。
+fn status_error(status: ExitStatus) -> ExchangeError {
+    use std::os::unix::process::ExitStatusExt;
+    match status.signal() {
+        Some(SIGILL) | Some(SIGABRT) | Some(SIGBUS) | Some(SIGSEGV) => ExchangeError::Limit,
+        _ => ExchangeError::Internal,
+    }
 }
 
 /// 子を 1 つ起こし、解析を始められる印まで待つ。
@@ -229,13 +308,13 @@ fn exchange_with(
     nonce: &[u8; 16],
     mode: u8,
     input: &str,
-) -> Option<Response> {
+) -> Result<Response, Interrupted> {
     // 待ち時間は、判定の残り時間と 1 回の解析の上限の短い方にする。
     let timeout = budget::remaining()
         .map(|remaining| remaining.min(CHILD_TIMEOUT))
         .unwrap_or(CHILD_TIMEOUT);
     if timeout.is_zero() {
-        return None;
+        return Err(Interrupted::Timeout);
     }
     // 相手が読まないまま書き込みが詰まる場合にも時間で切れるようにする。
     let _ = socket.set_write_timeout(Some(timeout));
@@ -244,15 +323,16 @@ fn exchange_with(
     request.push(mode);
     request.extend_from_slice(&(input.len() as u32).to_le_bytes());
     request.extend_from_slice(input.as_bytes());
-    socket.write_all(&request).ok()?;
+    socket.write_all(&request).map_err(|_| Interrupted::Write)?;
     let _ = socket.set_write_timeout(None);
-    // 異常終了も時間切れも block の原因（Failure::Limit）に落ちる。
-    socket.set_read_timeout(Some(timeout)).ok()?;
+    socket
+        .set_read_timeout(Some(timeout))
+        .map_err(|_| Interrupted::Protocol)?;
     let (got, body) = read_response(socket)?;
     if got != *nonce {
-        return None;
+        return Err(Interrupted::Protocol);
     }
-    wire::decode_response(&body).ok()
+    wire::decode_response(&body).map_err(|_| Interrupted::Protocol)
 }
 
 fn read_ready(socket: &mut UnixStream, nonce: &[u8; 16]) -> Option<()> {
@@ -264,18 +344,26 @@ fn read_ready(socket: &mut UnixStream, nonce: &[u8; 16]) -> Option<()> {
     Some(())
 }
 
-fn read_response(socket: &mut UnixStream) -> Option<([u8; 16], Vec<u8>)> {
+fn read_response(socket: &mut UnixStream) -> Result<([u8; 16], Vec<u8>), Interrupted> {
     let mut header = [0u8; RESPONSE_HEADER];
-    socket.read_exact(&mut header).ok()?;
+    read_exact(socket, &mut header)?;
     let mut nonce = [0u8; 16];
     nonce.copy_from_slice(&header[..16]);
     let len = u32::from_le_bytes([header[16], header[17], header[18], header[19]]) as usize;
     if len > MAX_FRAME_BYTES {
-        return None;
+        return Err(Interrupted::Protocol);
     }
     let mut body = vec![0u8; len];
-    socket.read_exact(&mut body).ok()?;
-    Some((nonce, body))
+    read_exact(socket, &mut body)?;
+    Ok((nonce, body))
+}
+
+/// 読み取りの時間切れと、途中で終わった応答を分ける。
+fn read_exact(socket: &mut UnixStream, buf: &mut [u8]) -> Result<(), Interrupted> {
+    socket.read_exact(buf).map_err(|error| match error.kind() {
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => Interrupted::Timeout,
+        _ => Interrupted::Protocol,
+    })
 }
 
 /// 使い捨ての nonce。値そのものは秘密ではない（偶然の起動を弾く印）。

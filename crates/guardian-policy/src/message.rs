@@ -105,11 +105,13 @@ pub fn non_allow_message(op: Op, target: &Target, class: Class, why: &Why) -> St
 enum AskKind {
     /// 構文を読めない。
     Syntax,
+    /// 判定の内部で失敗した（自分に帰せる死。panic、起動とプロトコルの失敗）。
+    Internal,
     /// 入力が大きすぎる。
     TooLarge,
     /// 入れ子が深すぎる。
     TooDeep,
-    /// 判定の上限（回数・時間）を超えた。隔離した子の異常終了も含む。
+    /// 判定の上限（回数・時間）を超えた。
     Limit,
     /// 読めないシェル。
     Shell,
@@ -119,7 +121,8 @@ fn ask_kind(ask: &Ask) -> AskKind {
     match ask {
         Ask::Parse(Failure::TooLarge) => AskKind::TooLarge,
         Ask::Parse(Failure::TooDeep) => AskKind::TooDeep,
-        Ask::Parse(Failure::Panic | Failure::Limit) => AskKind::Limit,
+        Ask::Parse(Failure::Limit) => AskKind::Limit,
+        Ask::Parse(Failure::Panic | Failure::Internal) => AskKind::Internal,
         Ask::Parse(_) => AskKind::Syntax,
         Ask::UnreadableProgram(_) | Ask::UnreadableShellBody(_) | Ask::UnreadableEval => {
             AskKind::Syntax
@@ -170,6 +173,7 @@ pub fn ask_reason(asks: &[Ask]) -> String {
         None => String::new(),
         Some(ask) => match ask_kind(ask) {
             AskKind::Syntax => "構文を読めないため判定できません".to_string(),
+            AskKind::Internal => "判定の内部で失敗したため判定できません".to_string(),
             AskKind::Shell => match ask {
                 Ask::UnsupportedShell(name) => format!("読めないシェルです: {name}"),
                 _ => "読めないシェルです".to_string(),
@@ -191,6 +195,11 @@ pub fn ask_message(asks: &[Ask]) -> String {
         AskKind::Syntax => vec![
             "構文を読めないため判定できません".to_string(),
             "理由: コマンドの構文を読み取れません".to_string(),
+            "代替: 当てはまる代替はありません".to_string(),
+        ],
+        AskKind::Internal => vec![
+            "判定の内部で失敗したため判定できません".to_string(),
+            "理由: 判定の内部で失敗しました".to_string(),
             "代替: 当てはまる代替はありません".to_string(),
         ],
         AskKind::TooLarge | AskKind::TooDeep | AskKind::Limit => return limit_message(asks),

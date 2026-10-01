@@ -192,6 +192,7 @@ fn failure_write(w: &mut Writer, failure: &Failure) {
         }
         Failure::Panic => w.u8(4),
         Failure::Limit => w.u8(5),
+        Failure::Internal => w.u8(6),
     }
 }
 
@@ -203,6 +204,7 @@ fn failure_read(r: &mut Reader) -> Result<Failure, ()> {
         3 => Ok(Failure::UnknownNode(r.str()?)),
         4 => Ok(Failure::Panic),
         5 => Ok(Failure::Limit),
+        6 => Ok(Failure::Internal),
         _ => Err(()),
     }
 }
@@ -754,6 +756,7 @@ mod tests {
                 Failure::Syntax,
                 Failure::UnknownNode("x".to_string()),
                 Failure::Panic,
+                Failure::Internal,
                 Failure::Limit,
             ],
             script: Some(Script {
