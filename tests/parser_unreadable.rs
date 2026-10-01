@@ -3,6 +3,7 @@
 use guardian_parser::{Failure, Outcome, LIMIT_DEPTH};
 fn parse(input: &str) -> Outcome {
     guardian_app::runtime::ParserRuntime::new(env!("CARGO_BIN_EXE_command-guardian").into())
+        .validation()
         .parse(input)
 }
 

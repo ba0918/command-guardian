@@ -6,29 +6,59 @@ use guardian_parser::{Failure, Outcome, Script};
 pub use worker::run_if_child;
 pub use worker::ParserRuntime;
 
-pub(crate) fn begin_judgment() {
-    budget::begin();
-}
-pub(crate) fn judgment_over_budget() -> bool {
-    budget::exceeded()
-}
-
 impl ParserRuntime {
-    pub fn parse(&mut self, input: &str) -> Outcome {
+    pub fn judgment(&mut self) -> JudgmentSession<'_> {
+        JudgmentSession {
+            runtime: self,
+            budget: budget::Budget::new(),
+        }
+    }
+    pub fn validation(&mut self) -> ValidationSession<'_> {
+        ValidationSession { runtime: self }
+    }
+    fn parse(&mut self, input: &str, budget: Option<&mut budget::Budget>) -> Outcome {
         if input.len() > guardian_parser::LIMIT_BYTES {
             return Outcome {
                 script: Script::default(),
                 failures: vec![Failure::TooLarge],
             };
         }
-        self.request_parse(input).unwrap_or_else(|failure| Outcome {
-            script: Script::default(),
-            failures: vec![failure],
-        })
+        self.request_parse(input, budget)
+            .unwrap_or_else(|failure| Outcome {
+                script: Script::default(),
+                failures: vec![failure],
+            })
     }
+}
 
+pub struct JudgmentSession<'a> {
+    runtime: &'a mut ParserRuntime,
+    budget: budget::Budget,
+}
+impl JudgmentSession<'_> {
+    pub fn parse(&mut self, input: &str) -> Outcome {
+        self.runtime.parse(input, Some(&mut self.budget))
+    }
     pub fn strip_quotes(&mut self, input: &str) -> Result<String, Failure> {
-        self.request_strip_quotes(input)
+        self.runtime
+            .request_strip_quotes(input, Some(&mut self.budget))
+    }
+    pub fn over_budget(&self) -> bool {
+        self.budget.exceeded()
+    }
+    pub fn remaining(&self) -> std::time::Duration {
+        self.budget.remaining()
+    }
+}
+pub struct ValidationSession<'a> {
+    runtime: &'a mut ParserRuntime,
+}
+impl ValidationSession<'_> {
+    pub fn parse(&mut self, input: &str) -> Outcome {
+        self.runtime.parse(input, None)
+    }
+    pub fn strip_quotes(&mut self, input: &str) -> Result<String, Failure> {
+        self.runtime.request_strip_quotes(input, None)
     }
 }
 

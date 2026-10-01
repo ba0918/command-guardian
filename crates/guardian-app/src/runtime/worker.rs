@@ -185,8 +185,12 @@ fn write_response(socket: &mut UnixStream, nonce: &[u8; 16], body: &[u8]) -> std
 
 /// 親側: 解析を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
 impl ParserRuntime {
-    pub(crate) fn request_parse(&mut self, input: &str) -> Result<Outcome, Failure> {
-        match self.exchange(wire::MODE_PARSE, input) {
+    pub(super) fn request_parse(
+        &mut self,
+        input: &str,
+        budget: Option<&mut budget::Budget>,
+    ) -> Result<Outcome, Failure> {
+        match self.exchange(wire::MODE_PARSE, input, budget) {
             Ok(Response::Parsed { failures, script }) => Ok(Outcome {
                 script: script.unwrap_or_default(),
                 failures,
@@ -198,8 +202,12 @@ impl ParserRuntime {
     }
 
     /// 親側: 引用を外した本文を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
-    pub(crate) fn request_strip_quotes(&mut self, input: &str) -> Result<String, Failure> {
-        match self.exchange(wire::MODE_STRIP_QUOTES, input) {
+    pub(super) fn request_strip_quotes(
+        &mut self,
+        input: &str,
+        budget: Option<&mut budget::Budget>,
+    ) -> Result<String, Failure> {
+        match self.exchange(wire::MODE_STRIP_QUOTES, input, budget) {
             Ok(Response::Stripped(Ok(text))) => Ok(text),
             Ok(Response::Stripped(Err(failure))) => Err(failure),
             Ok(Response::Parsed { .. }) => Err(Failure::Internal),
@@ -220,26 +228,43 @@ pub(crate) enum ExchangeError {
 }
 
 impl ParserRuntime {
-    fn exchange(&mut self, mode: u8, input: &str) -> Result<Response, ExchangeError> {
+    fn exchange(
+        &mut self,
+        mode: u8,
+        input: &str,
+        mut budget: Option<&mut budget::Budget>,
+    ) -> Result<Response, ExchangeError> {
         // 判定の予算を先に確かめる（REQ-039）。構文解析の回数は構文解析だけが
         // 消費し、引用の除去は時間の上限だけを見る。
-        let allowed = if mode == wire::MODE_PARSE {
-            budget::take()
-        } else {
-            budget::within_time()
-        };
+        let allowed = budget.as_mut().is_none_or(|budget| {
+            if mode == wire::MODE_PARSE {
+                budget.take()
+            } else {
+                budget.within_time()
+            }
+        });
         if !allowed {
             return Err(ExchangeError::Limit);
         }
         if self.worker.is_none() {
-            self.worker = spawn_worker(&self.executable);
+            self.worker = spawn_worker(&self.executable, budget.as_deref());
         }
         let Some(worker) = self.worker.as_mut() else {
             // 子を起こせないのは自分に帰せる失敗（A23）。
-            return Err(ExchangeError::Internal);
+            return Err(if budget.as_deref().is_some_and(|b| !b.within_time()) {
+                ExchangeError::Limit
+            } else {
+                ExchangeError::Internal
+            });
         };
-        let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input)
-            .map_err(|interrupted| classify(interrupted, &mut worker.child));
+        let result = exchange_with(
+            &mut worker.socket,
+            &worker.nonce,
+            mode,
+            input,
+            budget.as_deref(),
+        )
+        .map_err(|interrupted| classify(interrupted, &mut worker.child));
         match result {
             Ok(response) => Ok(response),
             Err(error) => {
@@ -298,7 +323,7 @@ fn status_error(status: ExitStatus) -> ExchangeError {
 }
 
 /// 子を 1 つ起こし、解析を始められる印まで待つ。
-fn spawn_worker(exe: &std::path::Path) -> Option<Worker> {
+fn spawn_worker(exe: &std::path::Path, budget: Option<&budget::Budget>) -> Option<Worker> {
     let nonce = make_nonce();
     let (mut parent_end, child_end) = UnixStream::pair().ok()?;
     let mut child = Command::new(exe)
@@ -309,10 +334,12 @@ fn spawn_worker(exe: &std::path::Path) -> Option<Worker> {
         .spawn()
         .ok()?;
     // 起動待ちも判定の残り時間の内側に収める。
-    let startup = budget::remaining()
+    let startup = budget
+        .map(budget::Budget::remaining)
         .map(|remaining| remaining.min(WORKER_STARTUP_TIMEOUT))
         .unwrap_or(WORKER_STARTUP_TIMEOUT);
-    if parent_end.set_read_timeout(Some(startup)).is_err()
+    if startup.is_zero()
+        || parent_end.set_read_timeout(Some(startup)).is_err()
         || read_ready(&mut parent_end, &nonce).is_none()
     {
         let _ = child.kill();
@@ -331,9 +358,11 @@ fn exchange_with(
     nonce: &[u8; 16],
     mode: u8,
     input: &str,
+    budget: Option<&budget::Budget>,
 ) -> Result<Response, Interrupted> {
     // 待ち時間は、判定の残り時間と 1 回の解析の上限の短い方にする。
-    let timeout = budget::remaining()
+    let timeout = budget
+        .map(budget::Budget::remaining)
         .map(|remaining| remaining.min(CHILD_TIMEOUT))
         .unwrap_or(CHILD_TIMEOUT);
     if timeout.is_zero() {
@@ -348,8 +377,15 @@ fn exchange_with(
     request.extend_from_slice(input.as_bytes());
     socket.write_all(&request).map_err(|_| Interrupted::Write)?;
     let _ = socket.set_write_timeout(None);
+    let remaining = budget
+        .map(budget::Budget::remaining)
+        .unwrap_or(CHILD_TIMEOUT)
+        .min(CHILD_TIMEOUT);
+    if remaining.is_zero() {
+        return Err(Interrupted::Timeout);
+    }
     socket
-        .set_read_timeout(Some(timeout))
+        .set_read_timeout(Some(remaining))
         .map_err(|_| Interrupted::Protocol)?;
     let (got, body) = read_response(socket)?;
     if got != *nonce {

@@ -75,7 +75,7 @@ impl Engine {
             &env.cwd,
             env.home.as_deref(),
             env.tmpdir.as_deref(),
-            &mut |input| runtime.parse(input),
+            &mut |input| runtime.validation().parse(input),
         );
         Engine::build(loaded.config, env, loaded.warnings, None, runtime)
     }
@@ -148,10 +148,10 @@ impl Engine {
             tmpdir: self.env.tmpdir.clone(),
             cwd: Some(self.env.cwd.clone()),
         };
-        crate::runtime::begin_judgment();
         let mut runtime = self.runtime.borrow_mut();
-        let outcome = runtime.parse(command);
-        let analysis = analyze(outcome, &core_env, &mut |input| runtime.parse(input));
+        let mut session = runtime.judgment();
+        let outcome = session.parse(command);
+        let analysis = analyze(outcome, &core_env, &mut |input| session.parse(input));
         // 構文解析の ask。引用の除去の失敗も同じ列に足す（REQ-039・A23）。
         let mut asks = analysis.parse_errors;
         let mut effects = Vec::new();
@@ -166,7 +166,7 @@ impl Engine {
         // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
         let mut rules = Vec::new();
         if !self.custom_rules.is_empty() {
-            match runtime.strip_quotes(command) {
+            match session.strip_quotes(command) {
                 Ok(body) => {
                     for rule in &self.custom_rules {
                         if rule.regex.is_match(&body) {
@@ -191,7 +191,7 @@ impl Engine {
 
         // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
         if !self.config.guard.is_empty() {
-            let mut parse = |input: &str| runtime.parse(input);
+            let mut parse = |input: &str| session.parse(input);
             let invocations = guard::invocations(command, &mut parse);
             for failure in &invocations.failures {
                 let ask = Ask::Parse(failure.clone());
@@ -212,7 +212,7 @@ impl Engine {
 
         // 見張りの規則の照合でも構文解析をする。この判定で予算を使い切って
         // いたら、上限の超過として block にする（REQ-039）。
-        if crate::runtime::judgment_over_budget() && !asks.iter().any(Ask::is_limit) {
+        if session.over_budget() && !asks.iter().any(Ask::is_limit) {
             asks.push(Ask::Parse(guardian_parser::Failure::Limit));
         }
         let mut verdict = Verdict::Allow;
