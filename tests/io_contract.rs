@@ -9,9 +9,9 @@ fn command(home: &std::path::Path) -> Command {
     command
 }
 
-// @kotowari[REQ-017, REQ-021]
+// @kotowari[REQ-017, REQ-024]
 #[test]
-fn req_021_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
+fn req_017_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
     use std::os::unix::ffi::OsStringExt;
     let home = tempfile::tempdir().unwrap();
     let cwd = home
@@ -39,9 +39,9 @@ fn req_021_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
     assert_eq!(output.status.code(), Some(3));
 }
 
-// @kotowari[REQ-021]
+// @kotowari[REQ-017]
 #[test]
-fn req_021_check_output_failure_is_an_explicit_failure() {
+fn req_017_check_output_failure_is_an_explicit_failure() {
     let home = tempfile::tempdir().unwrap();
     for format in ["text", "json"] {
         let output = command(home.path())
@@ -58,9 +58,9 @@ fn req_021_check_output_failure_is_an_explicit_failure() {
     }
 }
 
-// @kotowari[REQ-017]
+// @kotowari[REQ-024, REQ-044]
 #[test]
-fn req_017_hook_and_help_keep_zero_on_output_failure() {
+fn req_024_hook_and_help_keep_zero_on_output_failure() {
     let home = tempfile::tempdir().unwrap();
     for args in [
         vec!["--help"],
@@ -100,7 +100,7 @@ fn req_017_hook_and_help_keep_zero_on_output_failure() {
     assert_eq!(child.wait().unwrap().code(), Some(0));
 }
 
-// @kotowari[REQ-015, REQ-021]
+// @kotowari[REQ-015, REQ-017]
 #[test]
 fn req_015_warning_output_failure_does_not_abort_judgment() {
     let home = tempfile::tempdir().unwrap();
