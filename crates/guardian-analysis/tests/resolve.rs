@@ -331,6 +331,30 @@ fn req_002_unknown_loop_repetition_also_keeps_later_iteration_targets_uncertain(
     );
 }
 
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_unknown_loop_delayed_assignment_chains_cannot_hide_later_targets() {
+    for count in [2, 4, 8] {
+        let assignments = (0..count)
+            .map(|index| format!("V{index}=/tmp/x;"))
+            .collect::<String>();
+        let updates = (0..count - 1)
+            .map(|index| format!("V{index}=\"$V{}\";", index + 1))
+            .collect::<String>();
+        let command = format!(
+            "{assignments} for x in /tmp/*; do rm \"$V0\"; {updates} V{}=/etc/x; done",
+            count - 1
+        );
+        let result = effects(&command);
+        assert!(
+            result
+                .iter()
+                .any(|effect| matches!(effect.target, Target::Unresolved(_))),
+            "{command}: {result:?}"
+        );
+    }
+}
+
 // @kotowari[REQ-002, REQ-041]
 #[test]
 fn req_002_only_unquoted_tilde_is_expanded_to_home() {

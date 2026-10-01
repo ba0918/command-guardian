@@ -455,15 +455,20 @@ fn extract_repeated_body(
     asks: &mut Vec<Ask>,
     depth: usize,
 ) {
-    let before = ctx.clone();
-    extract_script(body, ctx, out, asks, depth);
-    if ctx.vars != before.vars || ctx.cwd != before.cwd {
+    let collect_invocations = ctx.collect_invocations;
+    loop {
+        if !ctx.check(asks) {
+            break;
+        }
+        let before = ctx.clone();
+        extract_script(body, ctx, out, asks, depth);
         ctx.merge_state(&before);
-        let mut repeated = ctx.clone();
-        repeated.collect_invocations = false;
-        extract_script(body, &mut repeated, out, asks, depth);
-        ctx.merge_state(&repeated);
+        if ctx.vars == before.vars && ctx.cwd == before.cwd {
+            break;
+        }
+        ctx.collect_invocations = false;
     }
+    ctx.collect_invocations = collect_invocations;
 }
 
 /// 1 つの単純コマンドを読み、効果を足す。次段の供給元（find の起点と
