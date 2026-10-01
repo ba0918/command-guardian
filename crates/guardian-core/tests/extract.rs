@@ -22,6 +22,18 @@ fn effects(command: &str) -> Vec<Effect> {
     extract_effects(command, &env())
 }
 
+// @kotowari[REQ-001, REQ-037]
+#[test]
+fn req_001_prefix_assignment_substitutions_have_effects_with_a_program() {
+    assert_eq!(
+        effects("X=$(rm -rf /etc/x) true"),
+        vec![Effect {
+            op: Op::Delete,
+            target: path("/etc/x")
+        }]
+    );
+}
+
 // @kotowari[REQ-001]
 #[test]
 fn req_001_rm_delete() {

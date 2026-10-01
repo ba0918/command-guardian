@@ -363,6 +363,9 @@ fn extract_simple(
         return Vec::new();
     }
 
+    for word in &simple.words[..index] {
+        scan_word_substitutions(word, ctx, out, asks, depth);
+    }
     extract_redirects(&simple.redirects, ctx, out, asks, depth);
     extract_process_substitutions(simple, ctx, out, asks, depth);
 
