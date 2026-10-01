@@ -177,7 +177,17 @@ impl Judge {
             }
         }
 
-        if let Some(root) = self.worktree_root(path) {
+        // 末尾のリンク自体を削除する場合、リンク先の .git は探索しない。
+        let worktree_path = if !children
+            && path
+                .symlink_metadata()
+                .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            path.parent().unwrap_or(path)
+        } else {
+            path
+        };
+        if let Some(root) = self.worktree_root(worktree_path) {
             if !children && path == root {
                 return Ok(Classification::new(
                     Class::Protected,

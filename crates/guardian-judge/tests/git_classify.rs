@@ -40,6 +40,51 @@ fn req_004_untracked_file_is_unknown_with_untracked_reason() {
     assert_eq!(c.why, Why::Untracked);
 }
 
+// @kotowari[REQ-004, REQ-007]
+#[test]
+fn req_007_untracked_repository_symlink_is_classified_in_its_parent_worktree() {
+    let source = fixture();
+    let destination = fixture();
+    let link = source.root.join("repository-link");
+    let destination_path = Path::new("..").join(destination.root.file_name().unwrap());
+    std::os::unix::fs::symlink(destination_path, &link).unwrap();
+    let judge = judge_for(&source.root);
+    let result = judge.classify_path(&link, false);
+    assert_eq!(result.class, Class::Unknown);
+    assert_eq!(result.why, Why::Untracked);
+    assert_eq!(judge.classify_path(&link, true).class, Class::Protected);
+    assert_eq!(
+        judge.classify_path(&destination.root, false).class,
+        Class::Protected
+    );
+}
+
+// @kotowari[REQ-004, REQ-007]
+#[test]
+fn req_007_clean_repository_symlink_is_vcs() {
+    let source = fixture();
+    let destination = fixture();
+    let link = source.root.join("repository-link");
+    let destination_path = Path::new("..").join(destination.root.file_name().unwrap());
+    std::os::unix::fs::symlink(destination_path, &link).unwrap();
+    common::git_run(&source.root, &["add", "repository-link"]);
+    common::git_run(
+        &source.root,
+        &[
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "commit",
+            "-qm",
+            "track link",
+        ],
+    );
+    let result = judge_for(&source.root).classify_path(&link, false);
+    assert_eq!(result.class, Class::Vcs);
+    assert_eq!(result.why, Why::Vcs);
+}
+
 // @kotowari[REQ-004, EX-028]
 #[test]
 fn req_004_directory_with_uncommitted_changes_is_ask() {
