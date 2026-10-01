@@ -59,6 +59,7 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
     if !file.metadata()?.is_file() {
         return Err(std::io::Error::other("Shadow log is not a regular file"));
     }
+    file.lock()?;
     file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

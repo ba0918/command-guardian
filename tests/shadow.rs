@@ -112,6 +112,43 @@ fn req_019_shadow_directory_symlink_does_not_modify_its_target() {
     );
 }
 
+// @kotowari[REQ-019]
+#[test]
+fn req_019_concurrent_shadow_records_keep_fields_from_the_same_judgment() {
+    let home = temp_dir("shadow-concurrent-home-");
+    let state = temp_dir("shadow-concurrent-state-");
+    let xdg = home.path().join("config");
+    write_shadow_config(&xdg);
+    let barrier = std::sync::Barrier::new(24);
+    std::thread::scope(|scope| {
+        for index in 0..24 {
+            let home = home.path();
+            let state = state.path();
+            let xdg = &xdg;
+            let barrier = &barrier;
+            scope.spawn(move || {
+                barrier.wait();
+                let command = format!("echo '{}'; rm /etc/record-{index}", "x".repeat(4096));
+                let result = run_hook(&bash_input(&command, "/tmp"), home, xdg, Some(state));
+                assert_eq!(result.code, 0);
+                assert!(result.stdout.is_empty());
+            });
+        }
+    });
+    let log = std::fs::read_to_string(state.path().join("command-guardian/shadow.log")).unwrap();
+    assert_eq!(log.lines().count(), 24);
+    let mut records = std::collections::HashSet::new();
+    for line in log.lines() {
+        let fields: Vec<_> = line.split('\t').collect();
+        assert_eq!(fields.len(), 5, "record field count: {}", fields.len());
+        assert!(fields[0].parse::<u64>().is_ok());
+        assert_eq!(fields[1], "block");
+        assert!(fields[2].contains(fields[3]));
+        assert!(fields[4].ends_with(&format!("rm {}", fields[3])));
+        assert!(records.insert(fields[3]));
+    }
+}
+
 fn run_bin(
     args: &[&str],
     input: Option<&str>,
