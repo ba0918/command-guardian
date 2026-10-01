@@ -50,10 +50,10 @@
 ### REQ-039: 入力の上限
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-01-parser.md#A11, docs/decision/records/2026-10-01-parser.md#A12, docs/decision/records/2026-10-01-parser.md#A18
+- source: docs/decision/records/2026-10-01-parser.md#A11, docs/decision/records/2026-10-01-parser.md#A12, docs/decision/records/2026-10-01-parser.md#A18, docs/decision/records/2026-10-01-parser.md#A21
 - verification: unit
 
-コマンド文字列が 1 MiB を超えるとき（置換の再帰読みでは累計で測る）、構文の入れ子と置換の再帰の段数が 128 段を超えるときは ask にする。サイズは構文解析の前に測り、深さは再帰の各段で、深くなる前に測る。構文解析の panic は ask に落とし、プロセスを落とさない。
+コマンド文字列が 1 MiB を超えるとき（置換の再帰読みでは累計で測る）、構文の入れ子と置換の再帰の段数が 128 段を超えるときは ask にする。サイズは構文解析の前に測る。構文解析は隔離した子プロセスで行い、その異常終了（スタックオーバーフローと panic を含む）と時間の上限の超過は ask に落とす（判定は必ず返り、プロセスは落ちない）。深さは、正規化した構文木の走査で測り、128 段を超えた時点で打ち切って ask にする。自前の字句解析による事前の深さ測定は行わない。
 
 ### REQ-040: 文法の追加
 
@@ -125,4 +125,10 @@ Scenario: 本体がファイルの起動は読まない
 Scenario: ラッパー越しの非 POSIX 系のシェルは ask
   When "sudo fish -c 'rm -rf /etc/x'" を判定する
   Then 判定は ask になる
+
+@id=EX-057 @about=REQ-039 @source=docs/decision/records/2026-10-01-parser.md#A21
+Scenario: 深い入れ子でも判定は返り、プロセスは落ちない
+  Given 128 段を超える入れ子を here-doc とバッククォートの中に置いた入力がある
+  When 判定する
+  Then 判定は ask になる（プロセスは異常終了しない）
 ```
