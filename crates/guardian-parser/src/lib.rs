@@ -3,8 +3,8 @@
 //! （REQ-036）。
 //!
 //! - 入力由来の解析は隔離した子プロセス（同じ実行ファイル、スタックの上限つき）で
-//!   行う。子の異常終了（スタックオーバーフローを含む）と時間の上限の超過は ask
-//!   に落とし、判定は必ず返る（REQ-039）。
+//!   行う。子の異常終了（スタックオーバーフローを含む）と時間の上限の超過は
+//!   block の原因（Failure::Limit）に落とし、判定は必ず返る（REQ-039）。
 //! - サイズは構文解析の前に測る。置換の再帰読みは累計で測る（REQ-039）。
 //! - 深さは、正規化した構文木が保つ入れ子（複合構文と置換の再帰）を成功後の走査で
 //!   測る。構文木では平坦な断片になる再帰読み（パラメータ展開と算術式）と `[[ ]]`
@@ -39,7 +39,7 @@ pub const LIMIT_DEPTH: usize = 128;
 /// 読み直しの試行の上限。壊れた入力を読み続けないための歯止め。
 const MAX_RECOVERY_ATTEMPTS: usize = 64;
 
-/// 解析の失敗の種類（REQ-038）。
+/// 解析の失敗の種類（REQ-038・REQ-039）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
     /// 入力が上限（1 MiB）を超えた。
@@ -52,6 +52,8 @@ pub enum Failure {
     UnknownNode(String),
     /// 構文解析が panic した。
     Panic,
+    /// 隔離した子の異常終了か、判定の上限（回数・時間）の超過。
+    Limit,
 }
 
 /// 解析の結果。読めた構文木と、読めなかった理由。
@@ -78,10 +80,10 @@ pub fn parse(input: &str) -> Outcome {
         return Outcome::failure(Failure::TooLarge);
     }
     // 子の異常終了（スタックオーバーフローを含む）・panic・時間の上限の超過は
-    // すべて ask に落とす（REQ-039）。
+    // すべて block の原因（Failure::Limit）に落とす（REQ-039）。
     match worker::request_parse(input) {
         Some(outcome) => outcome,
-        None => Outcome::failure(Failure::TooDeep),
+        None => Outcome::failure(Failure::Limit),
     }
 }
 

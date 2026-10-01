@@ -1,6 +1,20 @@
 //! S8: 読めない構文は ask のコーパス（REQ-038）。
 
-use guardian_parser::{parse, Failure, LIMIT_DEPTH};
+use guardian_parser::{parse, Failure, Outcome, LIMIT_DEPTH};
+
+/// 深い入力が止まったことを確かめる。構文木の走査（TooDeep）か、隔離した子の
+/// 異常終了（Limit）のどちらでも、判定は block になる（REQ-039）。
+fn assert_stopped(outcome: &Outcome, input: &str) {
+    assert!(
+        matches!(
+            outcome.failures.as_slice(),
+            [Failure::TooDeep] | [Failure::Limit]
+        ),
+        "{input}: {:?}",
+        outcome.failures
+    );
+    assert!(outcome.script.is_empty(), "{input}");
+}
 
 /// 読めない入力のコーパス。
 const UNREADABLE: &[&str] = &[
@@ -67,9 +81,7 @@ fn req_039_parentheses_in_parameter_operands_do_not_hide_depth() {
     let mut input = "( ${x:-)}; ".repeat(2000);
     input.push_str(": ");
     input.push_str(&")".repeat(2000));
-    let outcome = parse(&input);
-    assert_eq!(outcome.failures, vec![Failure::TooDeep]);
-    assert!(outcome.script.is_empty());
+    assert_stopped(&parse(&input), &input);
 }
 
 // @kotowari[REQ-039]
@@ -81,9 +93,7 @@ fn req_039_openers_in_backquotes_do_not_hide_depth() {
         input.push_str("{ ");
     }
     input.push('`');
-    let outcome = parse(&input);
-    assert_eq!(outcome.failures, vec![Failure::TooDeep]);
-    assert!(outcome.script.is_empty());
+    assert_stopped(&parse(&input), &input);
 }
 
 // @kotowari[REQ-039]
@@ -98,9 +108,7 @@ fn req_039_comment_char_does_not_hide_depth() {
     for _ in 0..2700 {
         input.push(')');
     }
-    let outcome = parse(&input);
-    assert_eq!(outcome.failures, vec![Failure::TooDeep]);
-    assert!(outcome.script.is_empty());
+    assert_stopped(&parse(&input), &input);
 }
 
 // @kotowari[REQ-039]
@@ -151,9 +159,7 @@ fn req_039_other_hiding_spellings_do_not_hide_depth() {
     after_parameter.push_str(&")".repeat(2000));
     here_doc.push_str(":\nEOF\n");
     for input in [after_parameter, here_doc] {
-        let outcome = parse(&input);
-        assert_eq!(outcome.failures, vec![Failure::TooDeep], "{input}");
-        assert!(outcome.script.is_empty());
+        assert_stopped(&parse(&input), &input);
     }
 }
 
@@ -170,9 +176,7 @@ fn req_039_keyword_words_in_arguments_do_not_hide_depth() {
     for _ in 0..2000 {
         input.push_str("; done");
     }
-    let outcome = parse(&input);
-    assert_eq!(outcome.failures, vec![Failure::TooDeep]);
-    assert!(outcome.script.is_empty());
+    assert_stopped(&parse(&input), &input);
 }
 
 // @kotowari[REQ-039]

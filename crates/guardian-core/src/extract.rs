@@ -114,6 +114,22 @@ pub enum Ask {
     UnsupportedShell(String),
 }
 
+impl Ask {
+    /// 上限の超過か、隔離した子の異常終了か（REQ-039）。判定は block になる。
+    /// 上限の内側で読めないものは ask のまま（REQ-038・REQ-010）。
+    pub fn is_limit(&self) -> bool {
+        matches!(
+            self,
+            Ask::Parse(
+                guardian_parser::Failure::TooLarge
+                    | guardian_parser::Failure::TooDeep
+                    | guardian_parser::Failure::Panic
+                    | guardian_parser::Failure::Limit
+            )
+        )
+    }
+}
+
 /// コマンド文字列を解析して効果を取り出す。判定できない理由も返す。
 pub fn analyze(command: &str, env: &Env) -> Analysis {
     let outcome = guardian_parser::parse(command);

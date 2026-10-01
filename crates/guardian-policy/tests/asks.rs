@@ -80,16 +80,33 @@ fn req_038_an_unreadable_input_without_effects_asks() {
 
 // @kotowari[EX-050]
 #[test]
-fn ex_050_input_over_the_limit_asks() {
+fn ex_050_input_over_the_limit_blocks() {
     let command = "echo x; ".repeat(200_000);
     let report = engine().check(&command);
-    assert_eq!(report.verdict, Verdict::Ask);
-    assert!(
-        report.message.contains("入力が大きすぎる"),
-        "{}",
-        report.message
-    );
+    assert_eq!(report.verdict, Verdict::Block);
+    assert!(report.message.contains("大きすぎる"), "{}", report.message);
     assert!(report.reason.contains("大きすぎる"), "{}", report.reason);
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_input_over_the_depth_limit_blocks() {
+    // 算術式の内側の 129 段は上限を超える。理由をつけて block にする。
+    let at = "(".repeat(129);
+    let close = ")".repeat(129);
+    let report = engine().check(&format!("echo $(( {at}1{close} ))"));
+    assert_eq!(report.verdict, Verdict::Block);
+    assert!(report.message.contains("深すぎる"), "{}", report.message);
+    assert!(report.reason.contains("深すぎる"), "{}", report.reason);
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_depth_at_the_limit_is_judged_normally() {
+    let at = "(".repeat(128);
+    let close = ")".repeat(128);
+    let report = engine().check(&format!("echo $(( {at}1{close} ))"));
+    assert_eq!(report.verdict, Verdict::Allow);
 }
 
 // @kotowari[REQ-011, REQ-035]

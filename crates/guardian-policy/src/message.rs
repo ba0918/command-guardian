@@ -107,13 +107,19 @@ enum AskKind {
     Syntax,
     /// 入力が大きすぎる。
     TooLarge,
+    /// 入れ子が深すぎる。
+    TooDeep,
+    /// 判定の上限（回数・時間）を超えた。隔離した子の異常終了も含む。
+    Limit,
     /// 読めないシェル。
     Shell,
 }
 
 fn ask_kind(ask: &Ask) -> AskKind {
     match ask {
-        Ask::Parse(Failure::TooLarge | Failure::TooDeep) => AskKind::TooLarge,
+        Ask::Parse(Failure::TooLarge) => AskKind::TooLarge,
+        Ask::Parse(Failure::TooDeep) => AskKind::TooDeep,
+        Ask::Parse(Failure::Panic | Failure::Limit) => AskKind::Limit,
         Ask::Parse(_) => AskKind::Syntax,
         Ask::UnreadableProgram(_) | Ask::UnreadableShellBody(_) | Ask::UnreadableEval => {
             AskKind::Syntax
@@ -122,17 +128,53 @@ fn ask_kind(ask: &Ask) -> AskKind {
     }
 }
 
-/// 操作とパスが無い ask の理由を 1 行にする。
+/// 上限を超えた block の理由を 1 行にする（REQ-011）。
+pub fn limit_reason(asks: &[Ask]) -> String {
+    match asks.iter().find(|ask| ask.is_limit()) {
+        Some(Ask::Parse(Failure::TooLarge)) => "入力が大きすぎるため判定を止めました".to_string(),
+        Some(Ask::Parse(Failure::TooDeep)) => "入力が深すぎるため判定を止めました".to_string(),
+        _ => "判定の上限を超えたため判定を止めました".to_string(),
+    }
+}
+
+/// 上限を超えた block の文面（REQ-011）。操作とパスに代えて理由を示す。
+pub fn limit_message(asks: &[Ask]) -> String {
+    let (title, reason) = match asks.iter().find(|ask| ask.is_limit()) {
+        Some(Ask::Parse(Failure::TooLarge)) => (
+            "入力が大きすぎるため判定を止めました",
+            "理由: 構文解析の上限（1 MiB）を超えました",
+        ),
+        Some(Ask::Parse(Failure::TooDeep)) => (
+            "入力が深すぎるため判定を止めました",
+            "理由: 構文の入れ子が上限（128 段）を超えました",
+        ),
+        _ => (
+            "判定の上限を超えたため判定を止めました",
+            "理由: 1 回の判定で行える構文解析の上限（1000 回または 5 秒）を超えました",
+        ),
+    };
+    let mut text = format!("{title}\n{reason}\n代替: 当てはまる代替はありません");
+    if asks.len() > 1 {
+        text.push_str(&format!("\nほかに {} 件の指摘があります", asks.len() - 1));
+    }
+    text
+}
+
+/// 操作とパスが無い ask の理由を 1 行にする。上限を超えたものは block の
+/// 理由にする（REQ-011）。
 pub fn ask_reason(asks: &[Ask]) -> String {
+    if asks.iter().any(Ask::is_limit) {
+        return limit_reason(asks);
+    }
     match asks.first() {
         None => String::new(),
         Some(ask) => match ask_kind(ask) {
             AskKind::Syntax => "構文を読めないため判定できません".to_string(),
-            AskKind::TooLarge => "入力が大きすぎるため判定できません".to_string(),
             AskKind::Shell => match ask {
                 Ask::UnsupportedShell(name) => format!("読めないシェルです: {name}"),
                 _ => "読めないシェルです".to_string(),
             },
+            AskKind::TooLarge | AskKind::TooDeep | AskKind::Limit => limit_reason(asks),
         },
     }
 }
@@ -142,17 +184,16 @@ pub fn ask_message(asks: &[Ask]) -> String {
     let Some(first) = asks.first() else {
         return String::new();
     };
+    if asks.iter().any(Ask::is_limit) {
+        return limit_message(asks);
+    }
     let lines = match ask_kind(first) {
         AskKind::Syntax => vec![
             "構文を読めないため判定できません".to_string(),
             "理由: コマンドの構文を読み取れません".to_string(),
             "代替: 当てはまる代替はありません".to_string(),
         ],
-        AskKind::TooLarge => vec![
-            "入力が大きすぎるため判定できません".to_string(),
-            "理由: 構文解析の上限（1 MiB または 128 段）を超えました".to_string(),
-            "代替: 当てはまる代替はありません".to_string(),
-        ],
+        AskKind::TooLarge | AskKind::TooDeep | AskKind::Limit => return limit_message(asks),
         AskKind::Shell => {
             let name = match first {
                 Ask::UnsupportedShell(name) => name.clone(),

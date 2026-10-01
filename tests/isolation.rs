@@ -83,12 +83,10 @@ fn label(input: &str) -> String {
     format!("{head:?}（{} バイト）", input.len())
 }
 
-/// 128 段を超える入れ子の綴り（REQ-039・EX-057）。判定は ask になり、
+/// 128 段を超える入れ子の綴り（REQ-039・EX-057）。判定は block になり、
 /// プロセスは異常終了しない。
-fn deep_inputs() -> Vec<String> {
+fn over_limit_inputs() -> Vec<String> {
     vec![
-        // バッククォートの中の波括弧（閉じない）。
-        format!("echo {}`", "{ ".repeat(2000)),
         // `)` の直後の `#` の後ろの入れ子。
         format!("echo $(true)#{}: {}", "$(".repeat(2700), ")".repeat(2700)),
         // here-doc の `$(...)` の中の波括弧。
@@ -113,8 +111,16 @@ fn deep_inputs() -> Vec<String> {
         format!("{}: {}", "( ${x:-)}; ".repeat(2000), ")".repeat(2000)),
         // パラメータ展開の閉じの直後の `#` の後ろの入れ子。
         format!("echo ${{x}}#{}: {}", "$(".repeat(2000), ")".repeat(2000)),
-        // `case` の枝の中の入れ子（brush は読めないため構文の失敗として ask に
-        // なる。プロセスは落ちない）。
+    ]
+}
+
+/// 読めない深い綴り。上限の話ではなく、構文を読めないため ask のまま
+/// （REQ-038・A22）。
+fn unreadable_deep_inputs() -> Vec<String> {
+    vec![
+        // バッククォートの中の閉じない波括弧。
+        format!("echo {}`", "{ ".repeat(2000)),
+        // `case` の枝の中の入れ子（brush は読めない）。
         format!(
             "{}:{}",
             "case x in a) echo $(".repeat(2000),
@@ -126,12 +132,44 @@ fn deep_inputs() -> Vec<String> {
 // @kotowari[EX-057]
 #[test]
 fn ex_057_a_deep_input_still_gets_a_verdict() {
-    // 128 段を超える入れ子（here-doc とバッククォートの中を含む）は ask になり、
+    // 128 段を超える入れ子（here-doc とバッククォートの中を含む）は block になり、
     // プロセスは異常終了しない。
     let home = temp_home();
-    for input in deep_inputs() {
+    for input in over_limit_inputs() {
         let code = verdict_code(&input, home.path());
-        assert_eq!(code, 1, "深い入れ子は ask になる: {}", label(&input));
+        assert_eq!(code, 2, "深い入れ子は block になる: {}", label(&input));
+    }
+}
+
+// @kotowari[REQ-038]
+#[test]
+fn req_038_unreadable_deep_inputs_still_ask() {
+    // 読めない構文は上限の超過ではない。ask のままで、プロセスは落ちない。
+    let home = temp_home();
+    for input in unreadable_deep_inputs() {
+        let code = verdict_code(&input, home.path());
+        assert_eq!(code, 1, "読めない入力は ask になる: {}", label(&input));
+    }
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_arithmetic_and_conditional_depth_blocks_over_the_limit() {
+    // 129 段は block、128 段は通常どおり判定する（REQ-039）。条件式の括弧の
+    // 綴りも同じ数え方をする。
+    let home = temp_home();
+    let at = "(".repeat(128);
+    let close = ")".repeat(128);
+    let over = "(".repeat(129);
+    let over_close = ")".repeat(129);
+    for (input, expected) in [
+        (format!("echo $(( {over}1{over_close} ))"), 2),
+        (format!("[[ {over}-n x{over_close} ]]"), 2),
+        (format!("echo $(( {at}1{close} ))"), 0),
+        (format!("[[ {at}-n x{close} ]]"), 0),
+    ] {
+        let code = verdict_code(&input, home.path());
+        assert_eq!(code, expected, "{}", label(&input));
     }
 }
 
@@ -143,14 +181,15 @@ fn req_039_the_grammar_corpus_never_makes_the_process_die() {
     for input in common::CORPUS {
         let _ = verdict_code(input, home.path());
     }
-    // 算術式の内側の括弧は、正規化した構文木では平坦な断片になる。深い綴りでも
-    // 判定は返る（子のスタックの使い方により ask にも allow にもなる）。
+    // 算術式の内側の括弧は、正規化した構文木では平坦な断片になる。深い綴りは
+    // block になり、判定は必ず返る（REQ-039）。
     let arithmetic = format!(
         "cat <<EOF\n$((({}1{}))\nEOF\n",
         "(".repeat(6000),
         ")".repeat(6000)
     );
-    let _ = verdict_code(&arithmetic, home.path());
+    let code = verdict_code(&arithmetic, home.path());
+    assert_eq!(code, 2, "深い算術は block になる: {}", label(&arithmetic));
 }
 
 // @kotowari[REQ-039]

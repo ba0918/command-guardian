@@ -2,7 +2,7 @@
 //!
 //! 親は同じ実行ファイルを子として起動し、stdin に繋いだソケットで要求と応答を
 //! やり取りする。子はスタックの上限つきのスレッドで解析する。子の異常終了と
-//! 時間の上限の超過は ask（Failure::TooDeep）に落とし、判定は必ず返す。
+//! 時間の上限の超過は block の原因（Failure::Limit）に落とし、判定は必ず返す。
 
 use crate::wire::{self, Response};
 use crate::Outcome;

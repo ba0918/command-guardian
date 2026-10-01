@@ -183,9 +183,14 @@ impl Engine {
             verdict = verdict.worst(r.verdict);
         }
         // 構文解析由来の ask は最悪値で合成し、読めている block を上書きしない
-        // （REQ-009・REQ-038・A14）。
-        if !asks.is_empty() {
-            verdict = verdict.worst(Verdict::Ask);
+        // （REQ-009・REQ-038・A14）。上限の超過と隔離した子の異常終了は block に
+        // する（REQ-039・A22）。
+        for ask in &asks {
+            verdict = verdict.worst(if ask.is_limit() {
+                Verdict::Block
+            } else {
+                Verdict::Ask
+            });
         }
         let effect_message = self.compose_message(&effects, &rules);
         let message = if effect_message.is_empty() && !asks.is_empty() {
