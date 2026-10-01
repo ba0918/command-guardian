@@ -29,7 +29,12 @@ fn req_027_028_program_matches_path_and_wrapper() {
     assert!(matches(&rs, "/usr/bin/git push origin main"));
     assert!(matches(&rs, "sudo git push"));
     assert!(matches(&rs, "doas git push"));
+    // sudo の長いオプションの値もラッパーの一部として外す。
+    assert!(matches(&rs, "sudo --user root git push"));
+    assert!(matches(&rs, "sudo --user=root git push"));
     assert!(matches(&rs, "bash -c 'git push'"));
+    // 読むシェルの一覧は core と同じ（mksh も bash 系）。
+    assert!(matches(&rs, "mksh -c 'git push'"));
     assert!(matches(&rs, "eval \"git push\""));
     assert!(!matches(&rs, "git status"));
     assert!(!matches(&rs, "git commit -m push"));

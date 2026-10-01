@@ -80,18 +80,26 @@ const SUDO_VALUED: &[&str] = &[
 
 const DOAS_VALUED: &[&str] = &["-u", "-C", "-a"];
 
-/// 先頭の代入とラッパー（sudo・doas）を外した語の並び。
-pub fn strip_wrapper(words: &[Word]) -> &[Word] {
+/// 先頭の代入とラッパー（sudo・doas）を外した語の並び。外した範囲にある
+/// 代入の名前も返す（REQ-031 の環境変数の照合と共有する）。
+pub fn strip_wrapper<T: std::borrow::Borrow<Word>>(words: &[T]) -> (Vec<String>, &[T]) {
     let mut index = 0;
+    let mut names = Vec::new();
     loop {
         // 先頭の代入。
-        while index < words.len() && split_assignment(&words[index]).is_some() {
-            index += 1;
+        while index < words.len() {
+            match split_assignment(words[index].borrow()) {
+                Some((name, _)) => {
+                    names.push(name);
+                    index += 1;
+                }
+                None => break,
+            }
         }
         let Some(first) = words.get(index) else {
             break;
         };
-        let name = basename(&first.text);
+        let name = basename(&first.borrow().text);
         if name != "sudo" && name != "doas" {
             break;
         }
@@ -102,7 +110,7 @@ pub fn strip_wrapper(words: &[Word]) -> &[Word] {
         };
         index += 1;
         while index < words.len() {
-            let text = &words[index].text;
+            let text = &words[index].borrow().text;
             if text == "--" {
                 index += 1;
                 break;
@@ -118,11 +126,17 @@ pub fn strip_wrapper(words: &[Word]) -> &[Word] {
             }
         }
         // ラッパー越しの代入。
-        while index < words.len() && split_assignment(&words[index]).is_some() {
-            index += 1;
+        while index < words.len() {
+            match split_assignment(words[index].borrow()) {
+                Some((name, _)) => {
+                    names.push(name);
+                    index += 1;
+                }
+                None => break,
+            }
         }
     }
-    &words[index.min(words.len())..]
+    (names, &words[index.min(words.len())..])
 }
 
 /// 対象のシェルの種類（REQ-035）。
@@ -146,12 +160,16 @@ pub fn shell_kind(program: &str) -> ShellKind {
 }
 
 /// `-c` の位置を探す。`-lc` のようなまとめ書きを含む。
-pub fn shell_c_index(words: &[Word]) -> Option<usize> {
-    words.iter().position(|word| {
+pub fn shell_c_index<'a>(words: impl IntoIterator<Item = &'a Word>) -> Option<usize> {
+    for (index, word) in words.into_iter().enumerate() {
         let text = &word.text;
-        text == "-c"
+        if text == "-c"
             || (text.starts_with('-') && !text.starts_with("--") && text[1..].contains('c'))
-    })
+        {
+            return Some(index);
+        }
+    }
+    None
 }
 
 /// コマンドの起動の種類（REQ-035）。
@@ -167,7 +185,7 @@ pub enum ShellInvocation {
 
 /// ラッパーを外した後のプログラムの語で起動を判別する。
 pub fn shell_invocation(words: &[Word]) -> ShellInvocation {
-    let rest = strip_wrapper(words);
+    let (_, rest) = strip_wrapper(words);
     let Some(program) = rest.first() else {
         return ShellInvocation::Other;
     };

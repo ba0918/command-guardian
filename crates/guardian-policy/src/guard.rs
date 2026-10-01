@@ -588,26 +588,18 @@ fn walk_simple(simple: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) 
             None => break,
         }
     }
-    loop {
-        let Some(first) = words.get(index) else {
-            return;
-        };
-        let name = basename(&first.text);
-        if name == "sudo" || name == "doas" {
-            let (next, names) = strip_wrapper(&words, index, name);
-            env_names.extend(names);
-            index = next;
-        } else {
-            break;
-        }
-    }
+    // ラッパーの外し方は parser と共有する（A44）。外した範囲にある代入の
+    // 名前も拾う（REQ-031）。
+    let (names, stripped) = parser::strip_wrapper(&words[index..]);
+    env_names.extend(names);
+    index = words.len() - stripped.len();
     let Some(first) = words.get(index) else {
         return;
     };
     let program = basename(&first.text).to_string();
     let args: Vec<&Word> = words[index + 1..].to_vec();
 
-    if matches!(program.as_str(), "bash" | "sh" | "zsh" | "dash" | "ksh") {
+    if parser::shell_kind(&first.text) == parser::ShellKind::BashLike {
         if let Some(inner) = shell_c_string(&args) {
             walk_inner(&inner, out, depth);
         }
@@ -669,59 +661,10 @@ fn assignment_name(w: &Word) -> Option<(String, &Word)> {
     Some((name.to_string(), w))
 }
 
-const SUDO_VALUED: &[&str] = &[
-    "-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U", "-T", "-R", "-D",
-];
-const DOAS_VALUED: &[&str] = &["-u", "-C", "-a"];
-
-fn strip_wrapper(words: &[&Word], mut i: usize, name: &str) -> (usize, Vec<String>) {
-    let valued = if name == "doas" {
-        DOAS_VALUED
-    } else {
-        SUDO_VALUED
-    };
-    i += 1;
-    while i < words.len() {
-        let t = &words[i].text;
-        if t == "--" {
-            i += 1;
-            break;
-        }
-        if !t.starts_with('-') || t == "-" {
-            break;
-        }
-        let head = t.split('=').next().unwrap_or(t);
-        if valued.contains(&head) && !t.contains('=') {
-            i += 2;
-        } else {
-            i += 1;
-        }
-    }
-    let mut env_names = Vec::new();
-    while i < words.len() {
-        match assignment_name(words[i]) {
-            Some((n, _)) => {
-                env_names.push(n);
-                i += 1;
-            }
-            None => break,
-        }
-    }
-    (i, env_names)
-}
-
 fn shell_c_string(args: &[&Word]) -> Option<String> {
-    let mut i = 0;
-    while i < args.len() {
-        let t = &args[i].text;
-        let is_c =
-            t == "-c" || (t.starts_with('-') && !t.starts_with("--") && t[1..].contains('c'));
-        if is_c {
-            return args.get(i + 1).and_then(|w| w.literal_value());
-        }
-        i += 1;
-    }
-    None
+    // `-c` の位置の読み方は parser と共有する（A16）。
+    let index = parser::shell_c_index(args.iter().copied())?;
+    args.get(index + 1).and_then(|w| w.literal_value())
 }
 
 fn basename(text: &str) -> &str {

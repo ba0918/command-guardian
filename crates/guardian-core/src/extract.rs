@@ -340,7 +340,7 @@ fn extract_simple(
     let rest = &simple.words[index..];
     // ラッパー（sudo / doas）を外す。外した語（値付きオプションの値など）の
     // 置換も読む（EX-047）。
-    let stripped = strip_wrapper(rest);
+    let stripped = strip_wrapper(rest).1;
     for word in &rest[..rest.len().saturating_sub(stripped.len())] {
         scan_word_substitutions(word, ctx, out, asks, depth);
     }
