@@ -1,16 +1,19 @@
 //! 入力由来の解析を隔離した子プロセスで行う（REQ-039）。
 //!
-//! 親は同じ実行ファイルを子として起動し、stdin に繋いだソケットで要求と応答を
-//! やり取りする。子はスタックの上限つきのスレッドで解析する。子の異常終了と
-//! 時間の上限の超過は block の原因（Failure::Limit）に落とし、判定は必ず返す。
+//! 親は同じ実行ファイルを子として 1 度だけ起動し、stdin に繋いだソケットで
+//! 要求と応答をやり取りする。子はスタックの上限つきのスレッドで解析し、親が
+//! ソケットを閉じるまで働き続ける。子の異常終了と時間の上限の超過は block の
+//! 原因（Failure::Limit）に落とし、判定は必ず返す。1 回の判定で行うやり取りの
+//! 回数と時間には予算を設ける（REQ-039）。
 
+use crate::budget;
 use crate::wire::{self, Response};
 use crate::Outcome;
 use std::io::{Read, Write};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::net::UnixStream;
-use std::process::{Command, Stdio};
-use std::sync::Once;
+use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, Once};
 use std::time::Duration;
 
 /// 子として起動されたことを示す環境変数。値は使い捨ての nonce。
@@ -43,22 +46,33 @@ const RESPONSE_HEADER: usize = 20;
 
 static STARTED: Once = Once::new();
 
-/// 子として起動されていれば親の要求を 1 つ処理してプロセスを終了する。
+/// 使い回す子。プロセスごとに 1 つ持ち、やり取りは直列化する。
+struct Worker {
+    child: Child,
+    socket: UnixStream,
+    nonce: [u8; 16],
+}
+
+static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
+
+/// 子として起動されていれば親の要求を、親がソケットを閉じるまで処理する。
 /// 子でなければ何もしない。実行ファイルの main と、解析の入口（parse /
 /// strip_quotes）が呼ぶ。main を持たないテストの実行ファイルでも子として
-/// 働けるように、入口の側からも呼ぶ。
+/// 働けるように、入口の側からも呼ぶ。子では 1 つのスレッドだけが働き、ほかの
+/// 入口は Once で止まる（ほかのテストが親の要求を乱さない）。
 pub fn run_if_child() {
     if std::env::var_os(WORKER_ENV).is_none() {
         return;
     }
     STARTED.call_once(|| {
-        // run は必ず exit する。ここへ来るのは panic を捕まえたときだけ。
+        // run は親がソケットを閉じるまで返らない。ここへ来るのは panic を
+        // 捕まえたときだけ。
         let _ = std::panic::catch_unwind(run);
         std::process::exit(1);
     });
 }
 
-/// 子プロセスとして 1 つの要求を処理する。
+/// 子プロセスとして親の要求を順に処理する。
 fn run() -> ! {
     let Some(nonce) = nonce_from_env() else {
         std::process::exit(1);
@@ -70,23 +84,29 @@ fn run() -> ! {
     if write_ready(&mut socket, &nonce).is_err() {
         std::process::exit(1);
     }
-    let Some(request) = read_request(&mut socket) else {
-        std::process::exit(1);
-    };
-    if request.nonce != nonce {
-        std::process::exit(1);
-    }
-    let response = match request.mode {
-        wire::MODE_PARSE => {
-            let (failures, script) = crate::parse_in_child(&request.input);
-            Response::Parsed { failures, script }
+    loop {
+        let Some(request) = read_request(&mut socket) else {
+            // 親がソケットを閉じた。
+            std::process::exit(0);
+        };
+        if request.nonce != nonce {
+            std::process::exit(1);
         }
-        wire::MODE_STRIP_QUOTES => Response::Stripped(crate::strip_quotes_inner(&request.input)),
-        _ => std::process::exit(1),
-    };
-    let body = wire::encode_response(&response);
-    let _ = write_response(&mut socket, &nonce, &body);
-    std::process::exit(0);
+        let response = match request.mode {
+            wire::MODE_PARSE => {
+                let (failures, script) = crate::parse_in_child(&request.input);
+                Response::Parsed { failures, script }
+            }
+            wire::MODE_STRIP_QUOTES => {
+                Response::Stripped(crate::strip_quotes_inner(&request.input))
+            }
+            _ => std::process::exit(1),
+        };
+        let body = wire::encode_response(&response);
+        if write_response(&mut socket, &nonce, &body).is_err() {
+            std::process::exit(1);
+        }
+    }
 }
 
 struct Request {
@@ -126,7 +146,7 @@ fn write_response(socket: &mut UnixStream, nonce: &[u8; 16], body: &[u8]) -> std
     socket.write_all(&frame)
 }
 
-/// 親側: 解析を子に依頼する。子の異常終了・時間切れ・壊れた応答は None。
+/// 親側: 解析を子に依頼する。予算切れ・子の異常終了・時間切れ・壊れた応答は None。
 pub(crate) fn request_parse(input: &str) -> Option<Outcome> {
     match exchange(wire::MODE_PARSE, input)? {
         Response::Parsed { failures, script } => Some(Outcome {
@@ -146,6 +166,36 @@ pub(crate) fn request_strip_quotes(input: &str) -> Option<String> {
 }
 
 fn exchange(mode: u8, input: &str) -> Option<Response> {
+    // 判定の予算を先に確かめる（REQ-039）。構文解析の回数は構文解析だけが
+    // 消費し、引用の除去は時間の上限だけを見る。
+    let allowed = if mode == wire::MODE_PARSE {
+        budget::take()
+    } else {
+        budget::within_time()
+    };
+    if !allowed {
+        return None;
+    }
+    let mut guard = WORKER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if guard.is_none() {
+        *guard = spawn_worker();
+    }
+    let worker = guard.as_mut()?;
+    let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input);
+    if result.is_none() {
+        // 子が死んだか時間切れ。次の要求のために始末する。
+        if let Some(mut dead) = guard.take() {
+            let _ = dead.child.kill();
+            let _ = dead.child.wait();
+        }
+    }
+    result
+}
+
+/// 子を 1 つ起こし、解析を始められる印まで待つ。
+fn spawn_worker() -> Option<Worker> {
     let exe = std::env::current_exe().ok()?;
     let nonce = make_nonce();
     let (mut parent_end, child_end) = UnixStream::pair().ok()?;
@@ -156,11 +206,22 @@ fn exchange(mode: u8, input: &str) -> Option<Response> {
         .stderr(Stdio::null())
         .spawn()
         .ok()?;
-    let result = exchange_with(&mut parent_end, &nonce, mode, input);
-    // 応答が届いていてもいなくても、子は必ず reap する。
-    let _ = child.kill();
-    let _ = child.wait();
-    result
+    // 起動待ちも判定の残り時間の内側に収める。
+    let startup = budget::remaining()
+        .map(|remaining| remaining.min(WORKER_STARTUP_TIMEOUT))
+        .unwrap_or(WORKER_STARTUP_TIMEOUT);
+    if parent_end.set_read_timeout(Some(startup)).is_err()
+        || read_ready(&mut parent_end, &nonce).is_none()
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
+    }
+    Some(Worker {
+        child,
+        socket: parent_end,
+        nonce,
+    })
 }
 
 fn exchange_with(
@@ -169,8 +230,15 @@ fn exchange_with(
     mode: u8,
     input: &str,
 ) -> Option<Response> {
+    // 待ち時間は、判定の残り時間と 1 回の解析の上限の短い方にする。
+    let timeout = budget::remaining()
+        .map(|remaining| remaining.min(CHILD_TIMEOUT))
+        .unwrap_or(CHILD_TIMEOUT);
+    if timeout.is_zero() {
+        return None;
+    }
     // 相手が読まないまま書き込みが詰まる場合にも時間で切れるようにする。
-    let _ = socket.set_write_timeout(Some(CHILD_TIMEOUT));
+    let _ = socket.set_write_timeout(Some(timeout));
     let mut request = Vec::with_capacity(REQUEST_HEADER + input.len());
     request.extend_from_slice(nonce);
     request.push(mode);
@@ -178,11 +246,8 @@ fn exchange_with(
     request.extend_from_slice(input.as_bytes());
     socket.write_all(&request).ok()?;
     let _ = socket.set_write_timeout(None);
-    // 子の起動（解析を始められる印）を待つ。
-    socket.set_read_timeout(Some(WORKER_STARTUP_TIMEOUT)).ok()?;
-    read_ready(socket, nonce)?;
-    // ここからは解析そのものの時間。異常終了も時間切れも ask に落ちる。
-    socket.set_read_timeout(Some(CHILD_TIMEOUT)).ok()?;
+    // 異常終了も時間切れも block の原因（Failure::Limit）に落ちる。
+    socket.set_read_timeout(Some(timeout)).ok()?;
     let (got, body) = read_response(socket)?;
     if got != *nonce {
         return None;

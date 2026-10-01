@@ -132,6 +132,9 @@ impl Ask {
 
 /// コマンド文字列を解析して効果を取り出す。判定できない理由も返す。
 pub fn analyze(command: &str, env: &Env) -> Analysis {
+    // 判定の予算（構文解析の回数と時間）を数え直す（REQ-039）。この判定の間の
+    // 構文解析がここから数える。
+    guardian_parser::begin_judgment();
     let outcome = guardian_parser::parse(command);
     let mut ctx = Context::new(env);
     let mut effects = Vec::new();

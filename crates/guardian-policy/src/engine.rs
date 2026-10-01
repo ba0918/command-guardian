@@ -174,7 +174,12 @@ impl Engine {
             }
         }
 
-        let asks = analysis.parse_errors;
+        // 見張りの規則の照合でも構文解析をする。この判定で予算を使い切って
+        // いたら、上限の超過として block にする（REQ-039）。
+        let mut asks = analysis.parse_errors;
+        if guardian_parser::judgment_over_budget() && !asks.iter().any(Ask::is_limit) {
+            asks.push(Ask::Parse(guardian_parser::Failure::Limit));
+        }
         let mut verdict = Verdict::Allow;
         for e in &effects {
             verdict = verdict.worst(e.verdict);

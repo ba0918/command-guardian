@@ -1,6 +1,6 @@
 //! S6: 解析の失敗の検出（REQ-010）。
 
-use guardian_core::{analyze, Env};
+use guardian_core::{analyze, Ask, Env};
 use std::path::PathBuf;
 
 fn env() -> Env {
@@ -41,4 +41,23 @@ fn req_010_unterminated_quotes_are_parse_errors() {
     assert!(analyze("rm -rf $(rm /etc/foo)", &env())
         .parse_errors
         .is_empty());
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_limit_failures_become_blocks() {
+    // 上限の超過と、隔離した子の異常終了（panic を含む）は block の原因。
+    for failure in [
+        guardian_parser::Failure::TooLarge,
+        guardian_parser::Failure::TooDeep,
+        guardian_parser::Failure::Panic,
+        guardian_parser::Failure::Limit,
+    ] {
+        assert!(Ask::Parse(failure.clone()).is_limit(), "{failure:?}");
+    }
+    // 上限の内側で読めないものは ask のまま。
+    assert!(!Ask::Parse(guardian_parser::Failure::Syntax).is_limit());
+    assert!(!Ask::Parse(guardian_parser::Failure::UnknownNode("x".into())).is_limit());
+    assert!(!Ask::UnreadableEval.is_limit());
+    assert!(!Ask::UnsupportedShell("fish".into()).is_limit());
 }

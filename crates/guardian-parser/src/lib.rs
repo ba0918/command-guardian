@@ -14,6 +14,7 @@
 //!   （REQ-038）。
 
 pub mod ast;
+mod budget;
 mod depth;
 mod normalize;
 mod wire;
@@ -35,6 +36,12 @@ pub const LIMIT_BYTES: usize = 1024 * 1024;
 
 /// 構文の入れ子と置換の再帰の上限（REQ-039）。
 pub const LIMIT_DEPTH: usize = 128;
+
+/// 1 回の判定で行う構文解析の回数の上限（REQ-039）。固定値。
+pub const LIMIT_EXCHANGES: usize = 1000;
+
+/// 1 回の判定の時間の上限（REQ-039）。固定値。
+pub const LIMIT_JUDGMENT_TIME: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// 読み直しの試行の上限。壊れた入力を読み続けないための歯止め。
 const MAX_RECOVERY_ATTEMPTS: usize = 64;
@@ -85,6 +92,16 @@ pub fn parse(input: &str) -> Outcome {
         Some(outcome) => outcome,
         None => Outcome::failure(Failure::Limit),
     }
+}
+
+/// 1 回の判定の予算を数え直す（REQ-039）。判定の入口が呼ぶ。
+pub fn begin_judgment() {
+    budget::begin();
+}
+
+/// この判定で予算を使い切ったか（REQ-039）。判定の終わりに確かめる。
+pub fn judgment_over_budget() -> bool {
+    budget::exceeded()
 }
 
 /// 引用を外したコマンド本文。設定の照合（見張りの例の分割とカスタムルールの
@@ -377,6 +394,22 @@ mod tests {
         }
         let outcome = parse(&input);
         assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
+    }
+
+    // @kotowari[REQ-039]
+    #[test]
+    fn req_039_parse_exchanges_over_the_budget_fail() {
+        // 1 回の判定の構文解析は 1000 回まで。1001 回目は Limit になる。
+        begin_judgment();
+        for _ in 0..LIMIT_EXCHANGES {
+            let outcome = parse("true");
+            assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
+        }
+        // 引用の除去は字句解析であり、構文解析の回数の予算を消費しない。
+        assert_eq!(strip_quotes("true"), "true");
+        let outcome = parse("true");
+        assert_eq!(outcome.failures, vec![Failure::Limit]);
+        assert!(outcome.script.is_empty());
     }
 
     // @kotowari[REQ-038]

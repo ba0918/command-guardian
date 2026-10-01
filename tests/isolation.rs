@@ -114,8 +114,8 @@ fn over_limit_inputs() -> Vec<String> {
     ]
 }
 
-/// 読めない深い綴り。上限の話ではなく、構文を読めないため ask のまま
-/// （REQ-038・A22）。
+/// 読めない深い綴り。子が読めれば ask、子の異常終了なら block になる
+/// （REQ-038・REQ-039）。
 fn unreadable_deep_inputs() -> Vec<String> {
     vec![
         // バッククォートの中の閉じない波括弧。
@@ -141,14 +141,19 @@ fn ex_057_a_deep_input_still_gets_a_verdict() {
     }
 }
 
-// @kotowari[REQ-038]
+// @kotowari[REQ-038, REQ-039]
 #[test]
-fn req_038_unreadable_deep_inputs_still_ask() {
-    // 読めない構文は上限の超過ではない。ask のままで、プロセスは落ちない。
+fn req_038_unreadable_deep_inputs_still_get_a_verdict() {
+    // 読めない深い綴りは、子が読めれば ask、子の異常終了なら block になる。
+    // どちらでも allow にはならず、プロセスは落ちない（REQ-038・REQ-039）。
     let home = temp_home();
     for input in unreadable_deep_inputs() {
         let code = verdict_code(&input, home.path());
-        assert_eq!(code, 1, "読めない入力は ask になる: {}", label(&input));
+        assert!(
+            (1..=2).contains(&code),
+            "読めない入力は allow にしない: {}",
+            label(&input)
+        );
     }
 }
 
@@ -171,6 +176,29 @@ fn req_039_arithmetic_and_conditional_depth_blocks_over_the_limit() {
         let code = verdict_code(&input, home.path());
         assert_eq!(code, expected, "{}", label(&input));
     }
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_the_parse_exchange_budget_blocks_over_the_limit() {
+    // 1 回の判定で行う構文解析は 1000 回まで（REQ-039）。超えたら理由をつけて
+    // block にする。内側は通常どおり判定する。
+    let home = temp_home();
+    let under = "eval x; ".repeat(999);
+    let code = verdict_code(&under, home.path());
+    assert_eq!(code, 0, "予算の内側は通常どおり判定する: {}", label(&under));
+
+    let over = "eval x; ".repeat(1000);
+    let out = Command::new(bin())
+        .args(["check", &over, "--cwd", "/tmp/scratch", "--format", "json"])
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path().join(".config"))
+        .env("TMPDIR", "/tmp")
+        .output()
+        .expect("実行ファイルを起動できない");
+    assert_eq!(out.status.code(), Some(2), "予算の超過は block になる");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("判定の上限"), "{stdout}");
 }
 
 // @kotowari[REQ-039]
