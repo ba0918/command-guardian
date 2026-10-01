@@ -239,7 +239,10 @@ fn extract_pipeline(
         if !ctx.check(asks) {
             return;
         }
-        children_sources = extract_command(command, ctx, out, asks, depth, children_sources);
+        let mut child = (pipeline.commands.len() > 1).then(|| ctx.clone());
+        let command_ctx = child.as_mut().unwrap_or(&mut *ctx);
+        children_sources =
+            extract_command(command, command_ctx, out, asks, depth, children_sources);
     }
 }
 

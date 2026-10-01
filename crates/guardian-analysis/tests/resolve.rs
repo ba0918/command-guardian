@@ -346,3 +346,20 @@ fn req_002_literal_loop_values_remain_strings_when_used_after_the_loop() {
         vec![delete(p("/etc/relative"))]
     );
 }
+
+// @kotowari[REQ-001, REQ-002]
+#[test]
+fn req_002_pipeline_eval_state_does_not_escape_to_the_parent_or_other_stages() {
+    assert_eq!(
+        effects("S=/etc/x; eval 'S=/tmp/x' | cat; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(
+        effects("S=/etc/x; eval 'S=/tmp/x' | rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(
+        effects("eval 'S=/etc/x'; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+}
