@@ -315,3 +315,21 @@ fn req_002_quoted_glob_characters_are_literal_components_of_the_glob_base() {
         vec![delete(Target::GlobBase(PathBuf::from("/tmp/a*b")))]
     );
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_mktemp_dry_run_is_not_a_created_temporary_path() {
+    for options in ["-u", "--dry-run", "-du"] {
+        let command = format!("rm \"$(mktemp {options} /etc/guardian.XXXXXX)\"");
+        let effects = effects(&command);
+        assert_eq!(effects.len(), 1);
+        assert!(
+            matches!(effects[0].target, Target::Unresolved(_)),
+            "{effects:?}"
+        );
+    }
+    assert_eq!(
+        effects("d=$(mktemp -d); rm \"$d\""),
+        vec![delete(Target::Mktemp)]
+    );
+}

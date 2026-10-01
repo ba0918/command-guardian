@@ -1267,6 +1267,15 @@ fn is_mktemp_script(script: &Script) -> bool {
         return false;
     };
     basename(&first.text) == "mktemp"
+        && !simple.words[1..]
+            .iter()
+            .take_while(|word| word.text != "--")
+            .any(|word| {
+                word.text == "--dry-run"
+                    || (word.text.starts_with('-')
+                        && !word.text.starts_with("--")
+                        && word.text[1..].contains('u'))
+            })
 }
 
 fn lookup_var(name: &str, ctx: &Context) -> Option<Value> {
