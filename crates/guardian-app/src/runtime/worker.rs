@@ -341,9 +341,7 @@ fn spawn_worker(exe: &std::path::Path, budget: Option<&budget::Budget>) -> Optio
         .map(budget::Budget::remaining)
         .map(|remaining| remaining.min(WORKER_STARTUP_TIMEOUT))
         .unwrap_or(WORKER_STARTUP_TIMEOUT);
-    if startup.is_zero()
-        || parent_end.set_read_timeout(Some(startup)).is_err()
-        || read_ready(&mut parent_end, &nonce).is_none()
+    if startup.is_zero() || read_ready(&mut parent_end, &nonce, Instant::now() + startup).is_none()
     {
         let _ = child.kill();
         let _ = child.wait();
@@ -371,44 +369,47 @@ fn exchange_with(
     if timeout.is_zero() {
         return Err(Interrupted::Timeout);
     }
-    // 相手が読まないまま書き込みが詰まる場合にも時間で切れるようにする。
-    let _ = socket.set_write_timeout(Some(timeout));
+    let deadline = Instant::now() + timeout;
     let mut request = Vec::with_capacity(REQUEST_HEADER + input.len());
     request.extend_from_slice(nonce);
     request.push(mode);
     request.extend_from_slice(&(input.len() as u32).to_le_bytes());
     request.extend_from_slice(input.as_bytes());
-    socket.write_all(&request).map_err(|_| Interrupted::Write)?;
-    let _ = socket.set_write_timeout(None);
-    let remaining = budget
-        .map(budget::Budget::remaining)
-        .unwrap_or(CHILD_TIMEOUT)
-        .min(CHILD_TIMEOUT);
-    if remaining.is_zero() {
-        return Err(Interrupted::Timeout);
+    let mut request = request.as_slice();
+    while !request.is_empty() {
+        let remaining = remaining_time(deadline)?;
+        socket
+            .set_write_timeout(Some(remaining))
+            .map_err(|_| Interrupted::Write)?;
+        match socket.write(request) {
+            Ok(0) => return Err(Interrupted::Write),
+            Ok(written) => request = &request[written..],
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(io_interrupted(error, Interrupted::Write)),
+        }
     }
-    socket
-        .set_read_timeout(Some(remaining))
-        .map_err(|_| Interrupted::Protocol)?;
-    let (got, body) = read_response(socket)?;
+    let (got, body) = read_response(socket, deadline)?;
     if got != *nonce {
         return Err(Interrupted::Protocol);
     }
     wire::decode_response(&body).map_err(|_| Interrupted::Protocol)
 }
 
-fn read_ready(socket: &mut UnixStream, nonce: &[u8; 16]) -> Option<()> {
+fn read_ready(socket: &mut UnixStream, nonce: &[u8; 16], deadline: Instant) -> Option<()> {
     let mut frame = [0u8; 17];
-    socket.read_exact(&mut frame).ok()?;
+    read_exact(socket, &mut frame, deadline).ok()?;
     if &frame[..16] != nonce || frame[16] != READY_MARKER {
         return None;
     }
     Some(())
 }
 
-fn read_response(socket: &mut UnixStream) -> Result<([u8; 16], Vec<u8>), Interrupted> {
+fn read_response(
+    socket: &mut UnixStream,
+    deadline: Instant,
+) -> Result<([u8; 16], Vec<u8>), Interrupted> {
     let mut header = [0u8; RESPONSE_HEADER];
-    read_exact(socket, &mut header)?;
+    read_exact(socket, &mut header, deadline)?;
     let mut nonce = [0u8; 16];
     nonce.copy_from_slice(&header[..16]);
     let len = u32::from_le_bytes([header[16], header[17], header[18], header[19]]) as usize;
@@ -416,16 +417,45 @@ fn read_response(socket: &mut UnixStream) -> Result<([u8; 16], Vec<u8>), Interru
         return Err(Interrupted::Protocol);
     }
     let mut body = vec![0u8; len];
-    read_exact(socket, &mut body)?;
+    read_exact(socket, &mut body, deadline)?;
     Ok((nonce, body))
 }
 
 /// 読み取りの時間切れと、途中で終わった応答を分ける。
-fn read_exact(socket: &mut UnixStream, buf: &mut [u8]) -> Result<(), Interrupted> {
-    socket.read_exact(buf).map_err(|error| match error.kind() {
+fn remaining_time(deadline: Instant) -> Result<Duration, Interrupted> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        Err(Interrupted::Timeout)
+    } else {
+        Ok(remaining)
+    }
+}
+
+fn io_interrupted(error: std::io::Error, fallback: Interrupted) -> Interrupted {
+    match error.kind() {
         std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => Interrupted::Timeout,
-        _ => Interrupted::Protocol,
-    })
+        _ => fallback,
+    }
+}
+
+fn read_exact(
+    socket: &mut UnixStream,
+    mut buf: &mut [u8],
+    deadline: Instant,
+) -> Result<(), Interrupted> {
+    while !buf.is_empty() {
+        socket
+            .set_read_timeout(Some(remaining_time(deadline)?))
+            .map_err(|_| Interrupted::Protocol)?;
+        match socket.read(buf) {
+            Ok(0) => return Err(Interrupted::Protocol),
+            Ok(read) => buf = &mut buf[read..],
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(io_interrupted(error, Interrupted::Protocol)),
+        }
+    }
+    remaining_time(deadline)?;
+    Ok(())
 }
 
 /// 使い捨ての nonce。値そのものは秘密ではない（偶然の起動を弾く印）。
@@ -461,4 +491,45 @@ fn nonce_from_env() -> Option<[u8; 16]> {
         out[index] = u8::from_str_radix(chunk, 16).ok()?;
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @kotowari[REQ-039]
+    #[test]
+    fn req_039_response_progress_does_not_restart_the_deadline() {
+        let outcome = guardian_parser::parse("echo x");
+        let response = Response::Parsed {
+            failures: outcome.failures,
+            script: Some(outcome.script),
+        };
+        let body = wire::encode_response(&response);
+        let nonce = [1; 16];
+        let (mut parent, mut producer) = UnixStream::pair().unwrap();
+        let sender = std::thread::spawn(move || {
+            let mut frame = Vec::new();
+            frame.extend_from_slice(&nonce);
+            frame.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            frame.extend_from_slice(&body);
+            for chunk in frame.chunks(frame.len().div_ceil(4)) {
+                std::thread::sleep(Duration::from_millis(100));
+                if producer.write_all(chunk).is_err() {
+                    break;
+                }
+            }
+        });
+        let start = Instant::now();
+        let result = read_response(&mut parent, start + Duration::from_millis(250));
+        let elapsed = start.elapsed();
+        drop(parent);
+        sender.join().unwrap();
+        eprintln!("progress response elapsed: {elapsed:?}");
+        assert!(
+            matches!(result, Err(Interrupted::Timeout)),
+            "response exceeded the deadline without timing out"
+        );
+        assert!(elapsed < Duration::from_millis(380), "{elapsed:?}");
+    }
 }
