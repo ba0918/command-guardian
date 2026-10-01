@@ -378,15 +378,17 @@ fn extract_for(
         }
     }
     if all_literal && ctx.mode == AnalysisMode::Effects {
+        let mut child = ctx.clone();
         for (index, value) in resolved.into_iter().enumerate() {
             if !ctx.check(asks) {
                 return;
             }
-            let mut child = ctx.clone();
             child.collect_invocations = ctx.collect_invocations && index == 0;
             child.vars.insert(var.to_string(), value);
             extract_script(body, &mut child, out, asks, depth + 1);
         }
+        ctx.vars = child.vars;
+        ctx.cwd = child.cwd;
     } else {
         let mut child = ctx.clone();
         child.vars.insert(var.to_string(), Value::UnknownSource);

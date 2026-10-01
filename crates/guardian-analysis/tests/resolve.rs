@@ -225,3 +225,20 @@ fn req_002_eval_updates_parent_state_but_shell_commands_do_not() {
         vec![delete(p("/home/you/work/repo/x"))]
     );
 }
+
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_literal_loop_state_survives_iterations_and_loop_completion() {
+    assert_eq!(
+        effects("S=/tmp/x; for x in /a; do S=/etc/x; done; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(
+        effects("cd /tmp; for x in /a /b; do cd child; rm x; done; rm y"),
+        vec![
+            delete(p("/tmp/child/x")),
+            delete(p("/tmp/child/child/x")),
+            delete(p("/tmp/child/child/y")),
+        ]
+    );
+}
