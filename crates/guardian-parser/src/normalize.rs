@@ -179,6 +179,11 @@ impl Normalizer {
             raw::CommandPrefixOrSuffixItem::ProcessSubstitution(kind, subshell) => {
                 let write = matches!(kind, raw::ProcessSubstitutionKind::Write);
                 let body = self.script(&subshell.list, depth + 1);
+                out.words.push(Word::from_parts(vec![Part::Opaque(format!(
+                    "{}({})",
+                    if write { ">" } else { "<" },
+                    subshell.list
+                ))]));
                 out.process_substitutions
                     .push(ProcessSubstitution { write, body });
             }

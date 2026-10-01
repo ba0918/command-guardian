@@ -96,6 +96,7 @@ fn brush_item(item: &raw::CommandPrefixOrSuffixItem, shape: &mut Shape) {
         raw::CommandPrefixOrSuffixItem::AssignmentWord(_, word) => brush_word(word, shape),
         raw::CommandPrefixOrSuffixItem::IoRedirect(redirect) => brush_redirect(redirect, shape),
         raw::CommandPrefixOrSuffixItem::ProcessSubstitution(_, subshell) => {
+            shape.words += 1;
             brush_list(&subshell.list, shape)
         }
     }

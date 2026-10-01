@@ -203,3 +203,19 @@ fn req_041_process_substitution_bodies_are_kept() {
         assert_eq!(substitution.body.items.len(), 1);
     }
 }
+
+// @kotowari[REQ-041, REQ-037]
+#[test]
+fn req_041_process_substitution_arguments_keep_their_word_positions() {
+    for source in ["bash <(echo x) -c 'echo y'", "bash >(echo x) -c 'echo y'"] {
+        let cmd = simple(source);
+        assert_eq!(cmd.words.len(), 4);
+        assert_eq!(cmd.words[0].literal_value().as_deref(), Some("bash"));
+        assert!(!cmd.words[1].literal());
+        assert!(matches!(cmd.words[1].parts.as_slice(), [Part::Opaque(_)]));
+        assert_eq!(cmd.words[2].literal_value().as_deref(), Some("-c"));
+        assert_eq!(cmd.words[3].literal_value().as_deref(), Some("echo y"));
+        assert_eq!(cmd.process_substitutions.len(), 1);
+        assert_eq!(cmd.process_substitutions[0].body.items.len(), 1);
+    }
+}
