@@ -154,7 +154,11 @@ impl Policy {
             }))
             .fold(Verdict::Allow, Verdict::worst);
         let effect_message = compose_message(&effects, &rules);
-        let message = if effect_message.is_empty() && !asks.is_empty() {
+        let explicit_block = effects.iter().any(|e| e.verdict == Verdict::Block)
+            || rules.iter().any(|r| r.verdict == Verdict::Block);
+        let message = if (asks.iter().any(Ask::is_limit) && !explicit_block)
+            || (effect_message.is_empty() && !asks.is_empty())
+        {
             message::ask_message(&asks)
         } else {
             effect_message
@@ -191,7 +195,13 @@ fn compose_message(effects: &[EffectReport], rules: &[RuleReport]) -> String {
         .iter()
         .filter(|r| r.verdict != Verdict::Allow)
         .collect();
-    if let Some(w) = worst_effect(effects) {
+    let rule = bad_rules
+        .iter()
+        .find(|r| r.verdict == Verdict::Block)
+        .or_else(|| bad_rules.first());
+    if let Some(w) = worst_effect(effects)
+        .filter(|effect| rule.is_none_or(|rule| effect.verdict >= rule.verdict))
+    {
         let text = message::non_allow_message(w.op, &w.target, w.class, &w.why);
         let others = effects
             .iter()
@@ -205,10 +215,15 @@ fn compose_message(effects: &[EffectReport], rules: &[RuleReport]) -> String {
             text
         };
     }
-    if let Some(r) = bad_rules.first() {
+    if let Some(r) = rule {
         let text = format!("{}\n判定: {}", r.reason, r.verdict);
-        return if bad_rules.len() > 1 {
-            format!("{text}\nほかに {} 件の指摘があります", bad_rules.len() - 1)
+        let others = bad_rules.len() - 1
+            + effects
+                .iter()
+                .filter(|e| e.verdict != Verdict::Allow)
+                .count();
+        return if others > 0 {
+            format!("{text}\nほかに {others} 件の指摘があります")
         } else {
             text
         };

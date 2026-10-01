@@ -134,3 +134,65 @@ fn req_031_guards_match_the_supplied_apparent_words_and_assignment_names() {
         1
     );
 }
+
+// @kotowari[REQ-009, REQ-011, REQ-039]
+#[test]
+fn req_011_the_message_explains_the_source_that_decides_block() {
+    let policy = Policy::new(Config::builtin(None), vec![]);
+    let effect = |verdict| guardian_policy::EffectReport {
+        op: guardian_core::Op::Delete,
+        target: guardian_core::Target::Path {
+            path: "/work/file".into(),
+            dereference: false,
+        },
+        class: Class::Unknown,
+        why: Why::Untracked,
+        verdict,
+    };
+    let rule = |verdict, reason: &str| RuleReport {
+        name: "rule".into(),
+        reason: reason.into(),
+        verdict,
+    };
+    for (effects, rules, expected) in [
+        (vec![effect(Verdict::Ask)], vec![], "判定の上限"),
+        (
+            vec![],
+            vec![rule(Verdict::Ask, "確認する規則")],
+            "判定の上限",
+        ),
+        (
+            vec![effect(Verdict::Ask)],
+            vec![rule(Verdict::Ask, "確認する規則")],
+            "判定の上限",
+        ),
+        (vec![effect(Verdict::Block)], vec![], "未追跡"),
+        (
+            vec![effect(Verdict::Ask)],
+            vec![rule(Verdict::Block, "拒否する規則")],
+            "拒否する規則",
+        ),
+        (
+            vec![],
+            vec![
+                rule(Verdict::Ask, "確認する規則"),
+                rule(Verdict::Block, "拒否する規則"),
+            ],
+            "拒否する規則",
+        ),
+    ] {
+        let report = policy.report(
+            effects,
+            rules,
+            vec![Ask::Parse(Failure::Syntax), Ask::Parse(Failure::Limit)],
+        );
+        assert_eq!(report.verdict, Verdict::Block);
+        assert!(report.reason.contains(expected), "{}", report.reason);
+        assert!(report.message.contains(expected), "{}", report.message);
+        assert!(
+            (2..=4).contains(&report.message.lines().count()),
+            "{}",
+            report.message
+        );
+    }
+}
