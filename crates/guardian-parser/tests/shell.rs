@@ -43,6 +43,11 @@ fn req_035_bash_like_shells_with_c_read_the_body() {
     // "-lc" のまとめ書きも "-c" として扱う。
     let word = bash_body("bash -lc 'rm -rf /etc/x'").expect("本体の語がある");
     assert_eq!(word.literal_value().as_deref(), Some("rm -rf /etc/x"));
+    // 値にオプション名を取るものは、その値も読み飛ばす。
+    let word = bash_body("bash -o pipefail -c 'rm -rf /etc/x'").expect("本体の語がある");
+    assert_eq!(word.literal_value().as_deref(), Some("rm -rf /etc/x"));
+    let word = bash_body("bash --rcfile /dev/null -c 'rm -rf /etc/x'").expect("本体の語がある");
+    assert_eq!(word.literal_value().as_deref(), Some("rm -rf /etc/x"));
 }
 
 // @kotowari[REQ-035]
@@ -53,6 +58,10 @@ fn req_035_shells_without_c_have_no_body() {
         "sh < file",
         "bash --version",
         "zsh -x script.zsh",
+        // ファイル起動の後の `-c` はスクリプトへの引数。
+        "bash script.sh -c 'rm -rf /etc/x'",
+        // `--` の後はオプションとして読まない。
+        "bash -- -c 'rm -rf /etc/x'",
     ] {
         let word = bash_body(command);
         assert!(word.is_none(), "{command}");

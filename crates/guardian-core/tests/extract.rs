@@ -643,6 +643,9 @@ fn ex_055_script_file_launch_is_not_read() {
     // 本体がコマンド文字列の外にある起動は読まない。
     assert_eq!(effects("bash script.sh"), vec![]);
     assert_eq!(effects("sh < file"), vec![]);
+    // `-c` はオプションの並びの中にだけ現れる。ファイル起動の後の `-c` は
+    // スクリプトへの引数で、本体ではない（REQ-035）。
+    assert_eq!(effects("bash script.sh -c 'rm -rf /etc/x'"), vec![]);
 }
 
 // @kotowari[REQ-008]

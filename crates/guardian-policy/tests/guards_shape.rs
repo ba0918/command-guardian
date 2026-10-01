@@ -33,6 +33,8 @@ fn req_027_028_program_matches_path_and_wrapper() {
     assert!(matches(&rs, "sudo --user root git push"));
     assert!(matches(&rs, "sudo --user=root git push"));
     assert!(matches(&rs, "bash -c 'git push'"));
+    // ファイル起動の後の `-c` はスクリプトへの引数で、本体ではない。
+    assert!(!matches(&rs, "bash script.sh -c 'git push'"));
     // 読むシェルの一覧は core と同じ（mksh も bash 系）。
     assert!(matches(&rs, "mksh -c 'git push'"));
     assert!(matches(&rs, "eval \"git push\""));

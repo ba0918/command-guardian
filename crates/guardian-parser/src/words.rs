@@ -159,14 +159,26 @@ pub fn shell_kind(program: &str) -> ShellKind {
     }
 }
 
-/// `-c` の位置を探す。`-lc` のようなまとめ書きを含む。
+/// `-c` の位置を探す。`-lc` のようなまとめ書きを含む。オプションの読み取りは
+/// 最初の非オプションの語（スクリプトファイルや `-`）と `--` で終わるので、
+/// その後に現れる `-c` は本体ではなく引数として扱う（REQ-035）。
 pub fn shell_c_index<'a>(words: impl IntoIterator<Item = &'a Word>) -> Option<usize> {
-    for (index, word) in words.into_iter().enumerate() {
-        let text = &word.text;
-        if text == "-c"
-            || (text.starts_with('-') && !text.starts_with("--") && text[1..].contains('c'))
-        {
+    let mut words = words.into_iter();
+    let mut index = 0;
+    while let Some(word) = words.next() {
+        let text = word.text.as_str();
+        if text == "--" || text == "-" || !text.starts_with('-') {
+            return None;
+        }
+        if text == "-c" || (!text.starts_with("--") && text[1..].contains('c')) {
             return Some(index);
+        }
+        // 値にオプション名を取るものは、その値も読み飛ばす。
+        if matches!(text, "-o" | "-O" | "--rcfile" | "--init-file") {
+            words.next();
+            index += 2;
+        } else {
+            index += 1;
         }
     }
     None
