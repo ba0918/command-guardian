@@ -24,11 +24,11 @@ enum Resolved {
 }
 
 impl Resolved {
-    fn into_target(self, word: &Word) -> Target {
+    fn into_target(self, word: &Word, ctx: &Context) -> Target {
         match self {
             Resolved::Path(path) => Target::Path {
                 path,
-                dereference: word.text.ends_with('/'),
+                dereference: dereferences(word, ctx),
             },
             Resolved::Glob(base) => Target::GlobBase(base),
             Resolved::Mktemp => Target::Mktemp,
@@ -512,7 +512,7 @@ fn extract_simple(
                 let res = resolve_word(target, ctx);
                 out.push(Effect {
                     op: Op::Delete,
-                    target: res.into_target(target),
+                    target: res.into_target(target, ctx),
                 });
             }
             Vec::new()
@@ -523,7 +523,7 @@ fn extract_simple(
                 let res = resolve_word(target, ctx);
                 out.push(Effect {
                     op: Op::Delete,
-                    target: res.into_target(target),
+                    target: res.into_target(target, ctx),
                 });
             }
             Vec::new()
@@ -534,7 +534,7 @@ fn extract_simple(
                 let res = resolve_word(target, ctx);
                 out.push(Effect {
                     op: Op::Truncate,
-                    target: res.into_target(target),
+                    target: res.into_target(target, ctx),
                 });
             }
             Vec::new()
@@ -555,7 +555,7 @@ fn extract_simple(
                 };
                 out.push(Effect {
                     op,
-                    target: res.into_target(&value_word),
+                    target: res.into_target(&value_word, ctx),
                 });
             }
             Vec::new()
@@ -571,7 +571,7 @@ fn extract_simple(
                 let res = resolve_word(target, ctx);
                 out.push(Effect {
                     op: Op::Format,
-                    target: res.into_target(target),
+                    target: res.into_target(target, ctx),
                 });
             }
             Vec::new()
@@ -582,7 +582,7 @@ fn extract_simple(
                 let res = resolve_word(target, ctx);
                 out.push(Effect {
                     op: Op::Format,
-                    target: res.into_target(target),
+                    target: res.into_target(target, ctx),
                 });
             }
             Vec::new()
@@ -898,7 +898,7 @@ fn find_effects(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>) -> Vec<
         }
     } else {
         for word in starts {
-            let dereference = word.text.ends_with('/');
+            let dereference = dereferences(word, ctx);
             let base = resolve_word(word, ctx);
             if let Some(source) = find_source(base, dereference, has_delete, out) {
                 sources.push(source);
@@ -1046,7 +1046,7 @@ fn extract_redirects(
                         let res = resolve_word(word, ctx);
                         out.push(Effect {
                             op: Op::Truncate,
-                            target: res.into_target(word),
+                            target: res.into_target(word, ctx),
                         });
                     }
                     // `>& file` は `&> file` の別の綴りで、ファイルを切り詰める。
@@ -1057,7 +1057,7 @@ fn extract_redirects(
                         let res = resolve_word(word, ctx);
                         out.push(Effect {
                             op: Op::Truncate,
-                            target: res.into_target(word),
+                            target: res.into_target(word, ctx),
                         });
                     }
                     _ => {}
@@ -1090,6 +1090,10 @@ fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
         Value::UnknownSource => Resolved::UnknownSource,
         Value::Unresolved(text) => Resolved::Unresolved(text),
     }
+}
+
+fn dereferences(word: &Word, ctx: &Context) -> bool {
+    matches!(resolve_value(word, ctx), Value::Text(text) if text.ends_with('/'))
 }
 
 fn resolve_value(word: &Word, ctx: &Context) -> Value {

@@ -242,3 +242,28 @@ fn req_002_literal_loop_state_survives_iterations_and_loop_completion() {
         ]
     );
 }
+
+// @kotowari[REQ-002, REQ-007]
+#[test]
+fn req_007_variable_trailing_slash_is_preserved_for_dereferencing() {
+    for command in ["S=/tmp/link/; rm -rf \"$S\"", "S=/tmp/link; rm -rf \"$S/\""] {
+        assert_eq!(
+            effects(command),
+            vec![delete(Target::Path {
+                path: PathBuf::from("/tmp/link"),
+                dereference: true,
+            })]
+        );
+    }
+    assert_eq!(
+        effects("S=/tmp/link; rm \"$S\""),
+        vec![delete(p("/tmp/link"))]
+    );
+    assert_eq!(
+        effects("S=/tmp/link/; find \"$S\" -delete"),
+        vec![delete(Target::Children {
+            base: PathBuf::from("/tmp/link"),
+            dereference: true,
+        })]
+    );
+}
