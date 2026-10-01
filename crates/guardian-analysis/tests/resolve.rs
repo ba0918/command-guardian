@@ -285,3 +285,16 @@ fn req_008_glob_loop_binding_represents_children_not_the_source_root() {
         vec![delete(Target::Unresolved("$x/child".into()))]
     );
 }
+
+// @kotowari[REQ-002, REQ-041]
+#[test]
+fn req_002_only_unquoted_tilde_is_expanded_to_home() {
+    for command in ["rm '~/x'", "rm \"~/x\"", "S='~/x'; rm \"$S\""] {
+        assert_eq!(effects(command), vec![delete(p("/home/you/work/repo/~/x"))]);
+    }
+    assert_eq!(effects("rm ~/x"), vec![delete(p("/home/you/x"))]);
+    assert_eq!(
+        effects("S=~/x; cd /etc; rm \"$S\""),
+        vec![delete(p("/home/you/x"))]
+    );
+}

@@ -1124,7 +1124,8 @@ fn resolve_value(word: &Word, ctx: &Context) -> Value {
             }
             Part::Opaque(_) => return Value::Unresolved(word.text.clone()),
             Part::Glob(_) => {}
-            Part::Literal(text) | Part::Quoted(text) => return text_value(text, ctx),
+            Part::Literal(text) => return text_value(text, ctx),
+            Part::Quoted(text) => return Value::Text(text.clone()),
         }
     }
 
@@ -1163,7 +1164,11 @@ fn resolve_value(word: &Word, ctx: &Context) -> Value {
         }
         return Value::Mktemp;
     }
-    text_value(&text, ctx)
+    if matches!(word.parts.first(), Some(Part::Literal(_))) {
+        text_value(&text, ctx)
+    } else {
+        Value::Text(text)
+    }
 }
 
 /// 置換そのものの解決結果。効果の抽出はしない（断片の語では先に読む）。
@@ -1237,12 +1242,10 @@ fn expand_tilde(text: &str, ctx: &Context) -> Option<String> {
 
 /// 文字列をパスとして解決する。
 fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
-    let Some(expanded) = expand_tilde(text, ctx) else {
-        return Resolved::Unresolved(text.to_string());
-    };
+    let expanded = text;
 
     if has_glob {
-        let base = glob_base(&expanded);
+        let base = glob_base(expanded);
         let path = if base.is_empty() {
             match &ctx.cwd {
                 Some(cwd) => cwd.clone(),
@@ -1266,7 +1269,7 @@ fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
         Resolved::Path(clean_path(Path::new(&expanded)))
     } else {
         match &ctx.cwd {
-            Some(cwd) => Resolved::Path(clean_path(&cwd.join(&expanded))),
+            Some(cwd) => Resolved::Path(clean_path(&cwd.join(expanded))),
             None => Resolved::Unresolved(text.to_string()),
         }
     }
