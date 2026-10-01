@@ -100,6 +100,55 @@ fn req_015_broken_user_config_keeps_builtin_defaults_and_warns() {
     assert_eq!(verdict_of(&e, "rm -rf /etc/x"), Verdict::Block);
 }
 
+// @kotowari[REQ-013, REQ-015]
+#[test]
+fn req_015_invalid_general_user_settings_discard_that_file_but_keep_a_valid_project() {
+    let dir = fixture_dir("command-guardian-conf-");
+    let root = dir.path().canonicalize().unwrap();
+    let user = root.join("config.toml");
+    write(&user, "paths = []\n[mode]\nenforce = false\n");
+    write(
+        &root.join(".command-guardian.toml"),
+        "[paths]\nprotected_roots = ['/tmp/project-protected']\n",
+    );
+    let e = engine(Some(&user), &root);
+    assert!(e.config().enforce);
+    assert_eq!(
+        verdict_of(&e, "rm /tmp/project-protected/x"),
+        Verdict::Block
+    );
+    assert!(e
+        .check("true")
+        .warnings
+        .iter()
+        .any(|w| w.contains("user configuration")));
+}
+
+// @kotowari[REQ-013, REQ-015]
+#[test]
+fn req_015_invalid_general_project_settings_keep_the_valid_user_layer() {
+    let dir = fixture_dir("command-guardian-conf-");
+    let root = dir.path().canonicalize().unwrap();
+    let user = root.join("config.toml");
+    write(
+        &user,
+        "[paths]\nprotected_roots = ['/tmp/user-protected']\n",
+    );
+    write(&root.join(".command-guardian.toml"), "rules = []\n[paths]\nprotected_roots = ['/tmp/rejected-project']\n[mode]\nenforce = false\n");
+    let e = engine(Some(&user), &root);
+    assert!(e.config().enforce);
+    assert_eq!(verdict_of(&e, "rm /tmp/user-protected/x"), Verdict::Block);
+    assert!(!e
+        .config()
+        .protected_roots
+        .contains(&PathBuf::from("/tmp/rejected-project")));
+    assert!(e
+        .check("true")
+        .warnings
+        .iter()
+        .any(|w| w.contains("project configuration")));
+}
+
 // @kotowari[REQ-014, EX-014]
 #[test]
 fn req_014_untrusted_project_settings_only_tighten() {

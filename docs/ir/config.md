@@ -23,10 +23,10 @@ command-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディ�
 ### REQ-015: 壊れた設定
 
 - kind: event_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-10-02-ir-friction-contracts.md#A1
 - verification: unit
 
-設定が読めない、または壊れているとき、command-guardian は、組み込みの既定で判定を続け、警告を出す。
+設定が読めない、TOML構文が壊れている、または一般設定の型・値が誤っているとき、command-guardian は、その設定ファイル全体を不採用にして警告を出す。組み込みの既定と他の正常な設定層で判定を続け、壊れたファイルの正常部分は残さない。個々のguard規則の誤りはREQ-034の規則単位無効化を使う。commandsセクションやguard一覧自体の型の誤りは一般設定の誤りとして扱う。
 
 ### REQ-026: ルールの意味論
 

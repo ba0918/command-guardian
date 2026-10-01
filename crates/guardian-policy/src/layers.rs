@@ -30,7 +30,7 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
     if root.as_table().is_none() {
         return Err("Expected a TOML table".into());
     }
-    for section in ["paths", "unknown", "rules", "git", "mode"] {
+    for section in ["paths", "unknown", "rules", "git", "mode", "commands"] {
         if root
             .get(section)
             .is_some_and(|value| value.as_table().is_none())
@@ -68,7 +68,6 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
         &mut layer.warnings,
     );
     read_custom_rules(root, &mut layer.rules_custom, &mut layer.warnings);
-    layer.guard = guard::parse_guards(root, &mut layer.warnings);
     layer.git_enabled = read_bool(root, "git", "enabled", &mut layer.warnings);
     layer.enforce = read_bool(root, "mode", "enforce", &mut layer.warnings);
     read_path_list(
@@ -80,6 +79,26 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
         &mut layer.trusted_projects,
         &mut layer.warnings,
     );
+    for name in &layer.rules_disable {
+        if !matches!(name.as_str(), "delete" | "truncate" | "format") {
+            layer
+                .warnings
+                .push(format!("Unknown built-in rule: {name}"));
+        }
+    }
+    if root
+        .get("commands")
+        .and_then(|commands| commands.get("guard"))
+        .is_some_and(|guard| guard.as_array().is_none())
+    {
+        layer
+            .warnings
+            .push("commands.guard: expected a list of rules".into());
+    }
+    if !layer.warnings.is_empty() {
+        return Err(layer.warnings.join("; "));
+    }
+    layer.guard = guard::parse_guards(root, &mut layer.warnings);
     Ok(layer)
 }
 
@@ -223,6 +242,12 @@ fn read_custom_rules(root: &toml::Value, out: &mut Vec<CustomRule>, warnings: &m
                         continue;
                     }
                 };
+                if let Err(error) = regex::Regex::new(pattern) {
+                    warnings.push(format!(
+                        "Invalid custom regular expression ({name}): {error}"
+                    ));
+                    continue;
+                }
                 out.push(CustomRule {
                     name: name.to_string(),
                     pattern: pattern.to_string(),
