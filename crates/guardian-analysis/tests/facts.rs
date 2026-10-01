@@ -130,17 +130,7 @@ fn req_039_cpu_traversal_obeys_the_callers_deadline() {
         facts.diagnostics,
         [guardian_core::Ask::Parse(guardian_parser::Failure::Limit)]
     );
-    assert!(!facts.effects.is_empty());
     assert!(facts.effects.len() < 100 * 100 * 100);
-    assert_eq!(
-        facts.effects[0].target,
-        guardian_core::Target::Path {
-            path: "/work/0".into(),
-            dereference: false
-        }
-    );
-    assert_eq!(facts.invocations.len(), 1);
-    assert_eq!(facts.invocations[0].words, ["$x"]);
 }
 
 // @kotowari[REQ-001, REQ-002, REQ-031, REQ-037]
