@@ -23,7 +23,7 @@ struct HookInput {
 pub fn run(args: &[std::ffi::OsString]) -> i32 {
     let agent = match parse_agent(args) {
         HookArgs::Help => {
-            println!("{HELP}");
+            let _ = crate::output(format_args!("{HELP}"));
             return 0;
         }
         HookArgs::Agent(agent) => agent,
@@ -41,7 +41,7 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
     };
     let report = engine.check(&input.command);
     for w in &report.warnings {
-        eprintln!("Warning: {w}");
+        crate::diagnostic(format_args!("Warning: {w}"));
     }
     // 影実行ではフックとして何も返さず、判定をログに残す（REQ-018）。
     if !engine.config().enforce {
@@ -56,7 +56,7 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
                 "permissionDecisionReason": report.message,
             }
         });
-        println!("{output}");
+        let _ = crate::output(format_args!("{output}"));
     }
     0
 }

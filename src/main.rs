@@ -7,6 +7,7 @@ use guardian_app::{Engine, EngineEnv, Report};
 use guardian_core::Verdict;
 use guardian_policy::message;
 use std::ffi::OsString;
+use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
@@ -20,18 +21,18 @@ fn main() {
 fn run(args: &[OsString]) -> i32 {
     match args.first().and_then(|s| s.to_str()) {
         Some("--help" | "-h") => {
-            println!("{ROOT_HELP}");
+            let _ = output(format_args!("{ROOT_HELP}"));
             0
         }
         Some("check") => cmd_check(&args[1..]),
         Some("hook") => hook::run(&args[1..]),
         Some(other) => {
-            eprintln!("Unknown command: {other}");
-            eprintln!("Usage: command-guardian <check|hook> ...");
+            diagnostic(format_args!("Unknown command: {other}"));
+            diagnostic(format_args!("Usage: command-guardian <check|hook> ..."));
             3
         }
         None => {
-            eprintln!("Usage: command-guardian <check|hook> ...");
+            diagnostic(format_args!("Usage: command-guardian <check|hook> ..."));
             3
         }
     }
@@ -93,11 +94,11 @@ fn cmd_check(args: &[OsString]) -> i32 {
     let parsed = match parse_check(args) {
         Ok(Some(p)) => p,
         Ok(None) => {
-            println!("{CHECK_HELP}");
+            let _ = output(format_args!("{CHECK_HELP}"));
             return 0;
         }
         Err(e) => {
-            eprintln!("{e}");
+            diagnostic(format_args!("{e}"));
             return 3;
         }
     };
@@ -107,11 +108,14 @@ fn cmd_check(args: &[OsString]) -> i32 {
     };
     let report = engine.check(&parsed.command);
     for w in &report.warnings {
-        eprintln!("Warning: {w}");
+        diagnostic(format_args!("Warning: {w}"));
     }
-    match parsed.format {
+    let result = match parsed.format {
         Format::Text => print_text(&report),
         Format::Json => print_json(&report),
+    };
+    if result.is_err() {
+        return 3;
     }
     match report.verdict {
         Verdict::Allow => 0,
@@ -202,18 +206,28 @@ fn user_config_path() -> Option<PathBuf> {
     )
 }
 
-fn print_text(report: &Report) {
-    if report.verdict == Verdict::Allow {
-        println!("Verdict: allow");
-        return;
-    }
-    println!("Verdict: {}", report.verdict);
-    if !report.message.is_empty() {
-        println!("{}", report.message);
-    }
+fn output(args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    writeln!(stdout, "{args}")?;
+    stdout.flush()
 }
 
-fn print_json(report: &Report) {
+fn diagnostic(args: std::fmt::Arguments<'_>) {
+    let _ = writeln!(std::io::stderr().lock(), "{args}");
+}
+
+fn print_text(report: &Report) -> std::io::Result<()> {
+    if report.verdict == Verdict::Allow {
+        return output(format_args!("Verdict: allow"));
+    }
+    output(format_args!("Verdict: {}", report.verdict))?;
+    if !report.message.is_empty() {
+        output(format_args!("{}", report.message))?;
+    }
+    Ok(())
+}
+
+fn print_json(report: &Report) -> std::io::Result<()> {
     let effects: Vec<serde_json::Value> = report
         .effects
         .iter()
@@ -245,5 +259,5 @@ fn print_json(report: &Report) {
         "effects": effects,
         "rules": rules,
     });
-    println!("{json}");
+    output(format_args!("{json}"))
 }

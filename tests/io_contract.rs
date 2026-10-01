@@ -38,3 +38,84 @@ fn req_021_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
         .unwrap();
     assert_eq!(output.status.code(), Some(3));
 }
+
+// @kotowari[REQ-021]
+#[test]
+fn req_021_check_output_failure_is_an_explicit_failure() {
+    let home = tempfile::tempdir().unwrap();
+    for format in ["text", "json"] {
+        let output = command(home.path())
+            .args(["check", "true", "--format", format])
+            .stdout(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open("/dev/full")
+                    .unwrap(),
+            )
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(3), "{:?}", output);
+    }
+}
+
+// @kotowari[REQ-017]
+#[test]
+fn req_017_hook_and_help_keep_zero_on_output_failure() {
+    let home = tempfile::tempdir().unwrap();
+    for args in [
+        vec!["--help"],
+        vec!["check", "--help"],
+        vec!["hook", "--help"],
+    ] {
+        let output = command(home.path())
+            .args(args)
+            .stdout(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open("/dev/full")
+                    .unwrap(),
+            )
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(0));
+    }
+    use std::io::Write;
+    let mut child = command(home.path())
+        .args(["hook", "--agent", "claude"])
+        .stdin(Stdio::piped())
+        .stdout(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open("/dev/full")
+                .unwrap(),
+        )
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(br#"{"tool_name":"Bash","tool_input":{"command":"rm /etc/x"},"cwd":"/tmp"}"#)
+        .unwrap();
+    assert_eq!(child.wait().unwrap().code(), Some(0));
+}
+
+// @kotowari[REQ-015, REQ-021]
+#[test]
+fn req_015_warning_output_failure_does_not_abort_judgment() {
+    let home = tempfile::tempdir().unwrap();
+    let config = home.path().join("config/command-guardian/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(config, "invalid TOML !").unwrap();
+    let output = command(home.path())
+        .args(["check", "true"])
+        .stderr(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open("/dev/full")
+                .unwrap(),
+        )
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+}
