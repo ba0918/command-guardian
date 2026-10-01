@@ -608,3 +608,52 @@ fn req_039_a_worker_that_cannot_start_asks_with_the_internal_reason() {
         value["reason"]
     );
 }
+
+// @kotowari[REQ-026, REQ-039]
+#[test]
+fn req_026_a_deep_command_still_matches_a_custom_rule() {
+    // 深い入力でも引用を外した本文が得られ、カスタムのルールが合成に加わる
+    // （REQ-026・REQ-039）。子が死んでいたときは本文が空に落ち、設定した block の
+    // ルールが消えていた。
+    let home = temp_home();
+    let config = home.path().join(".config/hook-guardian/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(
+        &config,
+        r#"
+[[rules.custom]]
+name = "git push を止める"
+pattern = "push"
+verdict = "block"
+"#,
+    )
+    .unwrap();
+    let deep = format!(
+        "echo $(true)#{}: {} ; git push origin main",
+        "$(".repeat(2000),
+        ")".repeat(2000)
+    );
+    let r = run(
+        &[
+            "check",
+            deep.as_str(),
+            "--cwd",
+            "/tmp/scratch",
+            "--format",
+            "json",
+        ],
+        home.path(),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
+    assert_eq!(value["verdict"], "block");
+    assert!(
+        value["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|rule| rule["program"] == "git push を止める"),
+        "{}",
+        r.stdout
+    );
+}

@@ -17,8 +17,8 @@ pub(crate) enum Response {
         failures: Vec<Failure>,
         script: Option<Script>,
     },
-    /// 引用を外したコマンド本文。
-    Stripped(String),
+    /// 引用を外したコマンド本文。読めなかったときは理由（REQ-039）。
+    Stripped(Result<String, Failure>),
 }
 
 /// 応答の本体を符号化する。
@@ -39,9 +39,18 @@ pub(crate) fn encode_response(response: &Response) -> Vec<u8> {
                 None => w.bool(false),
             }
         }
-        Response::Stripped(text) => {
+        Response::Stripped(result) => {
             w.u8(1);
-            w.str(text);
+            match result {
+                Ok(text) => {
+                    w.bool(true);
+                    w.str(text);
+                }
+                Err(failure) => {
+                    w.bool(false);
+                    failure_write(&mut w, failure);
+                }
+            }
         }
     }
     w.out
@@ -66,9 +75,13 @@ pub(crate) fn decode_response(bytes: &[u8]) -> Result<Response, ()> {
             Ok(Response::Parsed { failures, script })
         }
         1 => {
-            let text = r.str()?;
+            let result = if r.bool()? {
+                Ok(r.str()?)
+            } else {
+                Err(failure_read(&mut r)?)
+            };
             r.finish()?;
-            Ok(Response::Stripped(text))
+            Ok(Response::Stripped(result))
         }
         _ => Err(()),
     }
@@ -825,6 +838,21 @@ mod tests {
         let response = sample();
         let bytes = encode_response(&response);
         assert_eq!(decode_response(&bytes), Ok(response));
+    }
+
+    // @kotowari[REQ-039]
+    #[test]
+    fn req_039_a_strip_response_roundtrips() {
+        for response in [
+            Response::Stripped(Ok("git push origin".to_string())),
+            Response::Stripped(Err(Failure::Syntax)),
+            Response::Stripped(Err(Failure::Panic)),
+            Response::Stripped(Err(Failure::Internal)),
+            Response::Stripped(Err(Failure::Limit)),
+        ] {
+            let bytes = encode_response(&response);
+            assert_eq!(decode_response(&bytes), Ok(response));
+        }
     }
 
     // @kotowari[REQ-039]

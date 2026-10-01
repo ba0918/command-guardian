@@ -25,6 +25,12 @@ const WORKER_ENV: &str = "HOOK_GUARDIAN_PARSER_WORKER";
 /// 親はそれを入力に帰せる死として block にする（REQ-039・A23）。
 pub(crate) const CHILD_STACK_BYTES: usize = 8 * 1024 * 1024;
 
+/// 引用の除去を行うスレッドのスタック。設定の照合は判定の重さに効くため、
+/// 解析の死より深い入力まで本文を返す（隔離前の解析スレッドと同じ 32 MiB）。
+/// 除去が死んだときは原因で分け、入力に帰せる死は block、自分に帰せる失敗は
+/// ask にする（REQ-039・A23）。
+pub(crate) const STRIP_STACK_BYTES: usize = 32 * 1024 * 1024;
+
 /// 子の応答を待つ時間。代表的な入力は数ミリ秒で返るため、これは病的な入力だけに
 /// 掛かる歯止め（REQ-021 の 100ms 予算は代表的な入力に対する目標）。上限いっぱいの
 /// 入力でも、境界（128 段）の読み直しと応答の符号化が負荷の下で収まる幅を取る。
@@ -112,7 +118,7 @@ fn run() -> ! {
                 Response::Parsed { failures, script }
             }
             wire::MODE_STRIP_QUOTES => {
-                Response::Stripped(crate::strip_quotes_inner(&request.input))
+                Response::Stripped(crate::strip_quotes_in_child(&request.input))
             }
             _ => std::process::exit(1),
         };
@@ -173,11 +179,14 @@ pub(crate) fn request_parse(input: &str) -> Result<Outcome, Failure> {
     }
 }
 
-/// 親側: 引用を外した本文を子に依頼する。
-pub(crate) fn request_strip_quotes(input: &str) -> Option<String> {
+/// 親側: 引用を外した本文を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
+pub(crate) fn request_strip_quotes(input: &str) -> Result<String, Failure> {
     match exchange(wire::MODE_STRIP_QUOTES, input) {
-        Ok(Response::Stripped(text)) => Some(text),
-        _ => None,
+        Ok(Response::Stripped(Ok(text))) => Ok(text),
+        Ok(Response::Stripped(Err(failure))) => Err(failure),
+        Ok(Response::Parsed { .. }) => Err(Failure::Internal),
+        Err(ExchangeError::Limit) => Err(Failure::Limit),
+        Err(ExchangeError::Internal) => Err(Failure::Internal),
     }
 }
 

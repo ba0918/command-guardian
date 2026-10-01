@@ -136,6 +136,8 @@ impl Engine {
             cwd: Some(self.env.cwd.clone()),
         };
         let analysis = analyze(command, &core_env);
+        // 構文解析の ask。引用の除去の失敗も同じ列に足す（REQ-039・A23）。
+        let mut asks = analysis.parse_errors;
         let mut effects = Vec::new();
         for e in &analysis.effects {
             // 無効にした組み込みルールの効果は取り出さない（REQ-026）。
@@ -148,14 +150,25 @@ impl Engine {
         // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
         let mut rules = Vec::new();
         if !self.custom_rules.is_empty() {
-            let body = guardian_parser::strip_quotes(command);
-            for rule in &self.custom_rules {
-                if rule.regex.is_match(&body) {
-                    rules.push(RuleReport {
-                        name: rule.name.clone(),
-                        reason: format!("カスタムルール「{}」", rule.name),
-                        verdict: rule.verdict,
-                    });
+            match guardian_parser::strip_quotes(command) {
+                Ok(body) => {
+                    for rule in &self.custom_rules {
+                        if rule.regex.is_match(&body) {
+                            rules.push(RuleReport {
+                                name: rule.name.clone(),
+                                reason: format!("カスタムルール「{}」", rule.name),
+                                verdict: rule.verdict,
+                            });
+                        }
+                    }
+                }
+                Err(failure) => {
+                    // 引用の除去の失敗も構文解析の失敗と同じに扱う（REQ-039・A23）。
+                    // 入力に帰せる死は block、自分に帰せる失敗は ask に落ちる。
+                    let ask = Ask::Parse(failure);
+                    if !asks.contains(&ask) {
+                        asks.push(ask);
+                    }
                 }
             }
         }
@@ -176,7 +189,6 @@ impl Engine {
 
         // 見張りの規則の照合でも構文解析をする。この判定で予算を使い切って
         // いたら、上限の超過として block にする（REQ-039）。
-        let mut asks = analysis.parse_errors;
         if guardian_parser::judgment_over_budget() && !asks.iter().any(Ask::is_limit) {
             asks.push(Ask::Parse(guardian_parser::Failure::Limit));
         }

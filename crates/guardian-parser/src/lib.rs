@@ -3,7 +3,8 @@
 //! （REQ-036）。
 //!
 //! - 入力由来の解析は隔離した子プロセス（同じ実行ファイル、スタックの上限つき）で
-//!   行う。子の死は原因で分け（REQ-039・A23）、入力に帰せる死（スタック
+//!   行う。引用の除去も同じ隔離の内側（スタックの上限つきのスレッド）で行う。
+//!   子の死は原因で分け（REQ-039・A23）、入力に帰せる死（スタック
 //!   オーバーフロー、時間の上限の超過）と上限の超過は Failure::Limit（block）、
 //!   自分に帰せる死（panic、起動とプロトコルの失敗、帰せない死）は
 //!   Failure::Panic・Failure::Internal（ask）に落とし、判定は必ず返る。
@@ -112,11 +113,11 @@ pub fn judgment_over_budget() -> bool {
     budget::exceeded()
 }
 
-/// 引用を外したコマンド本文。設定の照合（見張りの例の分割とカスタムルールの
-/// 本文の引用の除去）で使う（REQ-036）。
-pub fn strip_quotes(input: &str) -> String {
+/// 引用を外したコマンド本文。失敗は原因を返す（REQ-039・A23）。設定の照合
+/// （見張りの例の分割とカスタムルールの本文の引用の除去）で使う（REQ-036）。
+pub fn strip_quotes(input: &str) -> Result<String, Failure> {
     worker::run_if_child();
-    worker::request_strip_quotes(input).unwrap_or_default()
+    worker::request_strip_quotes(input)
 }
 
 /// 差し込み可能な生の構文解析。panic はスレッドの境界で Failure に変える（REQ-038）。
@@ -229,13 +230,10 @@ fn top_level_separators(tokens: &[Token]) -> Vec<usize> {
     out
 }
 
-/// 引用を外したコマンド本文。
-pub(crate) fn strip_quotes_inner(input: &str) -> String {
+/// 引用を外したコマンド本文。読めなかったときは理由を返す（REQ-038）。
+pub(crate) fn strip_quotes_inner(input: &str) -> Result<String, Failure> {
     let options = options();
-    let tokens = match tokenize(input, &options) {
-        Ok(tokens) => tokens,
-        Err(_) => return String::new(),
-    };
+    let tokens = tokenize(input, &options)?;
     let mut out: Vec<String> = Vec::new();
     let mut index = 0;
     while index < tokens.len() {
@@ -267,7 +265,18 @@ pub(crate) fn strip_quotes_inner(input: &str) -> String {
             }
         }
     }
-    out.join(" ")
+    Ok(out.join(" "))
+}
+
+/// 子プロセス側の引用の除去。解析と同じ隔離の内側（スタックの上限つきの
+/// スレッド）で行う（REQ-039）。設定の照合が消えないよう、解析の死より深い
+/// 入力まで本文を返す。スレッドを起こせないときと panic は Failure::Panic に
+/// する。
+pub(crate) fn strip_quotes_in_child(input: &str) -> Result<String, Failure> {
+    match in_bounded_thread(worker::STRIP_STACK_BYTES, move || strip_quotes_inner(input)) {
+        Some(result) => result,
+        None => Err(Failure::Panic),
+    }
 }
 
 /// panic を捕まえて Err に変える境界（REQ-038）。
@@ -286,7 +295,9 @@ pub(crate) fn parse_in_child_with(
     input: &str,
     parser: ProgramParser,
 ) -> (Vec<Failure>, Option<Script>) {
-    match in_bounded_thread(move || parse_inner(input, parser)) {
+    match in_bounded_thread(worker::CHILD_STACK_BYTES, move || {
+        parse_inner(input, parser)
+    }) {
         Some(outcome) => finish(outcome),
         None => (vec![Failure::Panic], None),
     }
@@ -302,12 +313,12 @@ fn finish(outcome: Outcome) -> (Vec<Failure>, Option<Script>) {
     }
 }
 
-/// 解析をスタックの上限つきのスレッドで行う。スレッドを作れないときは None。
-fn in_bounded_thread<T: Send>(f: impl FnOnce() -> T + Send) -> Option<T> {
+/// 処理をスタックの上限つきのスレッドで行う。スレッドを作れないときは None。
+fn in_bounded_thread<T: Send>(stack: usize, f: impl FnOnce() -> T + Send) -> Option<T> {
     std::thread::scope(|scope| {
         let handle = std::thread::Builder::new()
             .name("guardian-parser".to_string())
-            .stack_size(worker::CHILD_STACK_BYTES)
+            .stack_size(stack)
             .spawn_scoped(scope, f)
             .ok()?;
         handle.join().ok()
@@ -414,7 +425,7 @@ mod tests {
             assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
         }
         // 引用の除去は字句解析であり、構文解析の回数の予算を消費しない。
-        assert_eq!(strip_quotes("true"), "true");
+        assert_eq!(strip_quotes("true").unwrap(), "true");
         let outcome = parse("true");
         assert_eq!(outcome.failures, vec![Failure::Limit]);
         assert!(outcome.script.is_empty());
@@ -443,8 +454,27 @@ mod tests {
     // @kotowari[REQ-036]
     #[test]
     fn req_036_strip_quotes_removes_quotes() {
-        assert_eq!(strip_quotes("git \"push\" origin"), "git push origin");
-        assert_eq!(strip_quotes("echo a\\ b"), "echo a b");
-        assert!(strip_quotes("cat <<EOF\nbody\nEOF").starts_with("cat << EOF"));
+        assert_eq!(
+            strip_quotes("git \"push\" origin").unwrap(),
+            "git push origin"
+        );
+        assert_eq!(strip_quotes("echo a\\ b").unwrap(), "echo a b");
+        assert!(strip_quotes("cat <<EOF\nbody\nEOF")
+            .unwrap()
+            .starts_with("cat << EOF"));
+    }
+
+    // @kotowari[REQ-036]
+    #[test]
+    fn req_036_strip_quotes_survives_a_deep_input() {
+        // 引用の除去も解析と同じ隔離の内側（スタックの上限つきのスレッド）で
+        // 行う（REQ-039）。深い入力でも本文が返り、設定の照合が空にならない。
+        let deep = format!(
+            "echo $(true)#{}: {} ; git push origin main",
+            "$(".repeat(2000),
+            ")".repeat(2000)
+        );
+        let text = strip_quotes(&deep).expect("深い入力でも引用を外せる");
+        assert!(text.contains("git push origin main"), "{text}");
     }
 }
