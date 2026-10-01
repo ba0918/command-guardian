@@ -91,7 +91,14 @@ pub struct GuardRule {
 /// deny-option-values = { "-c" = ["/alias[.].*/"], "--config-env" = ["/alias[.].*/"] }
 /// ```
 pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<GuardRule> {
-    let Some(value) = root.get("commands").and_then(|c| c.get("guard")) else {
+    let Some(commands) = root.get("commands") else {
+        return Vec::new();
+    };
+    if commands.as_table().is_none() {
+        warnings.push("Ignoring commands: expected a table".into());
+        return Vec::new();
+    }
+    let Some(value) = commands.get("guard") else {
         return Vec::new();
     };
     let Some(items) = value.as_array() else {

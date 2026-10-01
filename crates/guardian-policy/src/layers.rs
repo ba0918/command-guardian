@@ -30,6 +30,16 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
     if root.as_table().is_none() {
         return Err("Expected a TOML table".into());
     }
+    for section in ["paths", "unknown", "rules", "git", "mode"] {
+        if root
+            .get(section)
+            .is_some_and(|value| value.as_table().is_none())
+        {
+            layer
+                .warnings
+                .push(format!("Ignoring {section}: expected a table"));
+        }
+    }
 
     read_path_list(
         root,
