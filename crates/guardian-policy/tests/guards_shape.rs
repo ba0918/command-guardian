@@ -19,6 +19,33 @@ verdict = "ask"
 deny = [["push"]]
 "#;
 
+fn literal_eval(body: &str) -> String {
+    format!(
+        "eval \"{}\"",
+        body.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('$', "\\$")
+            .replace('`', "\\`")
+    )
+}
+
+// @kotowari[REQ-027, REQ-033, REQ-039]
+#[test]
+fn req_033_guards_inside_sixteen_and_seventeen_literal_evals_are_kept() {
+    let (rs, _) = rules(GIT_PUSH);
+    let mut command = "git push".to_string();
+    for depth in 1..=17 {
+        command = literal_eval(&command);
+        if depth >= 16 {
+            guardian_parser::begin_judgment();
+            assert!(
+                matches(&rs, &command),
+                "guard lost at {depth} literal evals"
+            );
+        }
+    }
+}
+
 // @kotowari[REQ-027, REQ-028, EX-040]
 #[test]
 fn req_027_028_program_matches_path_and_wrapper() {

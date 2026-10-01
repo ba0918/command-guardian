@@ -459,7 +459,7 @@ pub fn invocations(command: &str) -> Vec<Invocation> {
 }
 
 fn walk_script(script: &Script, out: &mut Vec<Invocation>, depth: usize) {
-    if depth > 16 {
+    if depth > parser::LIMIT_DEPTH {
         return;
     }
     for item in &script.items {
