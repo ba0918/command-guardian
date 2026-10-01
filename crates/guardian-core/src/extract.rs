@@ -245,7 +245,15 @@ fn extract_compound(
         Compound::For { var, values, body } => {
             extract_for(var, values, body, ctx, out, asks, depth);
         }
-        Compound::ArithmeticFor { body, .. } => {
+        Compound::ArithmeticFor {
+            initializer,
+            condition,
+            updater,
+            body,
+        } => {
+            for word in [initializer, condition, updater].into_iter().flatten() {
+                scan_word_substitutions(word, ctx, out, asks, depth);
+            }
             extract_script(body, ctx, out, asks, depth);
         }
         Compound::Case { value, arms } => {
@@ -262,7 +270,9 @@ fn extract_compound(
         Compound::BraceGroup(script) | Compound::Subshell(script) => {
             extract_script(script, ctx, out, asks, depth);
         }
-        Compound::Arithmetic(_) => {}
+        Compound::Arithmetic(word) => {
+            scan_word_substitutions(word, ctx, out, asks, depth);
+        }
         Compound::Coprocess { name, body } => {
             if let Some(name) = name {
                 scan_word_substitutions(name, ctx, out, asks, depth);
@@ -593,7 +603,18 @@ fn scan_word_substitutions(
     asks: &mut Vec<Ask>,
     depth: usize,
 ) {
-    for part in &word.parts {
+    scan_parts_substitutions(&word.parts, ctx, out, asks, depth);
+}
+
+/// 断片の並びの中のコマンド置換の内側だけを読む。
+fn scan_parts_substitutions(
+    parts: &[Part],
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    for part in parts {
         if let Part::Substitution(substitution) = part {
             if let Some(script) = &substitution.body {
                 let mut child = ctx.clone();
@@ -1017,6 +1038,9 @@ fn resolve_word(
         }
     }
 
+    // 断片を含む語は解決できないことが多いが、中の置換はすべて読む（REQ-037）。
+    scan_parts_substitutions(&word.parts, ctx, out, asks, depth);
+
     let mut text = String::new();
     let mut has_glob = word.has_glob;
     let mut mktemp_prefix = false;
@@ -1030,8 +1054,8 @@ fn resolve_word(
                 _ => return Resolved::Unresolved(word.text.clone()),
             },
             Part::Substitution(substitution) => {
-                let res = resolve_substitution(substitution, word, ctx, out, asks, depth);
-                if matches!(res, Resolved::Mktemp) && index == 0 {
+                if matches!(substitution_target(substitution, word), Resolved::Mktemp) && index == 0
+                {
                     mktemp_prefix = true;
                 } else {
                     return Resolved::Unresolved(word.text.clone());
@@ -1074,6 +1098,14 @@ fn resolve_substitution(
         Resolved::Mktemp
     } else {
         Resolved::Unresolved(word.text.clone())
+    }
+}
+
+/// 置換そのものの解決結果。効果の抽出はしない（断片の語では先に読む）。
+fn substitution_target(substitution: &Substitution, word: &Word) -> Resolved {
+    match &substitution.body {
+        Some(script) if is_mktemp_script(script) => Resolved::Mktemp,
+        _ => Resolved::Unresolved(word.text.clone()),
     }
 }
 

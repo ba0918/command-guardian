@@ -198,7 +198,8 @@ impl Normalizer {
         Ok(())
     }
 
-    /// 代入の語。配列の代入は値の形を取れないため、不透明な語として持つ。
+    /// 代入の語。配列の代入は値の形を取れないため、綴りを保った断片の語に
+    /// する（中の置換は読む。REQ-037）。
     fn assignment_word(
         &mut self,
         assignment: &raw::Assignment,
@@ -206,7 +207,7 @@ impl Normalizer {
         depth: usize,
     ) -> Result<Word, Failure> {
         if matches!(assignment.value, raw::AssignmentValue::Array(_)) {
-            return Ok(Word::from_parts(vec![Part::Opaque(word.value.clone())]));
+            return self.fragment_word(&word.value, depth);
         }
         self.word(word, depth)
     }
@@ -221,15 +222,29 @@ impl Normalizer {
         }
         let inner = depth + 1;
         match compound {
-            raw::CompoundCommand::Arithmetic(arithmetic) => {
-                Ok(Compound::Arithmetic(arithmetic.expr.value.clone()))
+            raw::CompoundCommand::Arithmetic(arithmetic) => Ok(Compound::Arithmetic(
+                self.fragment_word(&arithmetic.expr.value, inner)?,
+            )),
+            raw::CompoundCommand::ArithmeticForClause(clause) => {
+                let initializer = match &clause.initializer {
+                    Some(expr) => Some(self.fragment_word(&expr.value, inner)?),
+                    None => None,
+                };
+                let condition = match &clause.condition {
+                    Some(expr) => Some(self.fragment_word(&expr.value, inner)?),
+                    None => None,
+                };
+                let updater = match &clause.updater {
+                    Some(expr) => Some(self.fragment_word(&expr.value, inner)?),
+                    None => None,
+                };
+                Ok(Compound::ArithmeticFor {
+                    initializer,
+                    condition,
+                    updater,
+                    body: self.script(&clause.body.list, inner),
+                })
             }
-            raw::CompoundCommand::ArithmeticForClause(clause) => Ok(Compound::ArithmeticFor {
-                initializer: clause.initializer.as_ref().map(|e| e.value.clone()),
-                condition: clause.condition.as_ref().map(|e| e.value.clone()),
-                updater: clause.updater.as_ref().map(|e| e.value.clone()),
-                body: self.script(&clause.body.list, inner),
-            }),
             raw::CompoundCommand::BraceGroup(group) => {
                 Ok(Compound::BraceGroup(self.script(&group.list, inner)))
             }
@@ -475,8 +490,7 @@ impl Normalizer {
                 Ok(())
             }
             word::WordPiece::ParameterExpansion(expression) => {
-                parts.push(parameter_part(expression, raw_text(source, piece)));
-                Ok(())
+                self.parameter_parts(expression, raw_text(source, piece), depth, parts)
             }
             word::WordPiece::CommandSubstitution(_)
             | word::WordPiece::BackquotedCommandSubstitution(_) => {
@@ -489,9 +503,7 @@ impl Normalizer {
                 Ok(())
             }
             word::WordPiece::ArithmeticExpression(expression) => {
-                // 算術はコマンドとして読まない展開（原文の綴りを保つ）。
-                parts.push(Part::Opaque(format!("$(({}))", expression.value)));
-                Ok(())
+                self.arithmetic_parts(expression, depth, parts)
             }
         }
     }
@@ -519,8 +531,7 @@ impl Normalizer {
                 Ok(())
             }
             word::WordPiece::ParameterExpansion(expression) => {
-                parts.push(parameter_part(expression, raw_text(source, piece)));
-                Ok(())
+                self.parameter_parts(expression, raw_text(source, piece), depth, parts)
             }
             word::WordPiece::CommandSubstitution(_)
             | word::WordPiece::BackquotedCommandSubstitution(_) => {
@@ -529,8 +540,7 @@ impl Normalizer {
                 Ok(())
             }
             word::WordPiece::ArithmeticExpression(expression) => {
-                parts.push(Part::Opaque(format!("$(({}))", expression.value)));
-                Ok(())
+                self.arithmetic_parts(expression, depth, parts)
             }
             // 二重引用の内側に入れ子の引用は現れない。
             word::WordPiece::SingleQuotedText(text) | word::WordPiece::AnsiCQuotedText(text) => {
@@ -582,6 +592,136 @@ impl Normalizer {
             }
         }
     }
+
+    /// パラメータ展開。単純な名前は Var、それ以外は綴りを保ったまま
+    /// オペランドの中の置換を読む（REQ-037）。
+    fn parameter_parts(
+        &mut self,
+        expression: &word::ParameterExpr,
+        raw: &str,
+        depth: usize,
+        parts: &mut Vec<Part>,
+    ) -> Result<(), Failure> {
+        if let word::ParameterExpr::Parameter {
+            parameter,
+            indirect,
+        } = expression
+        {
+            match parameter {
+                word::Parameter::Named(name) if !indirect => {
+                    parts.push(Part::Var(name.clone()));
+                    return Ok(());
+                }
+                word::Parameter::NamedWithIndex { name, index }
+                    if !indirect && !index.contains('$') && !index.contains('`') =>
+                {
+                    parts.push(Part::Var(format!("{name}[{index}]")));
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+        self.fragment_operands(expression, raw, depth, parts)
+    }
+
+    /// 算術式。外側の綴りを保ち、中の置換だけを読む（REQ-037）。
+    fn arithmetic_parts(
+        &mut self,
+        expression: &raw::UnexpandedArithmeticExpr,
+        depth: usize,
+        parts: &mut Vec<Part>,
+    ) -> Result<(), Failure> {
+        parts.push(Part::Opaque("$((".to_string()));
+        self.fragment_parts(&expression.value, depth + 1, parts)?;
+        parts.push(Part::Opaque("))".to_string()));
+        Ok(())
+    }
+
+    /// 展開のオペランド（既定値、パターン、算術式など）を訪問する。
+    fn fragment_operands(
+        &mut self,
+        expression: &word::ParameterExpr,
+        raw: &str,
+        depth: usize,
+        parts: &mut Vec<Part>,
+    ) -> Result<(), Failure> {
+        let operands = parameter_operands(expression);
+        // 後ろのオペランドから位置を探し、重ならない綴りの範囲にする。
+        let mut spans: Vec<(usize, usize)> = Vec::new();
+        let mut limit = raw.len();
+        for operand in operands.iter().rev() {
+            if operand.is_empty() {
+                continue;
+            }
+            let Some(at) = raw[..limit].rfind(operand.as_str()) else {
+                return Err(Failure::UnknownNode(raw.to_string()));
+            };
+            spans.push((at, at + operand.len()));
+            limit = at;
+        }
+        spans.reverse();
+        let mut cursor = 0;
+        for (start, end) in spans {
+            if cursor < start {
+                parts.push(Part::Opaque(raw[cursor..start].to_string()));
+            }
+            self.fragment_parts(&raw[start..end], depth + 1, parts)?;
+            cursor = end;
+        }
+        if cursor < raw.len() {
+            parts.push(Part::Opaque(raw[cursor..].to_string()));
+        }
+        Ok(())
+    }
+
+    /// 生の断片。綴りは Opaque のまま保ち、中の置換だけを読む（REQ-037）。
+    fn fragment_parts(
+        &mut self,
+        raw: &str,
+        depth: usize,
+        parts: &mut Vec<Part>,
+    ) -> Result<(), Failure> {
+        if raw.is_empty() {
+            return Ok(());
+        }
+        if depth > LIMIT_DEPTH {
+            return Err(Failure::TooDeep);
+        }
+        let pieces = match catch(|| word::parse(raw, &self.options)) {
+            Ok(Ok(pieces)) => pieces,
+            Ok(Err(_)) => return Err(Failure::UnknownNode(raw.to_string())),
+            Err(()) => return Err(Failure::Panic),
+        };
+        for piece in &pieces {
+            match &piece.piece {
+                word::WordPiece::CommandSubstitution(_)
+                | word::WordPiece::BackquotedCommandSubstitution(_) => {
+                    let substitution = self.substitution_part(&piece.piece, depth);
+                    parts.push(Part::Substitution(substitution));
+                }
+                word::WordPiece::ParameterExpansion(expression) => {
+                    self.fragment_operands(expression, raw_text(raw, piece), depth + 1, parts)?;
+                }
+                word::WordPiece::ArithmeticExpression(expression) => {
+                    self.arithmetic_parts(expression, depth + 1, parts)?;
+                }
+                _ => {
+                    let slice = raw_text(raw, piece);
+                    if !slice.is_empty() {
+                        parts.push(Part::Opaque(slice.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// 断片を語にする。綴りを保ち、中の置換だけを読む（REQ-037）。
+    fn fragment_word(&mut self, raw: &str, depth: usize) -> Result<Word, Failure> {
+        let mut parts = Vec::new();
+        self.fragment_parts(raw, depth, &mut parts)?;
+        Ok(Word::from_parts(parts))
+    }
 }
 
 /// 引用の外の文字列を、リテラルと glob に分けて足す。
@@ -617,22 +757,82 @@ fn raw_text<'a>(source: &'a str, piece: &word::WordPieceWithSource) -> &'a str {
     source.get(piece.start_index..piece.end_index).unwrap_or("")
 }
 
-/// パラメータ展開を、単純な変数だけ Var にし、それ以外は原文の綴りにする。
-fn parameter_part(expression: &word::ParameterExpr, raw: &str) -> Part {
-    if let word::ParameterExpr::Parameter {
-        parameter,
-        indirect: false,
-    } = expression
-    {
-        match parameter {
-            word::Parameter::Named(name) => return Part::Var(name.clone()),
-            word::Parameter::NamedWithIndex { name, index } => {
-                return Part::Var(format!("{name}[{index}]"))
-            }
-            _ => {}
+/// パラメータ展開が持つオペランドの原文（既定値、パターン、算術式など）。
+fn parameter_operands(expression: &word::ParameterExpr) -> Vec<String> {
+    use word::ParameterExpr as Expr;
+    let mut operands = match expression {
+        Expr::Parameter { .. } | Expr::ParameterLength { .. } | Expr::Transform { .. } => {
+            Vec::new()
         }
+        Expr::UseDefaultValues { default_value, .. }
+        | Expr::AssignDefaultValues { default_value, .. } => {
+            default_value.iter().cloned().collect()
+        }
+        Expr::IndicateErrorIfNullOrUnset { error_message, .. } => {
+            error_message.iter().cloned().collect()
+        }
+        Expr::UseAlternativeValue {
+            alternative_value, ..
+        } => alternative_value.iter().cloned().collect(),
+        Expr::RemoveSmallestSuffixPattern { pattern, .. }
+        | Expr::RemoveLargestSuffixPattern { pattern, .. }
+        | Expr::RemoveSmallestPrefixPattern { pattern, .. }
+        | Expr::RemoveLargestPrefixPattern { pattern, .. }
+        | Expr::UppercaseFirstChar { pattern, .. }
+        | Expr::UppercasePattern { pattern, .. }
+        | Expr::LowercaseFirstChar { pattern, .. }
+        | Expr::LowercasePattern { pattern, .. } => pattern.iter().cloned().collect(),
+        Expr::Substring { offset, length, .. } => {
+            let mut operands = vec![offset.value.clone()];
+            if let Some(length) = length {
+                operands.push(length.value.clone());
+            }
+            operands
+        }
+        Expr::ReplaceSubstring {
+            pattern,
+            replacement,
+            ..
+        } => {
+            let mut operands = vec![pattern.clone()];
+            if let Some(replacement) = replacement {
+                operands.push(replacement.clone());
+            }
+            operands
+        }
+        Expr::VariableNames { prefix, .. } => vec![prefix.clone()],
+        Expr::MemberKeys { variable_name, .. } => vec![variable_name.clone()],
+    };
+    // 添字の中の置換も読む（REQ-037）。
+    if let Some(word::Parameter::NamedWithIndex { index, .. }) = expression_parameter(expression) {
+        operands.push(index.clone());
     }
-    Part::Opaque(raw.to_string())
+    operands
+}
+
+/// 展開が使うパラメータ。
+fn expression_parameter(expression: &word::ParameterExpr) -> Option<&word::Parameter> {
+    use word::ParameterExpr as Expr;
+    match expression {
+        Expr::Parameter { parameter, .. }
+        | Expr::UseDefaultValues { parameter, .. }
+        | Expr::AssignDefaultValues { parameter, .. }
+        | Expr::IndicateErrorIfNullOrUnset { parameter, .. }
+        | Expr::UseAlternativeValue { parameter, .. }
+        | Expr::ParameterLength { parameter, .. }
+        | Expr::RemoveSmallestSuffixPattern { parameter, .. }
+        | Expr::RemoveLargestSuffixPattern { parameter, .. }
+        | Expr::RemoveSmallestPrefixPattern { parameter, .. }
+        | Expr::RemoveLargestPrefixPattern { parameter, .. }
+        | Expr::Substring { parameter, .. }
+        | Expr::Transform { parameter, .. }
+        | Expr::UppercaseFirstChar { parameter, .. }
+        | Expr::UppercasePattern { parameter, .. }
+        | Expr::LowercaseFirstChar { parameter, .. }
+        | Expr::LowercasePattern { parameter, .. }
+        | Expr::ReplaceSubstring { parameter, .. } => Some(parameter),
+        Expr::VariableNames { .. } | Expr::MemberKeys { .. } => None,
+    }
 }
 
 fn substitution_source(piece: &word::WordPiece) -> String {

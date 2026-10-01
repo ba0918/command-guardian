@@ -541,7 +541,17 @@ fn walk_compound(compound: &Compound, out: &mut Vec<Invocation>, depth: usize) {
             }
             walk_script(body, out, depth);
         }
-        Compound::ArithmeticFor { body, .. } => walk_script(body, out, depth),
+        Compound::ArithmeticFor {
+            initializer,
+            condition,
+            updater,
+            body,
+        } => {
+            for word in [initializer, condition, updater].into_iter().flatten() {
+                walk_word_subst(word, out, depth);
+            }
+            walk_script(body, out, depth)
+        }
         Compound::Case { value, arms } => {
             walk_word_subst(value, out, depth);
             for arm in arms {
@@ -556,7 +566,7 @@ fn walk_compound(compound: &Compound, out: &mut Vec<Invocation>, depth: usize) {
         Compound::BraceGroup(script) | Compound::Subshell(script) => {
             walk_script(script, out, depth)
         }
-        Compound::Arithmetic(_) => {}
+        Compound::Arithmetic(word) => walk_word_subst(word, out, depth),
         Compound::Coprocess { name, body } => {
             if let Some(name) = name {
                 walk_word_subst(name, out, depth);

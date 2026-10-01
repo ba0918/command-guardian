@@ -1,6 +1,6 @@
 //! S1: 破壊的効果の抽出（REQ-001）。
 
-use guardian_core::{extract_effects, Effect, Env, Op, Target};
+use guardian_core::{analyze, extract_effects, Effect, Env, Op, Target};
 use std::path::PathBuf;
 
 fn env() -> Env {
@@ -671,4 +671,34 @@ fn req_008_find_with_multiple_start_points_feeds_xargs() {
             },
         ]
     );
+}
+
+// @kotowari[REQ-001, REQ-037]
+#[test]
+fn req_037_substitutions_in_expansion_operands_are_read() {
+    // パラメータ展開のオペランド、算術、添字、配列の値の中の置換も読む。
+    for cmd in [
+        "echo ${X:-$(rm -rf /etc/x)}",
+        "echo ${X:-${Y:-$(rm -rf /etc/x)}}",
+        "echo $(( $(rm -rf /etc/x) + 1 ))",
+        "(( $(rm -rf /etc/x) ))",
+        "for ((i=0; i<$(rm -rf /etc/x); i++)); do :; done",
+        "echo ${a[$(rm -rf /etc/x)]}",
+        "declare -a a=($(rm -rf /etc/x))",
+    ] {
+        let analysis = analyze(cmd, &env());
+        assert_eq!(
+            analysis.effects,
+            vec![Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            }],
+            "{cmd}"
+        );
+        assert!(
+            analysis.parse_errors.is_empty(),
+            "{cmd}: {:?}",
+            analysis.parse_errors
+        );
+    }
 }

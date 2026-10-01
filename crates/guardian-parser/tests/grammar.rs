@@ -53,6 +53,14 @@ const CORPUS: &[&str] = &[
     "sudo -u root bash -lc 'rm -rf /etc/x'",
     // 入れ子の置換
     "echo $(echo $(echo $(pwd)))",
+    // 展開のオペランド・算術・配列の中の置換（走査漏れの位置）
+    "echo ${X:-$(rm -rf /etc/x)}",
+    "echo ${X:-${Y:-$(rm -rf /etc/x)}}",
+    "echo $(( $(rm -rf /etc/x) + 1 ))",
+    "(( $(rm -rf /etc/x) ))",
+    "for ((i=0; i<$(rm -rf /etc/x); i++)); do :; done",
+    "echo ${a[$(rm -rf /etc/x)]}",
+    "a=($(rm -rf /etc/x))",
 ];
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -181,8 +189,18 @@ fn brush_redirect(redirect: &raw::IoRedirect, shape: &mut Shape) {
 fn brush_compound(compound: &raw::CompoundCommand, shape: &mut Shape) {
     shape.compounds += 1;
     match compound {
-        raw::CompoundCommand::Arithmetic(_) => {}
-        raw::CompoundCommand::ArithmeticForClause(clause) => brush_list(&clause.body.list, shape),
+        raw::CompoundCommand::Arithmetic(arithmetic) => {
+            brush_arithmetic(&arithmetic.expr.value, shape)
+        }
+        raw::CompoundCommand::ArithmeticForClause(clause) => {
+            for expr in [&clause.initializer, &clause.condition, &clause.updater]
+                .into_iter()
+                .flatten()
+            {
+                brush_arithmetic(&expr.value, shape);
+            }
+            brush_list(&clause.body.list, shape)
+        }
         raw::CompoundCommand::BraceGroup(group) => brush_list(&group.list, shape),
         raw::CompoundCommand::Subshell(subshell) => brush_list(&subshell.list, shape),
         raw::CompoundCommand::ForClause(clause) => {
@@ -272,8 +290,98 @@ fn brush_pieces(pieces: &[word::WordPieceWithSource], shape: &mut Shape) {
                 shape.substitutions.push(text.clone());
                 brush_body(text, shape);
             }
+            word::WordPiece::ParameterExpansion(expression) => {
+                for operand in brush_operands(expression) {
+                    brush_word_pieces(&operand, false, shape);
+                }
+            }
+            word::WordPiece::ArithmeticExpression(expression) => {
+                brush_arithmetic(&expression.value, shape);
+            }
             _ => {}
         }
+    }
+}
+
+/// 算術式の中を語の断片として読み、中の置換を数える。
+fn brush_arithmetic(value: &str, shape: &mut Shape) {
+    brush_word_pieces(value, false, shape);
+}
+
+/// パラメータ展開が持つオペランドの原文（既定値、パターン、算術式、添字など）。
+fn brush_operands(expression: &word::ParameterExpr) -> Vec<String> {
+    use word::ParameterExpr as Expr;
+    let mut operands = match expression {
+        Expr::Parameter { .. } | Expr::ParameterLength { .. } | Expr::Transform { .. } => {
+            Vec::new()
+        }
+        Expr::UseDefaultValues { default_value, .. }
+        | Expr::AssignDefaultValues { default_value, .. } => {
+            default_value.iter().cloned().collect()
+        }
+        Expr::IndicateErrorIfNullOrUnset { error_message, .. } => {
+            error_message.iter().cloned().collect()
+        }
+        Expr::UseAlternativeValue {
+            alternative_value, ..
+        } => alternative_value.iter().cloned().collect(),
+        Expr::RemoveSmallestSuffixPattern { pattern, .. }
+        | Expr::RemoveLargestSuffixPattern { pattern, .. }
+        | Expr::RemoveSmallestPrefixPattern { pattern, .. }
+        | Expr::RemoveLargestPrefixPattern { pattern, .. }
+        | Expr::UppercaseFirstChar { pattern, .. }
+        | Expr::UppercasePattern { pattern, .. }
+        | Expr::LowercaseFirstChar { pattern, .. }
+        | Expr::LowercasePattern { pattern, .. } => pattern.iter().cloned().collect(),
+        Expr::Substring { offset, length, .. } => {
+            let mut operands = vec![offset.value.clone()];
+            if let Some(length) = length {
+                operands.push(length.value.clone());
+            }
+            operands
+        }
+        Expr::ReplaceSubstring {
+            pattern,
+            replacement,
+            ..
+        } => {
+            let mut operands = vec![pattern.clone()];
+            if let Some(replacement) = replacement {
+                operands.push(replacement.clone());
+            }
+            operands
+        }
+        Expr::VariableNames { prefix, .. } => vec![prefix.clone()],
+        Expr::MemberKeys { variable_name, .. } => vec![variable_name.clone()],
+    };
+    if let Some(word::Parameter::NamedWithIndex { index, .. }) = brush_parameter(expression) {
+        operands.push(index.clone());
+    }
+    operands
+}
+
+/// 展開が使うパラメータ。
+fn brush_parameter(expression: &word::ParameterExpr) -> Option<&word::Parameter> {
+    use word::ParameterExpr as Expr;
+    match expression {
+        Expr::Parameter { parameter, .. }
+        | Expr::UseDefaultValues { parameter, .. }
+        | Expr::AssignDefaultValues { parameter, .. }
+        | Expr::IndicateErrorIfNullOrUnset { parameter, .. }
+        | Expr::UseAlternativeValue { parameter, .. }
+        | Expr::ParameterLength { parameter, .. }
+        | Expr::RemoveSmallestSuffixPattern { parameter, .. }
+        | Expr::RemoveLargestSuffixPattern { parameter, .. }
+        | Expr::RemoveSmallestPrefixPattern { parameter, .. }
+        | Expr::RemoveLargestPrefixPattern { parameter, .. }
+        | Expr::Substring { parameter, .. }
+        | Expr::Transform { parameter, .. }
+        | Expr::UppercaseFirstChar { parameter, .. }
+        | Expr::UppercasePattern { parameter, .. }
+        | Expr::LowercaseFirstChar { parameter, .. }
+        | Expr::LowercasePattern { parameter, .. }
+        | Expr::ReplaceSubstring { parameter, .. } => Some(parameter),
+        Expr::VariableNames { .. } | Expr::MemberKeys { .. } => None,
     }
 }
 
@@ -370,6 +478,11 @@ fn normalized_redirect(redirect: &guardian_parser::Redirect, shape: &mut Shape) 
 
 fn normalized_word(word: &guardian_parser::Word, shape: &mut Shape) {
     shape.words += 1;
+    normalized_fragment(word, shape);
+}
+
+/// 語を数えずに、断片の中の置換だけを数える。
+fn normalized_fragment(word: &guardian_parser::Word, shape: &mut Shape) {
     for part in &word.parts {
         if let Part::Substitution(substitution) = part {
             shape.substitutions.push(substitution.body_text.clone());
@@ -409,7 +522,17 @@ fn normalized_compound(compound: &Compound, shape: &mut Shape) {
             }
             normalized_script(body, shape);
         }
-        Compound::ArithmeticFor { body, .. } => normalized_script(body, shape),
+        Compound::ArithmeticFor {
+            initializer,
+            condition,
+            updater,
+            body,
+        } => {
+            for word in [initializer, condition, updater].into_iter().flatten() {
+                normalized_fragment(word, shape);
+            }
+            normalized_script(body, shape);
+        }
         Compound::Case { value, arms } => {
             normalized_word(value, shape);
             for arm in arms {
@@ -424,7 +547,7 @@ fn normalized_compound(compound: &Compound, shape: &mut Shape) {
         Compound::BraceGroup(script) | Compound::Subshell(script) => {
             normalized_script(script, shape)
         }
-        Compound::Arithmetic(_) => {}
+        Compound::Arithmetic(word) => normalized_fragment(word, shape),
         Compound::Coprocess { name, body } => {
             if let Some(name) = name {
                 normalized_word(name, shape);

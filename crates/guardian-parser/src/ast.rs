@@ -108,11 +108,11 @@ pub enum Compound {
         values: Vec<Word>,
         body: Script,
     },
-    /// `for (( ... ))`。式は展開しない生の文字列として持つ。
+    /// `for (( ... ))`。式は読んだ断片として持つ。
     ArithmeticFor {
-        initializer: Option<String>,
-        condition: Option<String>,
-        updater: Option<String>,
+        initializer: Option<Word>,
+        condition: Option<Word>,
+        updater: Option<Word>,
         body: Script,
     },
     /// `case`。
@@ -121,8 +121,8 @@ pub enum Compound {
     BraceGroup(Script),
     /// `( ... )`。
     Subshell(Script),
-    /// `(( ... ))`。式は展開しない生の文字列として持つ。
-    Arithmetic(String),
+    /// `(( ... ))`。式は読んだ断片として持つ。
+    Arithmetic(Word),
     /// `coproc`。
     Coprocess {
         name: Option<Word>,
