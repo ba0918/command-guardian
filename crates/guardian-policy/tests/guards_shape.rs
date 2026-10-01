@@ -29,6 +29,14 @@ fn literal_eval(body: &str) -> String {
     )
 }
 
+// @kotowari[REQ-038, REQ-033]
+#[test]
+fn req_038_guard_collection_keeps_syntax_failures_from_literal_bodies() {
+    guardian_parser::begin_judgment();
+    let result = invocations("eval 'if true; then git push'");
+    assert_eq!(result.failures, vec![guardian_parser::Failure::Syntax]);
+}
+
 // @kotowari[REQ-027, REQ-033, REQ-039]
 #[test]
 fn req_033_guards_inside_sixteen_and_seventeen_literal_evals_are_kept() {

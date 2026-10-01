@@ -176,6 +176,12 @@ impl Engine {
         // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
         if !self.config.guard.is_empty() {
             let invocations = guard::invocations(command);
+            for failure in &invocations.failures {
+                let ask = Ask::Parse(failure.clone());
+                if !asks.contains(&ask) {
+                    asks.push(ask);
+                }
+            }
             for rule in &self.config.guard {
                 if invocations.iter().any(|inv| rule.matches(inv)) {
                     rules.push(RuleReport {

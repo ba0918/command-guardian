@@ -451,15 +451,42 @@ fn option_value_hit(name: &str, values: &[WordMatch], words: &[String]) -> bool 
 
 /// コマンド文字列から起動を集める。ラッパーと `bash -c`・`eval` の内側、
 /// コマンド置換の内側も展開する（REQ-044 の調査済みの範囲）。
-pub fn invocations(command: &str) -> Vec<Invocation> {
+pub struct InvocationAnalysis {
+    pub invocations: Vec<Invocation>,
+    pub failures: Vec<parser::Failure>,
+}
+
+impl std::ops::Deref for InvocationAnalysis {
+    type Target = [Invocation];
+
+    fn deref(&self) -> &Self::Target {
+        &self.invocations
+    }
+}
+
+impl InvocationAnalysis {
+    fn push(&mut self, invocation: Invocation) {
+        self.invocations.push(invocation);
+    }
+
+    fn as_slice(&self) -> &[Invocation] {
+        &self.invocations
+    }
+}
+
+pub fn invocations(command: &str) -> InvocationAnalysis {
     let outcome = parser::parse(command);
-    let mut out = Vec::new();
+    let mut out = InvocationAnalysis {
+        invocations: Vec::new(),
+        failures: outcome.failures,
+    };
     walk_script(&outcome.script, &mut out, 0);
     out
 }
 
-fn walk_script(script: &Script, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_script(script: &Script, out: &mut InvocationAnalysis, depth: usize) {
     if depth > parser::LIMIT_DEPTH {
+        out.failures.push(parser::Failure::TooDeep);
         return;
     }
     for item in &script.items {
@@ -470,13 +497,13 @@ fn walk_script(script: &Script, out: &mut Vec<Invocation>, depth: usize) {
     }
 }
 
-fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut InvocationAnalysis, depth: usize) {
     for command in &pipeline.commands {
         walk_command(command, out, depth);
     }
 }
 
-fn walk_command(command: &Command, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_command(command: &Command, out: &mut InvocationAnalysis, depth: usize) {
     match command {
         Command::Simple(simple) => walk_simple(simple, out, depth),
         Command::Compound {
@@ -500,7 +527,7 @@ fn walk_command(command: &Command, out: &mut Vec<Invocation>, depth: usize) {
     }
 }
 
-fn walk_redirects(redirects: &[Redirect], out: &mut Vec<Invocation>, depth: usize) {
+fn walk_redirects(redirects: &[Redirect], out: &mut InvocationAnalysis, depth: usize) {
     for redirect in redirects {
         match &redirect.target {
             parser::RedirectTarget::Word(word) => walk_word_subst(word, out, depth),
@@ -513,7 +540,7 @@ fn walk_redirects(redirects: &[Redirect], out: &mut Vec<Invocation>, depth: usiz
     }
 }
 
-fn walk_compound(compound: &Compound, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_compound(compound: &Compound, out: &mut InvocationAnalysis, depth: usize) {
     match compound {
         Compound::If {
             condition,
@@ -576,7 +603,7 @@ fn walk_compound(compound: &Compound, out: &mut Vec<Invocation>, depth: usize) {
     }
 }
 
-fn walk_simple(simple: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usize) {
     for word in &simple.words {
         walk_word_subst(word, out, depth);
     }
@@ -635,12 +662,13 @@ fn walk_simple(simple: &SimpleCommand, out: &mut Vec<Invocation>, depth: usize) 
     });
 }
 
-fn walk_inner(inner: &str, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_inner(inner: &str, out: &mut InvocationAnalysis, depth: usize) {
     let outcome = parser::parse(inner);
+    out.failures.extend(outcome.failures);
     walk_script(&outcome.script, out, depth + 1);
 }
 
-fn walk_word_subst(word: &Word, out: &mut Vec<Invocation>, depth: usize) {
+fn walk_word_subst(word: &Word, out: &mut InvocationAnalysis, depth: usize) {
     for part in &word.parts {
         if let Part::Substitution(substitution) = part {
             if let Some(body) = &substitution.body {
