@@ -2,6 +2,8 @@
 
 pub mod classify;
 pub mod git;
+pub mod observation;
 
 pub use classify::{under_root, Classification, Judge, JudgeEnv};
-pub use git::{find_worktree_root, GitError, GitRunner, SystemGit};
+pub use git::{find_worktree_root, GitError, GitFailure, GitRunner, SystemGit};
+pub use observation::{PathObserver, SystemPaths};

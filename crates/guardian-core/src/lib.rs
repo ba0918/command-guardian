@@ -2,8 +2,10 @@
 
 mod diagnostic;
 mod facts;
+mod observation;
 pub mod types;
 
 pub use diagnostic::{Ask, Env, Failure};
 pub use facts::{CommandFacts, Invocation};
+pub use observation::ObservedPath;
 pub use types::{Class, Effect, Op, ProtectedKind, Target, Verdict, Why};

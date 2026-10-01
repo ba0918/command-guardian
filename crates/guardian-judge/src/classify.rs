@@ -1,8 +1,9 @@
 //! パスの分類。fs を見て 4 分類する。設定は読まない。
 
-use crate::git::{find_worktree_root, GitRunner, SystemGit};
-use guardian_core::{Class, ProtectedKind, Why};
+use crate::git::{find_worktree_root, GitFailure, GitRunner, SystemGit};
+use guardian_core::{Class, Failure, ObservedPath, ProtectedKind, Why};
 use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, Instant};
 
 /// 分類に渡す環境。
 #[derive(Debug, Clone, Default)]
@@ -41,7 +42,7 @@ impl Judge {
     pub fn new(env: JudgeEnv) -> Judge {
         Judge {
             env,
-            git: Box::new(SystemGit),
+            git: Box::new(SystemGit::default()),
         }
     }
 
@@ -53,7 +54,8 @@ impl Judge {
     /// 1 つのパスを分類する。`dereference` は末尾スラッシュ付きの削除。
     pub fn classify_path(&self, path: &Path, dereference: bool) -> Classification {
         let path = self.resolve_dereference(path, dereference);
-        self.classify_inner(&path, false)
+        self.classify_inner(&path, false, Instant::now() + Duration::from_secs(5))
+            .unwrap_or_else(|_| Classification::new(Class::Unknown, Why::GitFailed))
     }
 
     /// 供給元の子（find・xargs・for の対象集合）を分類する。
@@ -64,7 +66,15 @@ impl Judge {
     /// 末尾スラッシュ付きの起点は、リンク先を解決してから子を分類する。
     pub fn classify_children_deref(&self, base: &Path, dereference: bool) -> Classification {
         let base = self.resolve_dereference(base, dereference);
-        self.classify_inner(&base, true)
+        self.classify_inner(&base, true, Instant::now() + Duration::from_secs(5))
+            .unwrap_or_else(|_| Classification::new(Class::Unknown, Why::GitFailed))
+    }
+    pub fn classify_observed(
+        &self,
+        path: &ObservedPath,
+        deadline: Instant,
+    ) -> Result<Classification, Failure> {
+        self.classify_inner(&path.path, path.children, deadline)
     }
 
     fn resolve_dereference(&self, path: &Path, dereference: bool) -> PathBuf {
@@ -91,10 +101,18 @@ impl Judge {
         roots
     }
 
-    fn classify_inner(&self, path: &Path, children: bool) -> Classification {
+    fn classify_inner(
+        &self,
+        path: &Path,
+        children: bool,
+        deadline: Instant,
+    ) -> Result<Classification, Failure> {
         // "/" それ自体、およびその子（children のとき）は保護。
         if path == Path::new("/") {
-            return Classification::new(Class::Protected, Why::Protected(ProtectedKind::Root));
+            return Ok(Classification::new(
+                Class::Protected,
+                Why::Protected(ProtectedKind::Root),
+            ));
         }
 
         // システムの領域とその配下。"/var/tmp" とその配下だけは除く。
@@ -105,88 +123,100 @@ impl Judge {
                 if path.starts_with(var_tmp) {
                     continue;
                 }
-                return Classification::new(
+                return Ok(Classification::new(
                     Class::Protected,
                     Why::Protected(ProtectedKind::SystemArea),
-                );
+                ));
             }
         }
 
         // ".git" とその配下。
         if path.components().any(|c| c.as_os_str() == ".git") {
-            return Classification::new(Class::Protected, Why::Protected(ProtectedKind::DotGit));
+            return Ok(Classification::new(
+                Class::Protected,
+                Why::Protected(ProtectedKind::DotGit),
+            ));
         }
 
         // ほかの利用者のホームとその配下。
         if self.is_other_home(path) {
-            return Classification::new(Class::Protected, Why::Protected(ProtectedKind::OtherHome));
+            return Ok(Classification::new(
+                Class::Protected,
+                Why::Protected(ProtectedKind::OtherHome),
+            ));
         }
 
         // 一時領域。
         for root in self.ephemeral_roots() {
             if path == root {
                 if children {
-                    return Classification::new(Class::Ephemeral, Why::Ephemeral);
+                    return Ok(Classification::new(Class::Ephemeral, Why::Ephemeral));
                 }
-                return Classification::new(
+                return Ok(Classification::new(
                     Class::Protected,
                     Why::Protected(ProtectedKind::EphemeralRoot),
-                );
+                ));
             }
             if path.starts_with(&root) {
-                return Classification::new(Class::Ephemeral, Why::Ephemeral);
+                return Ok(Classification::new(Class::Ephemeral, Why::Ephemeral));
             }
         }
 
         if !children {
             if let Some(home) = &self.env.home {
                 if !home.as_os_str().is_empty() && path == home {
-                    return Classification::new(
+                    return Ok(Classification::new(
                         Class::Protected,
                         Why::Protected(ProtectedKind::Home),
-                    );
+                    ));
                 }
             }
             if let Some(cwd) = &self.env.cwd {
                 if path == cwd {
-                    return Classification::new(
+                    return Ok(Classification::new(
                         Class::Protected,
                         Why::Protected(ProtectedKind::Cwd),
-                    );
+                    ));
                 }
             }
         }
 
         if let Some(root) = self.worktree_root(path) {
             if !children && path == root {
-                return Classification::new(
+                return Ok(Classification::new(
                     Class::Protected,
                     Why::Protected(ProtectedKind::RepoRoot),
-                );
+                ));
             }
-            return self.git_classify(&root, path);
+            return self.git_classify(&root, path, deadline);
         }
 
-        Classification::new(Class::Unknown, Why::Unmanaged)
+        Ok(Classification::new(Class::Unknown, Why::Unmanaged))
     }
 
     /// 作業ツリーの中のパスを、git status の報告の有無で分ける。
-    fn git_classify(&self, root: &Path, path: &Path) -> Classification {
+    fn git_classify(
+        &self,
+        root: &Path,
+        path: &Path,
+        deadline: Instant,
+    ) -> Result<Classification, Failure> {
         if !self.env.git_enabled {
-            return Classification::new(Class::Unknown, Why::Unmanaged);
+            return Ok(Classification::new(Class::Unknown, Why::Unmanaged));
         }
-        match self.git.status(root, path) {
+        match self.git.status_until(root, path, deadline) {
             Ok(report) => {
                 let report = report.trim();
                 if report.is_empty() {
-                    Classification::new(Class::Vcs, Why::Vcs)
+                    Ok(Classification::new(Class::Vcs, Why::Vcs))
                 } else if report.lines().any(|l| l.starts_with("??")) {
-                    Classification::new(Class::Unknown, Why::Untracked)
+                    Ok(Classification::new(Class::Unknown, Why::Untracked))
                 } else {
-                    Classification::new(Class::Unknown, Why::Uncommitted)
+                    Ok(Classification::new(Class::Unknown, Why::Uncommitted))
                 }
             }
-            Err(_) => Classification::new(Class::Unknown, Why::GitFailed),
+            Err(GitFailure::Failed(_)) => Ok(Classification::new(Class::Unknown, Why::GitFailed)),
+            Err(GitFailure::Limit) => Err(Failure::Limit),
         }
     }
 

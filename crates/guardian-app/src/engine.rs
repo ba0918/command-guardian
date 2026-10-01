@@ -56,6 +56,7 @@ struct CompiledRule {
 
 pub struct Engine {
     runtime: std::cell::RefCell<crate::runtime::ParserRuntime>,
+    paths: Box<dyn guardian_judge::PathObserver>,
     config: Config,
     env: EngineEnv,
     judge: Judge,
@@ -129,6 +130,7 @@ impl Engine {
         }
         Engine {
             runtime: std::cell::RefCell::new(runtime),
+            paths: Box::new(guardian_judge::SystemPaths),
             config,
             env,
             judge,
@@ -139,6 +141,17 @@ impl Engine {
 
     pub fn config(&self) -> &Config {
         &self.config
+    }
+    pub fn with_observers(
+        config: Config,
+        env: EngineEnv,
+        git: Box<dyn GitRunner>,
+        paths: Box<dyn guardian_judge::PathObserver>,
+        runtime: crate::runtime::ParserRuntime,
+    ) -> Engine {
+        let mut engine = Self::with_git(config, env, git, runtime);
+        engine.paths = paths;
+        engine
     }
 
     /// コマンド文字列を判定する。
@@ -160,7 +173,19 @@ impl Engine {
             if self.config.rules_disable.iter().any(|r| r == e.op.name()) {
                 continue;
             }
-            effects.push(self.judge_effect(e.op, &e.target));
+            match self.judge_effect(
+                e.op,
+                &e.target,
+                std::time::Instant::now() + session.remaining(),
+            ) {
+                Ok(effect) => effects.push(effect),
+                Err(failure) => {
+                    let ask = Ask::Parse(failure);
+                    if !asks.contains(&ask) {
+                        asks.push(ask);
+                    }
+                }
+            }
         }
 
         // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
@@ -242,40 +267,42 @@ impl Engine {
         }
     }
 
-    fn judge_effect(&self, op: Op, target: &Target) -> EffectReport {
-        let (class, why, verdict) = self.judge_target(target);
-        EffectReport {
+    fn judge_effect(
+        &self,
+        op: Op,
+        target: &Target,
+        deadline: std::time::Instant,
+    ) -> Result<EffectReport, guardian_core::Failure> {
+        let (class, why, verdict) = self.judge_target(target, deadline)?;
+        Ok(EffectReport {
             op,
             target: target.clone(),
             class,
             why,
             verdict,
-        }
+        })
     }
 
-    fn judge_target(&self, target: &Target) -> (Class, Why, Verdict) {
+    fn judge_target(
+        &self,
+        target: &Target,
+        deadline: std::time::Instant,
+    ) -> Result<(Class, Why, Verdict), guardian_core::Failure> {
         match target {
-            Target::Unresolved(text) => (
+            Target::Unresolved(text) => Ok((
                 Class::Unknown,
                 Why::Unresolved(text.clone()),
                 Verdict::Block,
-            ),
-            Target::Mktemp => (Class::Ephemeral, Why::Mktemp, Verdict::Allow),
-            Target::UnknownSource => (Class::Unknown, Why::UnknownSource, Verdict::Ask),
+            )),
+            Target::Mktemp => Ok((Class::Ephemeral, Why::Mktemp, Verdict::Allow)),
+            Target::UnknownSource => Ok((Class::Unknown, Why::UnknownSource, Verdict::Ask)),
             _ => {
-                if let Some(overridden) = self.apply_roots(target) {
-                    return overridden;
+                let observed = guardian_judge::observation::observe(target, self.paths.as_ref())
+                    .expect("path target");
+                if let Some(overridden) = self.apply_roots(&observed) {
+                    return Ok(overridden);
                 }
-                let c = match target {
-                    Target::Path { path, dereference } => {
-                        self.judge.classify_path(path, *dereference)
-                    }
-                    Target::GlobBase(base) => self.judge.classify_path(base, false),
-                    Target::Children { base, dereference } => {
-                        self.judge.classify_children_deref(base, *dereference)
-                    }
-                    _ => unreachable!(),
-                };
+                let c = self.judge.classify_observed(&observed, deadline)?;
                 let verdict = match c.class {
                     Class::Ephemeral | Class::Vcs => Verdict::Allow,
                     Class::Protected => Verdict::Block,
@@ -285,20 +312,15 @@ impl Engine {
                         _ => self.config.unknown_verdict,
                     },
                 };
-                (c.class, c.why, verdict)
+                Ok((c.class, c.why, verdict))
             }
         }
     }
 
     /// 設定の保護ルートと許可ルートを先に当てる。
-    fn apply_roots(&self, target: &Target) -> Option<(Class, Why, Verdict)> {
-        let (path, children) = match target {
-            Target::Path { path, dereference } => (self.deref_path(path, *dereference), false),
-            Target::GlobBase(base) => (base.clone(), false),
-            Target::Children { base, dereference } => (self.deref_path(base, *dereference), true),
-            _ => return None,
-        };
-        let path = path.as_path();
+    fn apply_roots(&self, observed: &guardian_core::ObservedPath) -> Option<(Class, Why, Verdict)> {
+        let path = observed.path.as_path();
+        let children = observed.children;
         for root in &self.config.protected_roots {
             if root.as_os_str().is_empty() {
                 continue;
@@ -324,15 +346,6 @@ impl Engine {
             }
         }
         None
-    }
-
-    /// 末尾スラッシュ付きの対象は、リンク先を解決してからルートに当てる。
-    fn deref_path(&self, path: &Path, dereference: bool) -> PathBuf {
-        if dereference {
-            std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
-        } else {
-            path.to_path_buf()
-        }
     }
 
     fn compose_message(&self, effects: &[EffectReport], rules: &[RuleReport]) -> String {
