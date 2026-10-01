@@ -333,3 +333,16 @@ fn req_002_mktemp_dry_run_is_not_a_created_temporary_path() {
         vec![delete(Target::Mktemp)]
     );
 }
+
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_literal_loop_values_remain_strings_when_used_after_the_loop() {
+    assert_eq!(
+        effects("x=/etc; for x in etc; do :; done; rm -rf /$x/x"),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(
+        effects("for x in relative; do cd /etc; rm \"$x\"; done"),
+        vec![delete(p("/etc/relative"))]
+    );
+}

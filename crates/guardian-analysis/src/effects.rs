@@ -376,7 +376,7 @@ fn extract_for(
             continue;
         }
         match resolve_word(word, ctx) {
-            Resolved::Path(path) => resolved.push(Value::Text(path.to_string_lossy().into_owned())),
+            Resolved::Path(_) => resolved.push(resolve_value(word, ctx)),
             Resolved::Glob(base) | Resolved::Children(base) => resolved.push(Value::Children(base)),
             Resolved::Mktemp => resolved.push(Value::Mktemp),
             _ => all_literal = false,
