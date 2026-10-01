@@ -899,7 +899,7 @@ fn find_effects(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>) -> Vec<
                         .iter()
                         .position(|word| word.text == ";" || word.text == "+")
                         .unwrap_or(tail.len());
-                    rm_fixed_effects(&tail[..end], Some("{}"), ctx, out);
+                    rm_fixed_effects(&tail[..end], Some("{}"), word.text == "-execdir", ctx, out);
                 }
             }
         }
@@ -978,6 +978,7 @@ const XARGS_VALUED: &[&str] = &[
 fn rm_fixed_effects(
     args: &[Word],
     placeholder: Option<&str>,
+    source_relative: bool,
     ctx: &Context,
     out: &mut Vec<Effect>,
 ) {
@@ -985,6 +986,23 @@ fn rm_fixed_effects(
     for word in targets {
         if placeholder.is_some_and(|placeholder| word.text == placeholder) {
             continue;
+        }
+        if source_relative {
+            if let Value::Text(text) = resolve_value(word, ctx) {
+                let path = Path::new(&text);
+                if !path.is_absolute() {
+                    if path
+                        .components()
+                        .any(|component| component == Component::ParentDir)
+                    {
+                        out.push(Effect {
+                            op: Op::Delete,
+                            target: Target::Unresolved(word.text.clone()),
+                        });
+                    }
+                    continue;
+                }
+            }
         }
         out.push(Effect {
             op: Op::Delete,
@@ -1035,7 +1053,7 @@ fn xargs_effects(
     if basename(&utility.text) != "rm" {
         return;
     }
-    rm_fixed_effects(&args[index + 1..], placeholder, ctx, out);
+    rm_fixed_effects(&args[index + 1..], placeholder, false, ctx, out);
     if children_sources.is_empty() {
         out.push(Effect {
             op: Op::Delete,

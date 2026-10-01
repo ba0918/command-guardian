@@ -71,6 +71,45 @@ fn req_001_find_and_xargs_rm_keep_fixed_targets_as_well_as_source_children() {
     }
 }
 
+// @kotowari[REQ-001, REQ-002, REQ-008]
+#[test]
+fn req_008_execdir_relative_targets_use_the_source_directory_not_parent_cwd() {
+    let children = Effect {
+        op: Op::Delete,
+        target: Target::Children {
+            base: PathBuf::from("/tmp/scratch"),
+            dereference: false,
+        },
+    };
+    assert_eq!(
+        effects("find /tmp/scratch -type f -execdir rm -f victim {} \\;"),
+        vec![children.clone()]
+    );
+    assert_eq!(
+        effects("find /tmp/scratch -exec rm victim {} +"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/home/you/work/repo/victim")
+            },
+            children.clone()
+        ]
+    );
+    assert_eq!(
+        effects("find /tmp/scratch -execdir rm /etc/x {} +"),
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: path("/etc/x")
+            },
+            children
+        ]
+    );
+    assert!(effects("find /tmp/scratch -execdir rm ../outside {} +")
+        .iter()
+        .any(|effect| matches!(effect.target, Target::Unresolved(_))));
+}
+
 // @kotowari[REQ-001]
 #[test]
 fn req_001_rmdir_unlink_shred_delete() {
