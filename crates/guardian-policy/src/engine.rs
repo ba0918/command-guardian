@@ -344,12 +344,16 @@ fn worst_effect(effects: &[EffectReport]) -> Option<&EffectReport> {
     worst
 }
 
-/// JSON の最上位に出す短い理由（REQ-017・A13）。
+/// JSON の最上位に出す短い理由（REQ-017・A13）。判定の重い順に選ぶ。
 fn compose_reason(effects: &[EffectReport], rules: &[RuleReport], asks: &[Ask]) -> String {
     if let Some(effect) = worst_effect(effects) {
         if effect.verdict == Verdict::Block {
             return message::reason_line(effect.class, &effect.why);
         }
+    }
+    // 規則が運んだ block も、構文解析の ask より重い。
+    if let Some(rule) = rules.iter().find(|rule| rule.verdict == Verdict::Block) {
+        return rule.reason.clone();
     }
     if !asks.is_empty() {
         return message::ask_reason(asks);

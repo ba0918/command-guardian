@@ -25,6 +25,42 @@ fn req_009_a_readable_block_is_not_overwritten_by_a_parse_ask() {
     assert!(report.reason.contains("protected"), "{}", report.reason);
 }
 
+// @kotowari[REQ-009]
+#[test]
+fn req_009_a_rule_block_names_the_rule_in_the_reason() {
+    // 見張りの規則で block になるとき、構文解析の ask が理由を上書きしない。
+    let dir = tempfile::Builder::new()
+        .prefix("hook-guardian-asks-")
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let user = root.join("config.toml");
+    std::fs::write(
+        &user,
+        r#"
+[[commands.guard]]
+program = "git"
+reason = "別名で push を定義して実行することはできません"
+verdict = "block"
+options-with-value = ["-c"]
+deny-option-values = { "-c" = ["/alias[.].*/"] }
+"#,
+    )
+    .unwrap();
+    let engine = Engine::load(
+        Some(&user),
+        EngineEnv {
+            home: Some(PathBuf::from("/home/you")),
+            tmpdir: Some(PathBuf::from("/tmp")),
+            cwd: root.clone(),
+        },
+    );
+    let report = engine.check("git -c alias.p=push p; if true; then");
+    assert_eq!(report.verdict, Verdict::Block);
+    assert!(!report.parse_errors.is_empty());
+    assert!(report.reason.contains("別名"), "{}", report.reason);
+}
+
 // @kotowari[REQ-038, EX-049]
 #[test]
 fn req_038_an_unreadable_input_without_effects_asks() {
