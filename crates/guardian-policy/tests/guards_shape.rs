@@ -42,6 +42,17 @@ fn req_027_028_program_matches_path_and_wrapper() {
     assert!(!matches(&rs, "git commit -m push"));
 }
 
+// @kotowari[REQ-027, REQ-037]
+#[test]
+fn req_027_substitutions_in_expansion_operands_are_seen() {
+    let (rs, warnings) = rules(GIT_PUSH);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    // 展開のオペランドの中の置換は、引用の有無にかかわらず見える。
+    assert!(matches(&rs, "echo ${X:-$(git push)}"));
+    assert!(matches(&rs, "echo ${X:-\"$(git push)\"}"));
+    assert!(matches(&rs, "echo $(( \"$(git push)\" ))"));
+}
+
 // @kotowari[REQ-027, EX-044]
 #[test]
 fn req_027_shape_errors_disable_only_that_rule() {

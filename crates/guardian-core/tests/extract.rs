@@ -685,6 +685,14 @@ fn req_037_substitutions_in_expansion_operands_are_read() {
         "for ((i=0; i<$(rm -rf /etc/x); i++)); do :; done",
         "echo ${a[$(rm -rf /etc/x)]}",
         "declare -a a=($(rm -rf /etc/x))",
+        // 二重引用の中に入れ子の置換が現れる綴り（REQ-037）。
+        "echo ${X:-\"$(rm -rf /etc/x)\"}",
+        "echo ${X:=\"$(rm -rf /etc/x)\"}",
+        "X=abc; echo ${X#\"$(rm -rf /etc/x)\"}",
+        "X=abc; echo ${X/zzz/\"$(rm -rf /etc/x)\"}",
+        "echo $(( \"$(rm -rf /etc/x)\" + 1 ))",
+        "(( \"$(rm -rf /etc/x)\" ))",
+        "declare -a a=(\"$(rm -rf /etc/x)\")",
     ] {
         let analysis = analyze(cmd, &env());
         assert_eq!(

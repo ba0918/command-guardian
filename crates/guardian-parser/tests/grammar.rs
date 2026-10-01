@@ -61,6 +61,11 @@ const CORPUS: &[&str] = &[
     "for ((i=0; i<$(rm -rf /etc/x); i++)); do :; done",
     "echo ${a[$(rm -rf /etc/x)]}",
     "a=($(rm -rf /etc/x))",
+    // 二重引用の中の置換（同じ位置の別の綴り）
+    "echo ${X:-\"$(rm -rf /etc/x)\"}",
+    "echo ${X:=\"$(rm -rf /etc/x)\"}",
+    "echo $(( \"$(rm -rf /etc/x)\" + 1 ))",
+    "a=(\"$(rm -rf /etc/x)\")",
 ];
 
 #[derive(Debug, Default, PartialEq, Eq)]

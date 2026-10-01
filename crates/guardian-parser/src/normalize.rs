@@ -693,23 +693,43 @@ impl Normalizer {
             Err(()) => return Err(Failure::Panic),
         };
         for piece in &pieces {
-            match &piece.piece {
-                word::WordPiece::CommandSubstitution(_)
-                | word::WordPiece::BackquotedCommandSubstitution(_) => {
-                    let substitution = self.substitution_part(&piece.piece, depth);
-                    parts.push(Part::Substitution(substitution));
+            self.fragment_piece(piece, raw, depth, parts)?;
+        }
+        Ok(())
+    }
+
+    /// 断片を構成する 1 つの部分。入れ子の部分（二重引用の並び）は中へ降り、
+    /// 置換はどの深さでも読む（REQ-037）。
+    fn fragment_piece(
+        &mut self,
+        piece: &word::WordPieceWithSource,
+        raw: &str,
+        depth: usize,
+        parts: &mut Vec<Part>,
+    ) -> Result<(), Failure> {
+        match &piece.piece {
+            word::WordPiece::CommandSubstitution(_)
+            | word::WordPiece::BackquotedCommandSubstitution(_) => {
+                let substitution = self.substitution_part(&piece.piece, depth);
+                parts.push(Part::Substitution(substitution));
+            }
+            word::WordPiece::ParameterExpansion(expression) => {
+                self.fragment_operands(expression, raw_text(raw, piece), depth + 1, parts)?;
+            }
+            word::WordPiece::ArithmeticExpression(expression) => {
+                self.arithmetic_parts(expression, depth + 1, parts)?;
+            }
+            // 入れ子になる部分は列挙せず、そのまま中へ降りる。
+            word::WordPiece::DoubleQuotedSequence(inner)
+            | word::WordPiece::GettextDoubleQuotedSequence(inner) => {
+                for inner_piece in inner {
+                    self.fragment_piece(inner_piece, raw, depth, parts)?;
                 }
-                word::WordPiece::ParameterExpansion(expression) => {
-                    self.fragment_operands(expression, raw_text(raw, piece), depth + 1, parts)?;
-                }
-                word::WordPiece::ArithmeticExpression(expression) => {
-                    self.arithmetic_parts(expression, depth + 1, parts)?;
-                }
-                _ => {
-                    let slice = raw_text(raw, piece);
-                    if !slice.is_empty() {
-                        parts.push(Part::Opaque(slice.to_string()));
-                    }
+            }
+            _ => {
+                let slice = raw_text(raw, piece);
+                if !slice.is_empty() {
+                    parts.push(Part::Opaque(slice.to_string()));
                 }
             }
         }
