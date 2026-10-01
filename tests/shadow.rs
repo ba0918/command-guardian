@@ -113,7 +113,7 @@ fn req_018_shadow_returns_nothing_and_logs() {
     assert!(log.contains("block"), "{log}");
     assert!(log.contains("/etc/nginx"), "{log}");
     assert!(log.contains("rm -rf /etc/nginx"), "{log}");
-    assert!(log.contains("システムの領域"), "{log}");
+    assert!(log.contains("system area"), "{log}");
 }
 
 // @kotowari[REQ-019, EX-026]
@@ -137,7 +137,7 @@ fn req_019_shadow_log_is_one_line_with_owner_only_permissions() {
     assert_eq!(fields.len(), 5, "{line}");
     assert!(fields[0].parse::<u64>().unwrap() > 0, "{line}");
     assert_eq!(fields[1], "block", "{line}");
-    assert!(fields[2].contains("システムの領域"), "{line}");
+    assert!(fields[2].contains("system area"), "{line}");
     assert_eq!(fields[3], "/etc/nginx", "{line}");
     assert_eq!(fields[4], "rm -rf /etc/nginx", "{line}");
     let mode = std::fs::metadata(&path).unwrap().permissions().mode();

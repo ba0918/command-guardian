@@ -164,7 +164,7 @@ fn req_022_claude_ask_returns_permission_decision() {
     assert!(specific["permissionDecisionReason"]
         .as_str()
         .unwrap()
-        .contains("未追跡"));
+        .contains("untracked"));
 }
 
 // @kotowari[REQ-022, EX-020]
@@ -185,7 +185,7 @@ fn req_022_claude_block_returns_deny() {
     assert!(specific["permissionDecisionReason"]
         .as_str()
         .unwrap()
-        .contains("システムの領域"));
+        .contains("system area"));
 }
 
 // @kotowari[REQ-022]
@@ -338,6 +338,6 @@ fn req_015_hook_warns_when_the_user_config_is_broken() {
         xdg.path(),
     );
     assert_eq!(r.code, 0);
-    assert!(r.stderr.contains("警告"), "{}", r.stderr);
-    assert!(r.stderr.contains("利用者設定"), "{}", r.stderr);
+    assert!(r.stderr.contains("Warning:"), "{}", r.stderr);
+    assert!(r.stderr.contains("user configuration"), "{}", r.stderr);
 }

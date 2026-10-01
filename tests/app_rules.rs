@@ -128,7 +128,7 @@ verdict = "allow"
     assert!(
         r.warnings
             .iter()
-            .any(|w| w.contains("利用者設定でのみ有効")),
+            .any(|w| w.contains("only valid in user configuration")),
         "{:?}",
         r.warnings
     );
@@ -177,7 +177,7 @@ verdict = "block"
     let e = Engine::load(Some(&user), env(&root));
     let r = e.check("anything");
     assert!(
-        r.warnings.iter().any(|w| w.contains("正規表現")),
+        r.warnings.iter().any(|w| w.contains("regular expression")),
         "{:?}",
         r.warnings
     );

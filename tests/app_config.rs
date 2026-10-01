@@ -92,7 +92,7 @@ fn req_015_broken_user_config_keeps_builtin_defaults_and_warns() {
     let e = engine(Some(&user), &root);
     let r = e.check("rm -rf /tmp/scratch/x");
     assert!(
-        r.warnings.iter().any(|w| w.contains("利用者設定")),
+        r.warnings.iter().any(|w| w.contains("user configuration")),
         "{:?}",
         r.warnings
     );
@@ -292,7 +292,9 @@ fn req_015_broken_project_config_is_ignored_with_a_warning() {
     let e = engine(None, &root);
     let r = e.check("rm -rf /home/you/x");
     assert!(
-        r.warnings.iter().any(|w| w.contains("プロジェクト設定")),
+        r.warnings
+            .iter()
+            .any(|w| w.contains("project configuration")),
         "{:?}",
         r.warnings
     );
@@ -367,7 +369,7 @@ fn req_027_untrusted_project_guard_rule_warning_is_kept() {
     let e = engine(None, &root);
     let r = e.check("git push origin main");
     assert!(
-        r.warnings.iter().any(|w| w.contains("見張り")),
+        r.warnings.iter().any(|w| w.contains("command guard")),
         "{:?}",
         r.warnings
     );

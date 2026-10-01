@@ -155,18 +155,18 @@ fn req_011_the_message_explains_the_source_that_decides_block() {
         verdict,
     };
     for (effects, rules, expected) in [
-        (vec![effect(Verdict::Ask)], vec![], "判定の上限"),
+        (vec![effect(Verdict::Ask)], vec![], "judgment limit"),
         (
             vec![],
             vec![rule(Verdict::Ask, "確認する規則")],
-            "判定の上限",
+            "judgment limit",
         ),
         (
             vec![effect(Verdict::Ask)],
             vec![rule(Verdict::Ask, "確認する規則")],
-            "判定の上限",
+            "judgment limit",
         ),
-        (vec![effect(Verdict::Block)], vec![], "未追跡"),
+        (vec![effect(Verdict::Block)], vec![], "untracked"),
         (
             vec![effect(Verdict::Ask)],
             vec![rule(Verdict::Block, "拒否する規則")],

@@ -198,7 +198,7 @@ fn req_039_the_parse_exchange_budget_blocks_over_the_limit() {
         .expect("実行ファイルを起動できない");
     assert_eq!(out.status.code(), Some(2), "予算の超過は block になる");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("判定の上限"), "{stdout}");
+    assert!(stdout.contains("judgment limit"), "{stdout}");
 }
 
 // @kotowari[REQ-039]
@@ -293,11 +293,11 @@ fn req_039_literal_loop_traversal_returns_a_reasoned_block() {
         serde_json::from_str(&std::fs::read_to_string(stdout).unwrap()).unwrap();
     assert_eq!(json["verdict"], "block");
     assert!(
-        json["reason"].as_str().unwrap().contains("判定の上限"),
+        json["reason"].as_str().unwrap().contains("judgment limit"),
         "{json}"
     );
     assert!(
-        json["message"].as_str().unwrap().contains("判定の上限"),
+        json["message"].as_str().unwrap().contains("judgment limit"),
         "{json}"
     );
 }
@@ -363,7 +363,7 @@ fn req_034_project_examples_visit_literal_loop_bodies_once() {
         };
         assert_eq!(status.code(), Some(if agent.is_some() { 0 } else { 2 }));
         let warnings = std::fs::read_to_string(&stderr).unwrap();
-        assert!(!warnings.contains("無効"), "{warnings}");
+        assert!(!warnings.contains("Disabling"), "{warnings}");
         let json: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&stdout).unwrap()).unwrap();
         if agent.is_some() {

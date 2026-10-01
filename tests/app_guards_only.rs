@@ -145,7 +145,7 @@ deny = [["/pu(sh/"]]
     );
     assert!(rs.is_empty());
     assert!(
-        warnings.iter().any(|w| w.contains("正規表現")),
+        warnings.iter().any(|w| w.contains("regular expression")),
         "{warnings:?}"
     );
 }

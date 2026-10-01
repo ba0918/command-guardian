@@ -95,7 +95,7 @@ pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<Guard
         return Vec::new();
     };
     let Some(items) = value.as_array() else {
-        warnings.push("commands.guard は規則の一覧ではないため無視します".to_string());
+        warnings.push("Ignoring commands.guard: expected a list of rules".to_string());
         return Vec::new();
     };
     let mut rules = Vec::new();
@@ -103,11 +103,11 @@ pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<Guard
         let name = item
             .get("program")
             .and_then(|v| v.as_str())
-            .unwrap_or("<program なし>")
+            .unwrap_or("<missing program>")
             .to_string();
         match parse_guard(item) {
             Ok(rule) => rules.push(rule),
-            Err(e) => warnings.push(format!("見張りの規則を無効にします（{name}）: {e}")),
+            Err(e) => warnings.push(format!("Disabling command guard ({name}): {e}")),
         }
     }
     rules
@@ -118,18 +118,18 @@ fn parse_guard(item: &toml::Value) -> Result<GuardRule, String> {
         .get("program")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
-        .ok_or("program が無い")?
+        .ok_or("Missing program")?
         .to_string();
     let reason = item
         .get("reason")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
-        .ok_or("reason が空")?
+        .ok_or("Empty reason")?
         .to_string();
     let verdict = match item.get("verdict").and_then(|v| v.as_str()) {
         None | Some("ask") => Verdict::Ask,
         Some("block") => Verdict::Block,
-        Some(other) => return Err(format!("verdict が不正（{other}）")),
+        Some(other) => return Err(format!("Invalid verdict ({other})")),
     };
     let options_with_value = string_list(item.get("options-with-value"), "options-with-value")?;
     let for_ = word_seq_list(item.get("for"), "for")?;
@@ -147,7 +147,8 @@ fn parse_guard(item: &toml::Value) -> Result<GuardRule, String> {
         && only.is_empty()
     {
         return Err(
-            "deny・deny-flags・deny-option-values・deny-env・only のどれも無い".to_string(),
+            "At least one of deny, deny-flags, deny-option-values, deny-env or only is required"
+                .to_string(),
         );
     }
 
@@ -172,13 +173,13 @@ fn string_list(value: Option<&toml::Value>, key: &str) -> Result<Vec<String>, St
         return Ok(Vec::new());
     };
     let Some(items) = value.as_array() else {
-        return Err(format!("{key} がリストではない"));
+        return Err(format!("{key}: expected a list"));
     };
     let mut out = Vec::new();
     for item in items {
         out.push(
             item.as_str()
-                .ok_or(format!("{key} の要素が文字列ではない"))?
+                .ok_or(format!("{key}: expected string entries"))?
                 .to_string(),
         );
     }
@@ -188,7 +189,7 @@ fn string_list(value: Option<&toml::Value>, key: &str) -> Result<Vec<String>, St
 fn word_list(value: Option<&toml::Value>, key: &str) -> Result<Vec<WordMatch>, String> {
     let raw = string_list(value, key)?;
     raw.iter()
-        .map(|s| WordMatch::new(s).map_err(|e| format!("{key} の正規表現が不正: {e}")))
+        .map(|s| WordMatch::new(s).map_err(|e| format!("{key}: invalid regular expression: {e}")))
         .collect()
 }
 
@@ -197,7 +198,7 @@ fn word_seq_list(value: Option<&toml::Value>, key: &str) -> Result<Vec<WordSeq>,
         return Ok(Vec::new());
     };
     let Some(items) = value.as_array() else {
-        return Err(format!("{key} がリストではない"));
+        return Err(format!("{key}: expected a list"));
     };
     let mut out = Vec::new();
     for item in items {
@@ -208,26 +209,30 @@ fn word_seq_list(value: Option<&toml::Value>, key: &str) -> Result<Vec<WordSeq>,
 
 fn parse_word_seq(item: &toml::Value, key: &str) -> Result<WordSeq, String> {
     let Some(positions) = item.as_array() else {
-        return Err(format!("{key} の項目が語の並びではない"));
+        return Err(format!("{key}: expected a word sequence"));
     };
     let mut seq = WordSeq::new();
     for position in positions {
         let mut alternatives = Alternatives::new();
         match position {
-            toml::Value::String(s) => alternatives
-                .push(WordMatch::new(s).map_err(|e| format!("{key} の正規表現が不正: {e}"))?),
+            toml::Value::String(s) => alternatives.push(
+                WordMatch::new(s).map_err(|e| format!("{key}: invalid regular expression: {e}"))?,
+            ),
             toml::Value::Array(items) => {
                 for a in items {
-                    let s = a.as_str().ok_or(format!("{key} の代替に語以外がある"))?;
+                    let s = a
+                        .as_str()
+                        .ok_or(format!("{key}: alternatives must be words"))?;
                     alternatives.push(
-                        WordMatch::new(s).map_err(|e| format!("{key} の正規表現が不正: {e}"))?,
+                        WordMatch::new(s)
+                            .map_err(|e| format!("{key}: invalid regular expression: {e}"))?,
                     );
                 }
             }
-            _ => return Err(format!("{key} の位置が語でも代替の一覧でもない")),
+            _ => return Err(format!("{key}: expected a word or a list of alternatives")),
         }
         if alternatives.is_empty() {
-            return Err(format!("{key} の代替が空"));
+            return Err(format!("{key}: empty alternatives"));
         }
         seq.push(alternatives);
     }
@@ -239,7 +244,7 @@ fn option_values(value: Option<&toml::Value>) -> Result<Vec<(String, Vec<WordMat
         return Ok(Vec::new());
     };
     let Some(table) = value.as_table() else {
-        return Err("deny-option-values が表ではない".to_string());
+        return Err("deny-option-values: expected a table".to_string());
     };
     let mut out = Vec::new();
     for (name, values) in table {

@@ -14,32 +14,39 @@ pub fn display_target(target: &Target) -> String {
             s
         }
         Target::GlobBase(base) => format!("{}/…", base.display()),
-        Target::Children { base, .. } => format!("{} の配下", base.display()),
-        Target::Mktemp => "mktemp が作ったパス".to_string(),
-        Target::UnknownSource => "供給元が分からない対象集合".to_string(),
-        Target::Unresolved(text) => format!("{text}（解決できないパス）"),
+        Target::Children { base, .. } => format!("children of {}", base.display()),
+        Target::Mktemp => "path created by mktemp".to_string(),
+        Target::UnknownSource => "targets from an unknown source".to_string(),
+        Target::Unresolved(text) => format!("{text} (unresolved path)"),
     }
+}
+
+/// Keep the original data separate from its reversible, single-line display.
+pub fn display_inline(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('\r', "\\r")
+        .replace('\n', "\\n")
 }
 
 pub fn op_label(op: Op) -> &'static str {
     match op {
-        Op::Delete => "削除",
-        Op::Truncate => "切り詰め",
-        Op::Format => "フォーマット",
+        Op::Delete => "Delete",
+        Op::Truncate => "Truncate",
+        Op::Format => "Format",
     }
 }
 
 fn protected_label(kind: &ProtectedKind) -> &'static str {
     match kind {
-        ProtectedKind::Root => "ルートディレクトリ",
-        ProtectedKind::SystemArea => "システムの領域",
-        ProtectedKind::EphemeralRoot => "一時領域のルート",
-        ProtectedKind::Home => "ホームディレクトリ",
-        ProtectedKind::Cwd => "作業ディレクトリ",
-        ProtectedKind::RepoRoot => "リポジトリのルート",
+        ProtectedKind::Root => "root directory",
+        ProtectedKind::SystemArea => "system area",
+        ProtectedKind::EphemeralRoot => "temporary directory root",
+        ProtectedKind::Home => "home directory",
+        ProtectedKind::Cwd => "working directory",
+        ProtectedKind::RepoRoot => "repository root",
         ProtectedKind::DotGit => ".git",
-        ProtectedKind::OtherHome => "ほかの利用者のホーム",
-        ProtectedKind::ConfiguredRoot => "設定で追加した保護ルート",
+        ProtectedKind::OtherHome => "another user's home",
+        ProtectedKind::ConfiguredRoot => "configured protected root",
     }
 }
 
@@ -48,54 +55,62 @@ fn reason_phrase(class: Class, why: &Why) -> String {
         Why::Ephemeral => String::new(),
         Why::Mktemp => String::new(),
         Why::Vcs => String::new(),
-        Why::Untracked => "（未追跡）".to_string(),
-        Why::Uncommitted => "（未コミットの変更あり）".to_string(),
-        Why::Unmanaged => "（管理外）".to_string(),
-        Why::Unresolved(_) => "（パスを解決できない）".to_string(),
-        Why::UnknownSource => "（対象集合を確定できない）".to_string(),
-        Why::GitFailed => "（git の確認に失敗）".to_string(),
-        Why::Protected(kind) => format!("（{}）", protected_label(kind)),
+        Why::Untracked => " (untracked)".to_string(),
+        Why::Uncommitted => " (uncommitted changes)".to_string(),
+        Why::Unmanaged => " (not managed by git)".to_string(),
+        Why::Unresolved(_) => " (unresolved path)".to_string(),
+        Why::UnknownSource => " (unknown targets)".to_string(),
+        Why::GitFailed => " (git check failed)".to_string(),
+        Why::Protected(kind) => format!(" ({})", protected_label(kind)),
     };
     format!("{class}{detail}")
 }
 
 fn loss_phrase(why: &Why) -> &'static str {
     match why {
-        Why::Untracked => "まだコミットされておらず、消えると戻せません",
-        Why::Uncommitted => "コミットされていない変更が失われます",
-        Why::Unmanaged => "git の管理下になく、消えると戻せません",
-        Why::Unresolved(_) => "対象を確定できず、何が消えるか分かりません",
-        Why::UnknownSource => "消える範囲を確定できません",
-        Why::GitFailed => "管理状態を確認できません",
-        Why::Protected(_) => "消えると戻せません",
-        Why::Ephemeral | Why::Mktemp | Why::Vcs => "消えると戻せません",
+        Why::Untracked => "this has not been committed and cannot be recovered after deletion",
+        Why::Uncommitted => "uncommitted changes will be lost",
+        Why::Unmanaged => "this is not managed by git and cannot be recovered after deletion",
+        Why::Unresolved(_) => "the target cannot be resolved, so what would be lost is unknown",
+        Why::UnknownSource => "the scope of deletion cannot be determined",
+        Why::GitFailed => "the git tracking state could not be checked",
+        Why::Protected(_) => "deleted data cannot be recovered",
+        Why::Ephemeral | Why::Mktemp | Why::Vcs => "deleted data cannot be recovered",
     }
 }
 
 fn alternative_phrase(why: &Why) -> &'static str {
     match why {
-        Why::Untracked => "一時領域や作業場所へ移してから消す、または先にコミットする",
-        Why::Uncommitted => "先にコミットする",
-        Why::Unmanaged => "一時領域や作業場所へ移してから消す、または許可ルートに追加する",
-        Why::Unresolved(_) => "リテラルのパスで指定し直す",
-        Why::UnknownSource => "対象をリテラルで指定し直す",
-        Why::GitFailed => "git status で管理状態を確かめてから消す",
-        Why::Protected(_) => "当てはまる代替はありません",
-        Why::Ephemeral | Why::Mktemp | Why::Vcs => "当てはまる代替はありません",
+        Why::Untracked => {
+            "Move it to a temporary or working area before deleting, or commit it first."
+        }
+        Why::Uncommitted => "Commit the changes first.",
+        Why::Unmanaged => {
+            "Move it to a temporary or working area before deleting, or add an allowed root."
+        }
+        Why::Unresolved(_) => "Specify a literal path instead.",
+        Why::UnknownSource => "Specify literal targets instead.",
+        Why::GitFailed => "Check the tracking state with git status before deleting.",
+        Why::Protected(_) => "No applicable alternative.",
+        Why::Ephemeral | Why::Mktemp | Why::Vcs => "No applicable alternative.",
     }
 }
 
 /// 非 allow の理由を 1 行にする。
 pub fn reason_line(class: Class, why: &Why) -> String {
-    format!("{}で、{}", reason_phrase(class, why), loss_phrase(why))
+    format!("{}; {}", reason_phrase(class, why), loss_phrase(why))
 }
 
 /// 非 allow の文面。`block` はエージェント向け、`ask` は利用者向けに書く。
 pub fn non_allow_message(op: Op, target: &Target, class: Class, why: &Why) -> String {
     let lines = [
-        format!("{}: {}", op_label(op), display_target(target)),
-        format!("理由: {}", reason_line(class, why)),
-        format!("代替: {}", alternative_phrase(why)),
+        format!(
+            "{}: {}",
+            op_label(op),
+            display_inline(&display_target(target))
+        ),
+        format!("Reason: {}", reason_line(class, why)),
+        format!("Alternative: {}", alternative_phrase(why)),
     ];
     lines.join("\n")
 }
@@ -134,9 +149,11 @@ fn ask_kind(ask: &Ask) -> AskKind {
 /// 上限を超えた block の理由を 1 行にする（REQ-011）。
 pub fn limit_reason(asks: &[Ask]) -> String {
     match asks.iter().find(|ask| ask.is_limit()) {
-        Some(Ask::Parse(Failure::TooLarge)) => "入力が大きすぎるため判定を止めました".to_string(),
-        Some(Ask::Parse(Failure::TooDeep)) => "入力が深すぎるため判定を止めました".to_string(),
-        _ => "判定の上限を超えたため判定を止めました".to_string(),
+        Some(Ask::Parse(Failure::TooLarge)) => "Judgment stopped: input is too large".to_string(),
+        Some(Ask::Parse(Failure::TooDeep)) => {
+            "Judgment stopped: input is nested too deeply".to_string()
+        }
+        _ => "Judgment stopped: a judgment limit was exceeded".to_string(),
     }
 }
 
@@ -144,21 +161,21 @@ pub fn limit_reason(asks: &[Ask]) -> String {
 pub fn limit_message(asks: &[Ask]) -> String {
     let (title, reason) = match asks.iter().find(|ask| ask.is_limit()) {
         Some(Ask::Parse(Failure::TooLarge)) => (
-            "入力が大きすぎるため判定を止めました",
-            "理由: 構文解析の上限（1 MiB）を超えました",
+            "Judgment stopped: input is too large",
+            "Reason: Input exceeds the parsing limit of 1 MiB.",
         ),
         Some(Ask::Parse(Failure::TooDeep)) => (
-            "入力が深すぎるため判定を止めました",
-            "理由: 構文の入れ子が上限（128 段）を超えました",
+            "Judgment stopped: input is nested too deeply",
+            "Reason: Syntax nesting exceeds the limit of 128 levels.",
         ),
         _ => (
-            "判定の上限を超えたため判定を止めました",
-            "理由: 構文解析が判定の上限（1000 回・5 秒）を超えたか、解析の子プロセスが異常終了しました",
+            "Judgment stopped: a judgment limit was exceeded",
+            "Reason: Parsing exceeded the judgment budget (1000 parses or 5 seconds), or the parser process terminated abnormally.",
         ),
     };
-    let mut text = format!("{title}\n{reason}\n代替: 当てはまる代替はありません");
+    let mut text = format!("{title}\n{reason}\nAlternative: No applicable alternative.");
     if asks.len() > 1 {
-        text.push_str(&format!("\nほかに {} 件の指摘があります", asks.len() - 1));
+        text.push_str(&format!("\nAdditional findings: {}", asks.len() - 1));
     }
     text
 }
@@ -172,11 +189,11 @@ pub fn ask_reason(asks: &[Ask]) -> String {
     match asks.first() {
         None => String::new(),
         Some(ask) => match ask_kind(ask) {
-            AskKind::Syntax => "構文を読めないため判定できません".to_string(),
-            AskKind::Internal => "判定の内部で失敗したため判定できません".to_string(),
+            AskKind::Syntax => "Cannot judge: command syntax could not be read".to_string(),
+            AskKind::Internal => "Cannot judge: an internal failure occurred".to_string(),
             AskKind::Shell => match ask {
-                Ask::UnsupportedShell(name) => format!("読めないシェルです: {name}"),
-                _ => "読めないシェルです".to_string(),
+                Ask::UnsupportedShell(name) => format!("Unsupported shell: {name}"),
+                _ => "Unsupported shell".to_string(),
             },
             AskKind::TooLarge | AskKind::TooDeep | AskKind::Limit => limit_reason(asks),
         },
@@ -193,31 +210,31 @@ pub fn ask_message(asks: &[Ask]) -> String {
     }
     let lines = match ask_kind(first) {
         AskKind::Syntax => vec![
-            "構文を読めないため判定できません".to_string(),
-            "理由: コマンドの構文を読み取れません".to_string(),
-            "代替: 当てはまる代替はありません".to_string(),
+            "Cannot judge: command syntax could not be read".to_string(),
+            "Reason: The command syntax could not be parsed.".to_string(),
+            "Alternative: No applicable alternative.".to_string(),
         ],
         AskKind::Internal => vec![
-            "判定の内部で失敗したため判定できません".to_string(),
-            "理由: 判定の内部で失敗しました".to_string(),
-            "代替: 当てはまる代替はありません".to_string(),
+            "Cannot judge: an internal failure occurred".to_string(),
+            "Reason: An internal judgment failure occurred.".to_string(),
+            "Alternative: No applicable alternative.".to_string(),
         ],
         AskKind::TooLarge | AskKind::TooDeep | AskKind::Limit => return limit_message(asks),
         AskKind::Shell => {
             let name = match first {
                 Ask::UnsupportedShell(name) => name.clone(),
-                _ => "知らないシェル".to_string(),
+                _ => "unknown shell".to_string(),
             };
             vec![
-                format!("読めないシェルです: {name}"),
-                "理由: 対象外のシェルの中身は読みません".to_string(),
-                "代替: 当てはまる代替はありません".to_string(),
+                format!("Unsupported shell: {}", display_inline(&name)),
+                "Reason: Bodies of unsupported shells are not analyzed.".to_string(),
+                "Alternative: No applicable alternative.".to_string(),
             ]
         }
     };
     let mut text = lines.join("\n");
     if asks.len() > 1 {
-        text.push_str(&format!("\nほかに {} 件の指摘があります", asks.len() - 1));
+        text.push_str(&format!("\nAdditional findings: {}", asks.len() - 1));
     }
     text
 }

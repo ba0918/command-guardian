@@ -21,7 +21,13 @@ struct HookInput {
 
 /// stdin のフック入力を判定し、エージェントごとの出力を返す。`hook` は常に 0 で終わる。
 pub fn run(args: &[String]) -> i32 {
-    let agent = parse_agent(args);
+    let agent = match parse_agent(args) {
+        HookArgs::Help => {
+            println!("{HELP}");
+            return 0;
+        }
+        HookArgs::Agent(agent) => agent,
+    };
     let mut text = String::new();
     if std::io::stdin().read_to_string(&mut text).is_err() {
         return 0;
@@ -35,7 +41,7 @@ pub fn run(args: &[String]) -> i32 {
     };
     let report = engine.check(&input.command);
     for w in &report.warnings {
-        eprintln!("警告: {w}");
+        eprintln!("Warning: {w}");
     }
     // 影実行ではフックとして何も返さず、判定をログに残す（REQ-018）。
     if !engine.config().enforce {
@@ -55,12 +61,37 @@ pub fn run(args: &[String]) -> i32 {
     0
 }
 
+const HELP: &str = "Judge a Bash request from an agent hook; read the JSON request from stdin.
+
+Usage: command-guardian hook --agent claude|codex
+
+Arguments:
+  No positional arguments are required. Hook input is supplied on stdin.
+
+Options:
+  --agent claude|codex  Select the calling agent's protocol.
+  --help, -h           Show help without reading stdin or loading configuration.
+
+Examples:
+  command-guardian hook --agent claude < request.json
+  command-guardian hook --agent codex < request.json
+
+Exit codes:
+  always 0, regardless of the verdict. Help also exits with 0.";
+
+enum HookArgs {
+    Help,
+    Agent(Option<Agent>),
+}
+
 /// `--agent claude|codex` を読む。
-fn parse_agent(args: &[String]) -> Option<Agent> {
+fn parse_agent(args: &[String]) -> HookArgs {
     let mut agent = None;
     let mut i = 0;
     while i < args.len() {
-        if args[i] == "--agent" {
+        if matches!(args[i].as_str(), "--help" | "-h") {
+            return HookArgs::Help;
+        } else if args[i] == "--agent" {
             agent = match args.get(i + 1).map(|s| s.as_str()) {
                 Some("claude") => Some(Agent::Claude),
                 Some("codex") => Some(Agent::Codex),
@@ -71,7 +102,7 @@ fn parse_agent(args: &[String]) -> Option<Agent> {
             i += 1;
         }
     }
-    agent
+    HookArgs::Agent(agent)
 }
 
 /// Bash のコマンドを含む入力だけを取り出す（REQ-024）。

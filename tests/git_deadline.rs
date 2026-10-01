@@ -100,11 +100,11 @@ fn req_039_system_git_wait_and_output_are_bounded_and_reaped() {
                 .unwrap()
         } else {
             assert_eq!(json["verdict"], "block");
-            assert!(json["reason"].as_str().unwrap().contains("上限"), "{json}");
+            assert!(json["reason"].as_str().unwrap().contains("limit"), "{json}");
             assert_eq!(json["effects"][0]["verdict"], "ask");
             json["message"].as_str().unwrap()
         };
-        assert!(message.contains("判定の上限"), "{json}");
+        assert!(message.contains("judgment limit"), "{json}");
         assert!((2..=4).contains(&message.lines().count()), "{json}");
         assert!(reaped, "git child was not reaped");
     }

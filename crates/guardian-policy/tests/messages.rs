@@ -23,26 +23,26 @@ fn req_011_protected_message_has_op_path_class_loss_and_alternative() {
     );
     let ls = lines(&text);
     assert!((2..=4).contains(&ls.len()), "{text}");
-    assert!(text.contains("削除"), "{text}");
+    assert!(text.contains("Delete"), "{text}");
     assert!(text.contains("/etc/nginx"), "{text}");
     assert!(text.contains("protected"), "{text}");
-    assert!(text.contains("戻せません"), "{text}");
-    assert!(text.contains("代替:"), "{text}");
+    assert!(text.contains("cannot be recovered"), "{text}");
+    assert!(text.contains("Alternative:"), "{text}");
 }
 
 // @kotowari[REQ-011]
 #[test]
 fn req_011_reason_and_alternative_per_kind() {
     let cases: Vec<(Why, &str, &str)> = vec![
-        (Why::Untracked, "未追跡", "コミット"),
-        (Why::Uncommitted, "未コミット", "コミット"),
+        (Why::Untracked, "untracked", "commit"),
+        (Why::Uncommitted, "uncommitted", "Commit"),
         (
             Why::Unresolved("$X".to_string()),
-            "解決できない",
-            "リテラルのパス",
+            "unresolved",
+            "literal path",
         ),
-        (Why::Unmanaged, "管理外", "移してから消す"),
-        (Why::UnknownSource, "確定できない", "リテラル"),
+        (Why::Unmanaged, "not managed by git", "Move it"),
+        (Why::UnknownSource, "cannot be determined", "literal"),
         (Why::GitFailed, "git", "git status"),
     ];
     for (why, reason_word, alternative_word) in cases {
@@ -67,7 +67,7 @@ fn req_011_reason_and_alternative_per_kind() {
         Class::Protected,
         &Why::Protected(ProtectedKind::SystemArea),
     );
-    assert!(text.contains("当てはまる代替はありません"), "{text}");
+    assert!(text.contains("No applicable alternative"), "{text}");
 }
 
 // @kotowari[REQ-011]
@@ -105,12 +105,9 @@ fn req_011_self_caused_deaths_ask_with_the_internal_reason() {
         let asks = vec![Ask::Parse(failure.clone())];
         assert!(!asks[0].is_limit(), "{failure:?}");
         let reason = ask_reason(&asks);
-        assert!(
-            reason.contains("判定の内部で失敗した"),
-            "{failure:?}: {reason}"
-        );
+        assert!(reason.contains("internal failure"), "{failure:?}: {reason}");
         let text = ask_message(&asks);
-        assert!(text.contains("判定の内部で失敗した"), "{failure:?}: {text}");
+        assert!(text.contains("internal failure"), "{failure:?}: {text}");
         let ls = lines(&text);
         assert!((2..=4).contains(&ls.len()), "{failure:?}: {text}");
     }

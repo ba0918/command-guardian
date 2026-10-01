@@ -18,19 +18,63 @@ fn main() {
 
 fn run(args: &[String]) -> i32 {
     match args.first().map(|s| s.as_str()) {
+        Some("--help" | "-h") => {
+            println!("{ROOT_HELP}");
+            0
+        }
         Some("check") => cmd_check(&args[1..]),
         Some("hook") => hook::run(&args[1..]),
         Some(other) => {
-            eprintln!("知らないコマンドです: {other}");
-            eprintln!("使い方: command-guardian <check|hook> ...");
+            eprintln!("Unknown command: {other}");
+            eprintln!("Usage: command-guardian <check|hook> ...");
             3
         }
         None => {
-            eprintln!("使い方: command-guardian <check|hook> ...");
+            eprintln!("Usage: command-guardian <check|hook> ...");
             3
         }
     }
 }
+
+const ROOT_HELP: &str = "Check Bash commands for destructive effects before execution.
+
+Usage: command-guardian <check|hook> ...
+
+Commands:
+  check  Judge a command string (use check --help for arguments and options).
+  hook   Read an agent hook request from stdin (use hook --help for options).
+
+Options:
+  --help, -h  Show this help without reading configuration or stdin.
+
+Examples:
+  command-guardian check 'rm -rf /etc/nginx' --cwd /tmp
+  command-guardian hook --agent claude < request.json
+
+Exit codes:
+  check: 0 allow, 1 ask, 2 block, 3 unable to produce a judgment.
+  hook: always 0. Help: 0. Invalid invocation: 3.";
+
+const CHECK_HELP: &str = "Judge a Bash command without executing it.
+
+Usage: command-guardian check [OPTIONS] <COMMAND>
+       command-guardian check [OPTIONS] -- <COMMAND>
+
+Arguments:
+  COMMAND  One command string; quote it to keep shell syntax intact.
+
+Options:
+  --cwd <PATH>        Working directory (default: current working directory).
+  --format text|json  Output format (default: text).
+  --help, -h          Show help without loading configuration or judging a command.
+  --                 Treat all following arguments as command strings, not options.
+
+Examples:
+  command-guardian check 'rm -rf /etc/nginx' --cwd /tmp --format json
+  command-guardian check -- '--help'
+
+Exit codes:
+  0 allow, 1 ask, 2 block, 3 unable to produce a judgment. Help: 0.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Format {
@@ -46,7 +90,11 @@ struct CheckArgs {
 
 fn cmd_check(args: &[String]) -> i32 {
     let parsed = match parse_check(args) {
-        Ok(p) => p,
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            println!("{CHECK_HELP}");
+            return 0;
+        }
         Err(e) => {
             eprintln!("{e}");
             return 3;
@@ -58,7 +106,7 @@ fn cmd_check(args: &[String]) -> i32 {
     };
     let report = engine.check(&parsed.command);
     for w in &report.warnings {
-        eprintln!("警告: {w}");
+        eprintln!("Warning: {w}");
     }
     match parsed.format {
         Format::Text => print_text(&report),
@@ -71,51 +119,57 @@ fn cmd_check(args: &[String]) -> i32 {
     }
 }
 
-fn parse_check(args: &[String]) -> Result<CheckArgs, String> {
+fn parse_check(args: &[String]) -> Result<Option<CheckArgs>, String> {
     let mut command: Option<String> = None;
     let mut cwd: Option<PathBuf> = None;
     let mut format = Format::Text;
     let mut i = 0;
+    let mut options = true;
     while i < args.len() {
         match args[i].as_str() {
-            "--cwd" => {
-                let value = args.get(i + 1).ok_or("--cwd の値がありません")?;
+            "--help" | "-h" if options => return Ok(None),
+            "--" if options => {
+                options = false;
+                i += 1;
+            }
+            "--cwd" if options => {
+                let value = args.get(i + 1).ok_or("Missing value for --cwd")?;
                 cwd = Some(PathBuf::from(value));
                 i += 2;
             }
-            "--format" => {
-                let value = args.get(i + 1).ok_or("--format の値がありません")?;
+            "--format" if options => {
+                let value = args.get(i + 1).ok_or("Missing value for --format")?;
                 format = match value.as_str() {
                     "text" => Format::Text,
                     "json" => Format::Json,
-                    other => return Err(format!("知らない --format です: {other}")),
+                    other => return Err(format!("Unknown --format: {other}")),
                 };
                 i += 2;
             }
-            value if value.starts_with("--") => {
-                return Err(format!("知らない引数です: {value}"));
+            value if options && value.starts_with("--") => {
+                return Err(format!("Unknown argument: {value}"));
             }
             value => {
                 if command.is_some() {
-                    return Err(format!("コマンド文字列が 2 つあります: {value}"));
+                    return Err(format!("More than one command string: {value}"));
                 }
                 command = Some(value.to_string());
                 i += 1;
             }
         }
     }
-    let command = command.ok_or("コマンド文字列がありません")?;
+    let command = command.ok_or("Missing command string")?;
     let cwd = match cwd {
         Some(c) => c,
         None => {
-            std::env::current_dir().map_err(|e| format!("作業ディレクトリを取れません: {e}"))?
+            std::env::current_dir().map_err(|e| format!("Cannot get working directory: {e}"))?
         }
     };
-    Ok(CheckArgs {
+    Ok(Some(CheckArgs {
         command,
         cwd,
         format,
-    })
+    }))
 }
 
 /// 環境から読み込んだ engine。失敗したら終了コード。
@@ -146,10 +200,10 @@ fn user_config_path() -> Option<PathBuf> {
 
 fn print_text(report: &Report) {
     if report.verdict == Verdict::Allow {
-        println!("判定: allow");
+        println!("Verdict: allow");
         return;
     }
-    println!("判定: {}", report.verdict);
+    println!("Verdict: {}", report.verdict);
     if !report.message.is_empty() {
         println!("{}", report.message);
     }

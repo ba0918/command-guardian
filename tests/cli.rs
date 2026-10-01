@@ -148,7 +148,7 @@ fn req_017_check_without_a_command_fails_with_exit_code_three() {
     let home = temp_home();
     let r = run(&["check"], home.path());
     assert_eq!(r.code, 3, "stdout: {} stderr: {}", r.stdout, r.stderr);
-    assert!(r.stderr.contains("コマンド文字列"), "{}", r.stderr);
+    assert!(r.stderr.contains("Missing command string"), "{}", r.stderr);
 }
 
 // @kotowari[REQ-017]
@@ -425,7 +425,7 @@ fn ex_046_a_non_posix_shell_asks() {
         home.path(),
     );
     assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
-    assert!(r.stdout.contains("読めないシェル"), "{}", r.stdout);
+    assert!(r.stdout.contains("Unsupported shell"), "{}", r.stdout);
 }
 
 // @kotowari[EX-056]
@@ -442,7 +442,7 @@ fn ex_056_a_wrapped_non_posix_shell_asks() {
         home.path(),
     );
     assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
-    assert!(r.stdout.contains("読めないシェル"), "{}", r.stdout);
+    assert!(r.stdout.contains("Unsupported shell"), "{}", r.stdout);
 }
 
 // @kotowari[EX-049]
@@ -459,7 +459,11 @@ fn ex_049_unreadable_syntax_asks() {
         home.path(),
     );
     assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
-    assert!(r.stdout.contains("構文を読めない"), "{}", r.stdout);
+    assert!(
+        r.stdout.contains("command syntax could not be read"),
+        "{}",
+        r.stdout
+    );
 }
 
 // @kotowari[REQ-009, REQ-038]
@@ -497,7 +501,10 @@ fn req_017_json_has_a_top_level_reason_for_a_parse_ask() {
     assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
     let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
     assert_eq!(value["verdict"], "ask");
-    assert!(value["reason"].as_str().unwrap().contains("構文を読めない"));
+    assert!(value["reason"]
+        .as_str()
+        .unwrap()
+        .contains("command syntax could not be read"));
     assert!(value["effects"].as_array().unwrap().is_empty());
 }
 
@@ -570,7 +577,7 @@ fn req_039_a_parser_panic_asks_with_the_internal_reason() {
         value["reason"]
             .as_str()
             .unwrap()
-            .contains("判定の内部で失敗した"),
+            .contains("internal failure"),
         "{}",
         value["reason"]
     );
@@ -603,7 +610,7 @@ fn req_039_a_worker_that_cannot_start_asks_with_the_internal_reason() {
         value["reason"]
             .as_str()
             .unwrap()
-            .contains("判定の内部で失敗した"),
+            .contains("internal failure"),
         "{}",
         value["reason"]
     );

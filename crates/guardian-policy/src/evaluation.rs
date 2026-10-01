@@ -50,7 +50,7 @@ impl Policy {
                     verdict: rule.verdict,
                 }),
                 Err(e) => warnings.push(format!(
-                    "カスタムのルールの正規表現が不正なため無視します: {}: {e}",
+                    "Ignoring custom rule with invalid regular expression: {}: {e}",
                     rule.name
                 )),
             }
@@ -118,7 +118,7 @@ impl Policy {
                 if rule.regex.is_match(body) {
                     rules.push(RuleReport {
                         name: rule.name.clone(),
-                        reason: format!("カスタムルール「{}」", rule.name),
+                        reason: format!("Custom rule: {}", rule.name),
                         verdict: rule.verdict,
                     });
                 }
@@ -210,20 +210,24 @@ fn compose_message(effects: &[EffectReport], rules: &[RuleReport]) -> String {
             .saturating_sub(1)
             + bad_rules.len();
         return if others > 0 {
-            format!("{text}\nほかに {others} 件の指摘があります")
+            format!("{text}\nAdditional findings: {others}")
         } else {
             text
         };
     }
     if let Some(r) = rule {
-        let text = format!("{}\n判定: {}", r.reason, r.verdict);
+        let text = format!(
+            "{}\nVerdict: {}\nAlternative: No applicable alternative.",
+            message::display_inline(&r.reason),
+            r.verdict
+        );
         let others = bad_rules.len() - 1
             + effects
                 .iter()
                 .filter(|e| e.verdict != Verdict::Allow)
                 .count();
         return if others > 0 {
-            format!("{text}\nほかに {others} 件の指摘があります")
+            format!("{text}\nAdditional findings: {others}")
         } else {
             text
         };

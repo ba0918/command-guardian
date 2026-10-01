@@ -28,7 +28,7 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
     let mut layer = Layer::default();
     let root = &value;
     if root.as_table().is_none() {
-        return Err("TOML の表ではない".into());
+        return Err("Expected a TOML table".into());
     }
 
     read_path_list(
@@ -94,13 +94,13 @@ fn read_path_list(
         return;
     };
     let Some(items) = value.as_array() else {
-        warnings.push(format!("{section}.{key} はリストではないため無視します"));
+        warnings.push(format!("Ignoring {section}.{key}: expected a list"));
         return;
     };
     for item in items {
         let Some(s) = item.as_str() else {
             warnings.push(format!(
-                "{section}.{key} の要素が文字列ではないため無視します"
+                "Ignoring an entry in {section}.{key}: expected a string"
             ));
             continue;
         };
@@ -138,14 +138,14 @@ fn read_string_list(
         return;
     };
     let Some(items) = value.as_array() else {
-        warnings.push(format!("{section}.{key} はリストではないため無視します"));
+        warnings.push(format!("Ignoring {section}.{key}: expected a list"));
         return;
     };
     for item in items {
         match item.as_str() {
             Some(s) => out.push(s.to_string()),
             None => warnings.push(format!(
-                "{section}.{key} の要素が文字列ではないため無視します"
+                "Ignoring an entry in {section}.{key}: expected a string"
             )),
         }
     }
@@ -162,11 +162,11 @@ fn read_verdict(
         Some("ask") => Some(Verdict::Ask),
         Some("block") => Some(Verdict::Block),
         Some("allow") => {
-            warnings.push(format!("{section}.{key} に allow は書けないため無視します"));
+            warnings.push(format!("Ignoring {section}.{key}: allow is not permitted"));
             None
         }
         _ => {
-            warnings.push(format!("{section}.{key} の値が不正なため無視します"));
+            warnings.push(format!("Ignoring {section}.{key}: invalid value"));
             None
         }
     }
@@ -182,7 +182,7 @@ fn read_bool(
     match value.as_bool() {
         Some(b) => Some(b),
         None => {
-            warnings.push(format!("{section}.{key} が真偽値ではないため無視します"));
+            warnings.push(format!("Ignoring {section}.{key}: expected a boolean"));
             None
         }
     }
@@ -193,7 +193,7 @@ fn read_custom_rules(root: &toml::Value, out: &mut Vec<CustomRule>, warnings: &m
         return;
     };
     let Some(items) = value.as_array() else {
-        warnings.push("rules.custom はリストではないため無視します".to_string());
+        warnings.push("Ignoring rules.custom: expected a list".to_string());
         return;
     };
     for item in items {
@@ -208,7 +208,7 @@ fn read_custom_rules(root: &toml::Value, out: &mut Vec<CustomRule>, warnings: &m
                     "block" => Verdict::Block,
                     _ => {
                         warnings.push(format!(
-                            "rules.custom の verdict が不正なため無視します: {name}"
+                            "Ignoring rules.custom entry with invalid verdict: {name}"
                         ));
                         continue;
                     }
@@ -220,7 +220,7 @@ fn read_custom_rules(root: &toml::Value, out: &mut Vec<CustomRule>, warnings: &m
                 });
             }
             _ => warnings.push(
-                "rules.custom の規則に name・pattern・verdict が無いため無視します".to_string(),
+                "Ignoring rules.custom entry: name, pattern and verdict are required".to_string(),
             ),
         }
     }
@@ -266,7 +266,7 @@ pub fn restrict_project(config: &mut Config, layer: &Layer) -> Vec<String> {
             (_, Verdict::Block) => config.unknown_verdict = Verdict::Block,
             (Verdict::Block, Verdict::Ask) => {
                 warnings.push(
-                    "信頼していないプロジェクト設定の unknown.verdict の緩和を無視します"
+                    "Ignoring a weaker unknown.verdict in untrusted project configuration"
                         .to_string(),
                 );
             }
@@ -277,7 +277,7 @@ pub fn restrict_project(config: &mut Config, layer: &Layer) -> Vec<String> {
     for rule in &layer.rules_custom {
         if rule.verdict == Verdict::Allow {
             warnings.push(format!(
-                "信頼していないプロジェクト設定の allow のルールを無視します: {}",
+                "Ignoring allow rule in untrusted project configuration: {}",
                 rule.name
             ));
         } else {
@@ -285,22 +285,21 @@ pub fn restrict_project(config: &mut Config, layer: &Layer) -> Vec<String> {
         }
     }
     if !layer.allowed_roots.is_empty() {
-        warnings
-            .push("信頼していないプロジェクト設定の allowed_roots の追加を無視します".to_string());
+        warnings.push(
+            "Ignoring allowed_roots additions in untrusted project configuration".to_string(),
+        );
     }
     if !layer.rules_disable.is_empty() {
-        warnings.push("信頼していないプロジェクト設定の rules.disable を無視します".to_string());
+        warnings.push("Ignoring rules.disable in untrusted project configuration".to_string());
     }
     if layer.git_enabled == Some(false) {
-        warnings
-            .push("信頼していないプロジェクト設定の git.enabled の無効化を無視します".to_string());
+        warnings.push("Ignoring git.enabled=false in untrusted project configuration".to_string());
     }
     if layer.enforce == Some(false) {
-        warnings
-            .push("信頼していないプロジェクト設定の mode.enforce の無効化を無視します".to_string());
+        warnings.push("Ignoring mode.enforce=false in untrusted project configuration".to_string());
     }
     if !layer.trusted_projects.is_empty() {
-        warnings.push("プロジェクト設定の trusted_projects は無視します".to_string());
+        warnings.push("Ignoring trusted_projects in project configuration".to_string());
     }
     warnings
 }

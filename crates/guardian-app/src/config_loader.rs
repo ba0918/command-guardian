@@ -53,7 +53,9 @@ pub fn load(
             match read_layer(path, path.parent().unwrap_or(Path::new("/")), home, session) {
                 Ok(layer) => layer,
                 Err(e) => {
-                    warnings.push(format!("利用者設定を読めないため既定で続けます: {e}"));
+                    warnings.push(format!(
+                        "Cannot read user configuration; continuing with defaults: {e}"
+                    ));
                     Layer::default()
                 }
             }
@@ -77,7 +79,7 @@ pub fn load(
                 {
                     layer.rules_custom.retain(|rule| {
                         if rule.verdict == Verdict::Allow {
-                            warnings.push(format!("allow を返すカスタムのルールは利用者設定でのみ有効なため無視します: {}", rule.name)); false
+                            warnings.push(format!("Ignoring custom allow rule; these rules are only valid in user configuration: {}", rule.name)); false
                         } else { true }
                     });
                     layers::merge(&mut config, &layer);
@@ -85,7 +87,9 @@ pub fn load(
                     warnings.extend(layers::restrict_project(&mut config, &layer));
                 }
             }
-            Err(e) => warnings.push(format!("プロジェクト設定を読めないため無視します: {e}")),
+            Err(e) => warnings.push(format!(
+                "Cannot read project configuration; ignoring it: {e}"
+            )),
         }
     }
     Loaded {
@@ -109,12 +113,12 @@ pub fn validate_examples(
                 });
                 let error = match facts.invocations.as_slice() {
                     [inv] if rule.matches(inv) == deny => continue,
-                    [_] if deny => "examples.deny に一致しない例がある",
-                    [_] => "examples.allow に一致する例がある",
-                    _ => "例を 1 つの起動として読めない",
+                    [_] if deny => "an examples.deny entry does not match",
+                    [_] => "an examples.allow entry matches",
+                    _ => "an example cannot be read as a single invocation",
                 };
                 warnings.push(format!(
-                    "見張りの規則を無効にします（{}）: {error}: {example}",
+                    "Disabling command guard ({}): {error}: {example}",
                     rule.program
                 ));
                 return false;

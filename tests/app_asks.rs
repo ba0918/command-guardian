@@ -68,7 +68,7 @@ fn req_038_an_unreadable_input_without_effects_asks() {
     let report = engine().check("if true; then rm -rf /etc/x");
     assert_eq!(report.verdict, Verdict::Ask);
     assert!(
-        report.message.contains("構文を読めない"),
+        report.message.contains("command syntax could not be read"),
         "{}",
         report.message
     );
@@ -85,8 +85,8 @@ fn ex_050_input_over_the_limit_blocks() {
     let command = "echo x; ".repeat(200_000);
     let report = engine().check(&command);
     assert_eq!(report.verdict, Verdict::Block);
-    assert!(report.message.contains("大きすぎる"), "{}", report.message);
-    assert!(report.reason.contains("大きすぎる"), "{}", report.reason);
+    assert!(report.message.contains("too large"), "{}", report.message);
+    assert!(report.reason.contains("too large"), "{}", report.reason);
 }
 
 // @kotowari[REQ-039]
@@ -97,8 +97,16 @@ fn req_039_input_over_the_depth_limit_blocks() {
     let close = ")".repeat(129);
     let report = engine().check(&format!("echo $(( {at}1{close} ))"));
     assert_eq!(report.verdict, Verdict::Block);
-    assert!(report.message.contains("深すぎる"), "{}", report.message);
-    assert!(report.reason.contains("深すぎる"), "{}", report.reason);
+    assert!(
+        report.message.contains("nested too deeply"),
+        "{}",
+        report.message
+    );
+    assert!(
+        report.reason.contains("nested too deeply"),
+        "{}",
+        report.reason
+    );
 }
 
 // @kotowari[REQ-039]
@@ -116,14 +124,18 @@ fn req_011_an_unreadable_shell_message_shows_the_reason() {
     let report = engine().check("fish -c 'rm -rf /etc/x'");
     assert_eq!(report.verdict, Verdict::Ask);
     assert!(
-        report.message.contains("読めないシェル"),
+        report.message.contains("Unsupported shell"),
         "{}",
         report.message
     );
     assert!(
-        report.reason.contains("読めないシェル"),
+        report.reason.contains("Unsupported shell"),
         "{}",
         report.reason
     );
-    assert!(report.message.contains("代替:"), "{}", report.message);
+    assert!(
+        report.message.contains("Alternative:"),
+        "{}",
+        report.message
+    );
 }
