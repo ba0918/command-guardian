@@ -673,6 +673,50 @@ fn req_008_find_with_multiple_start_points_feeds_xargs() {
     );
 }
 
+// @kotowari[REQ-006, REQ-037]
+#[test]
+fn req_037_subscript_operand_is_read_in_textual_order() {
+    // 添字はほかのオペランドより前の原文にある。順序が崩れると断片の位置が
+    // 取れなくなり、効果が消えて ask に落ちる（REQ-006・REQ-037）。
+    let analysis = analyze("rm -rf ${a[1]:-y}", &env());
+    assert!(
+        analysis.parse_errors.is_empty(),
+        "{:?}",
+        analysis.parse_errors
+    );
+    assert_eq!(
+        analysis.effects,
+        vec![Effect {
+            op: Op::Delete,
+            target: Target::Unresolved("${a[1]:-y}".to_string())
+        }]
+    );
+
+    for cmd in ["echo ${a[1]:-y}", "echo ${a[$x]:-y}", "echo ${a[b]:-y}"] {
+        let analysis = analyze(cmd, &env());
+        assert!(
+            analysis.parse_errors.is_empty(),
+            "{cmd}: {:?}",
+            analysis.parse_errors
+        );
+    }
+
+    let analysis = analyze("rm -rf ${a[$(rm -rf /etc/x)]:-y}", &env());
+    assert!(
+        analysis.parse_errors.is_empty(),
+        "{:?}",
+        analysis.parse_errors
+    );
+    assert!(
+        analysis.effects.contains(&Effect {
+            op: Op::Delete,
+            target: path("/etc/x")
+        }),
+        "{:?}",
+        analysis.effects
+    );
+}
+
 // @kotowari[REQ-001, REQ-037]
 #[test]
 fn req_037_substitutions_in_expansion_operands_are_read() {

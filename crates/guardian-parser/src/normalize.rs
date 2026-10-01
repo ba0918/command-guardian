@@ -823,9 +823,10 @@ fn parameter_operands(expression: &word::ParameterExpr) -> Vec<String> {
         Expr::VariableNames { prefix, .. } => vec![prefix.clone()],
         Expr::MemberKeys { variable_name, .. } => vec![variable_name.clone()],
     };
-    // 添字の中の置換も読む（REQ-037）。
+    // 添字の中の置換も読む（REQ-037）。添字はほかのオペランドより前の
+    // 原文にあるため、位置の対応を保つために先頭へ置く。
     if let Some(word::Parameter::NamedWithIndex { index, .. }) = expression_parameter(expression) {
-        operands.push(index.clone());
+        operands.insert(0, index.clone());
     }
     operands
 }

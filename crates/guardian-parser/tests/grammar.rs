@@ -60,6 +60,7 @@ const CORPUS: &[&str] = &[
     "(( $(rm -rf /etc/x) ))",
     "for ((i=0; i<$(rm -rf /etc/x); i++)); do :; done",
     "echo ${a[$(rm -rf /etc/x)]}",
+    "echo ${a[$(rm -rf /etc/x)]:-y}",
     "a=($(rm -rf /etc/x))",
     // 二重引用の中の置換（同じ位置の別の綴り）
     "echo ${X:-\"$(rm -rf /etc/x)\"}",
@@ -360,7 +361,8 @@ fn brush_operands(expression: &word::ParameterExpr) -> Vec<String> {
         Expr::MemberKeys { variable_name, .. } => vec![variable_name.clone()],
     };
     if let Some(word::Parameter::NamedWithIndex { index, .. }) = brush_parameter(expression) {
-        operands.push(index.clone());
+        // 添字は原文ではほかのオペランドより前にある。
+        operands.insert(0, index.clone());
     }
     operands
 }
