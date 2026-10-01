@@ -256,7 +256,7 @@ fn extract_pipeline(
     depth: usize,
 ) {
     let mut children_sources: Vec<(PathBuf, bool)> = Vec::new();
-    for command in &pipeline.commands {
+    for (index, command) in pipeline.commands.iter().enumerate() {
         if !ctx.check(asks) {
             return;
         }
@@ -264,6 +264,11 @@ fn extract_pipeline(
         let command_ctx = child.as_mut().unwrap_or(&mut *ctx);
         children_sources =
             extract_command(command, command_ctx, out, asks, depth, children_sources);
+        if index + 1 == pipeline.commands.len() {
+            if let Some(child) = child {
+                ctx.merge_state(&child);
+            }
+        }
     }
 }
 

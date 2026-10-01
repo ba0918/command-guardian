@@ -500,6 +500,45 @@ fn req_002_pipeline_eval_state_does_not_escape_to_the_parent_or_other_stages() {
     );
 }
 
+// @kotowari[REQ-002, REQ-046, EX-074]
+#[test]
+fn req_046_final_pipeline_stage_assignments_are_uncertain_without_a_known_execution_mode() {
+    for command in [
+        "S=/etc/x; printf '' | eval 'S=/tmp/x'; rm \"$S\"",
+        "S=/tmp/x; printf '' | eval 'S=/etc/x'; rm \"$S\"",
+        "shopt -s lastpipe; set +m; S=/tmp/x; printf '' | eval 'S=/etc/x'; rm \"$S\"",
+        "bash -c 'S=/tmp/x; printf x | eval \"S=/etc/x\"; rm \"$S\"'",
+    ] {
+        let result = effects(command);
+        assert_eq!(result.len(), 1, "{command}: {result:?}");
+        assert!(
+            matches!(result[0].target, Target::Unresolved(_)),
+            "{command}: {result:?}"
+        );
+    }
+}
+
+// @kotowari[REQ-002, REQ-046]
+#[test]
+fn req_046_final_pipeline_stage_directory_changes_leave_following_relative_targets_uncertain() {
+    let result = effects("cd /etc; printf x | cd /tmp; rm victim; rm /etc/absolute");
+    assert_eq!(result.len(), 2);
+    assert!(
+        matches!(result[0].target, Target::Unresolved(_)),
+        "{result:?}"
+    );
+    assert_eq!(result[1], delete(p("/etc/absolute")));
+}
+
+// @kotowari[REQ-002, REQ-046, EX-075]
+#[test]
+fn req_046_pipeline_stages_with_the_same_parent_state_keep_certain_values() {
+    assert_eq!(
+        effects("S=/etc/x; printf x | eval 'S=/etc/x'; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+}
+
 // @kotowari[REQ-002]
 #[test]
 fn req_002_mktemp_unambiguous_dry_run_abbreviations_are_not_created_paths() {
