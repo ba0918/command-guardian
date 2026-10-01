@@ -355,6 +355,33 @@ fn req_002_unknown_loop_delayed_assignment_chains_cannot_hide_later_targets() {
     }
 }
 
+// @kotowari[REQ-002]
+#[test]
+fn req_002_short_circuit_assignments_in_loop_conditions_remain_uncertain() {
+    for condition in ["false && S=/tmp/x", "true || S=/tmp/x"] {
+        let result = effects(&format!(
+            "S=/etc/x; for x in /a; do if {condition}; then :; fi; done; rm \"$S\""
+        ));
+        assert_eq!(result.len(), 1);
+        assert!(
+            matches!(result[0].target, Target::Unresolved(_)),
+            "{condition}: {result:?}"
+        );
+    }
+}
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_short_circuit_directory_changes_do_not_establish_the_following_directory() {
+    let result =
+        effects("cd /etc; for x in /a; do if false && cd /tmp; then :; fi; done; rm victim");
+    assert_eq!(result.len(), 1);
+    assert!(
+        matches!(result[0].target, Target::Unresolved(_)),
+        "{result:?}"
+    );
+}
+
 // @kotowari[REQ-002, REQ-041]
 #[test]
 fn req_002_only_unquoted_tilde_is_expanded_to_home() {

@@ -241,7 +241,9 @@ fn extract_script(
             if !ctx.check(asks) {
                 return;
             }
-            extract_pipeline(pipeline, ctx, out, asks, depth);
+            let mut conditional = ctx.clone();
+            extract_pipeline(pipeline, &mut conditional, out, asks, depth);
+            ctx.merge_state(&conditional);
         }
     }
 }
