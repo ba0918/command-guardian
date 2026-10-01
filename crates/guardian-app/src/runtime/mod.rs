@@ -53,6 +53,19 @@ impl JudgmentSession<'_> {
 pub struct ValidationSession<'a> {
     runtime: &'a mut ParserRuntime,
 }
+
+impl guardian_analysis::AnalysisControl for JudgmentSession<'_> {
+    fn parse(&mut self, input: &str) -> Outcome {
+        self.parse(input)
+    }
+    fn check(&mut self) -> Result<(), Failure> {
+        if self.over_budget() {
+            Err(Failure::Limit)
+        } else {
+            Ok(())
+        }
+    }
+}
 impl ValidationSession<'_> {
     pub fn parse(&mut self, input: &str) -> Outcome {
         self.runtime.parse(input, None)

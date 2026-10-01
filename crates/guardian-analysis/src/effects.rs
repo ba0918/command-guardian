@@ -52,7 +52,7 @@ struct Context<'a> {
     tmpdir: Option<PathBuf>,
     cwd: Option<PathBuf>,
     vars: HashMap<String, Value>,
-    parser: SharedParser<'a>,
+    control: SharedControl<'a>,
     facts: std::rc::Rc<std::cell::RefCell<WalkFacts>>,
     collect_invocations: bool,
 }
@@ -61,21 +61,39 @@ struct WalkFacts {
     invocations: Vec<Invocation>,
     // 同じ本文でも別の構文位置は別要求。木と保存したOutcomeは走査中ずっと生存する。
     inner: HashMap<usize, std::rc::Rc<guardian_parser::Outcome>>,
+    stopped: bool,
 }
-type SharedParser<'a> =
-    std::rc::Rc<std::cell::RefCell<&'a mut dyn FnMut(&str) -> guardian_parser::Outcome>>;
+type SharedControl<'a> = std::rc::Rc<std::cell::RefCell<&'a mut dyn AnalysisControl>>;
+
+/// 内側の構文解析と走査の継続可否を、呼出元の判定sessionへ委ねる。
+pub trait AnalysisControl {
+    fn parse(&mut self, input: &str) -> guardian_parser::Outcome;
+    fn check(&mut self) -> Result<(), guardian_parser::Failure>;
+}
 
 impl<'a> Context<'a> {
-    fn new(env: &Env, parser: &'a mut dyn FnMut(&str) -> guardian_parser::Outcome) -> Context<'a> {
+    fn new(env: &Env, control: &'a mut dyn AnalysisControl) -> Context<'a> {
         Context {
             home: env.home.clone(),
             tmpdir: env.tmpdir.clone(),
             cwd: env.cwd.clone(),
             vars: HashMap::new(),
-            parser: std::rc::Rc::new(std::cell::RefCell::new(parser)),
+            control: std::rc::Rc::new(std::cell::RefCell::new(control)),
             facts: Default::default(),
             collect_invocations: true,
         }
+    }
+
+    fn check(&self, asks: &mut Vec<Ask>) -> bool {
+        if self.facts.borrow().stopped {
+            return false;
+        }
+        if let Err(failure) = self.control.borrow_mut().check() {
+            self.facts.borrow_mut().stopped = true;
+            asks.push(Ask::Parse(failure));
+            return false;
+        }
+        true
     }
 }
 
@@ -97,7 +115,25 @@ pub fn analyze(
     env: &Env,
     parser: &mut dyn FnMut(&str) -> guardian_parser::Outcome,
 ) -> Analysis {
-    let mut ctx = Context::new(env, parser);
+    struct Unbounded<'a>(&'a mut dyn FnMut(&str) -> guardian_parser::Outcome);
+    impl AnalysisControl for Unbounded<'_> {
+        fn parse(&mut self, input: &str) -> guardian_parser::Outcome {
+            (self.0)(input)
+        }
+        fn check(&mut self) -> Result<(), guardian_parser::Failure> {
+            Ok(())
+        }
+    }
+    analyze_with_control(outcome, env, &mut Unbounded(parser))
+}
+
+/// 解析済みの構文を、呼出元の継続確認に従って走査する。
+pub fn analyze_with_control(
+    outcome: guardian_parser::Outcome,
+    env: &Env,
+    control: &mut dyn AnalysisControl,
+) -> Analysis {
+    let mut ctx = Context::new(env, control);
     let mut effects = Vec::new();
     let mut asks: Vec<Ask> = outcome.failures.into_iter().map(Ask::Parse).collect();
     extract_script(&outcome.script, &mut ctx, &mut effects, &mut asks, 0);
@@ -136,8 +172,14 @@ fn extract_script(
         return;
     }
     for item in &script.items {
+        if !ctx.check(asks) {
+            return;
+        }
         extract_pipeline(&item.first, ctx, out, asks, depth);
         for (_, pipeline) in &item.rest {
+            if !ctx.check(asks) {
+                return;
+            }
             extract_pipeline(pipeline, ctx, out, asks, depth);
         }
     }
@@ -152,6 +194,9 @@ fn extract_pipeline(
 ) {
     let mut children_sources: Vec<(PathBuf, bool)> = Vec::new();
     for command in &pipeline.commands {
+        if !ctx.check(asks) {
+            return;
+        }
         children_sources = extract_command(command, ctx, out, asks, depth, children_sources);
     }
 }
@@ -276,6 +321,9 @@ fn extract_for(
     let mut resolved = Vec::new();
     let mut all_literal = !values.is_empty();
     for word in values {
+        if !ctx.check(asks) {
+            return;
+        }
         scan_word_substitutions(word, ctx, out, asks, depth);
         match resolve_word(word, ctx) {
             Resolved::Path(path) | Resolved::Glob(path) => resolved.push(Value::Path(path)),
@@ -285,6 +333,9 @@ fn extract_for(
     }
     if all_literal {
         for (index, value) in resolved.into_iter().enumerate() {
+            if !ctx.check(asks) {
+                return;
+            }
             let mut child = ctx.clone();
             child.collect_invocations = ctx.collect_invocations && index == 0;
             child.vars.insert(var.to_string(), value);
@@ -546,9 +597,12 @@ fn extract_inner(
     asks: &mut Vec<Ask>,
     depth: usize,
 ) {
+    if !ctx.check(asks) {
+        return;
+    }
     let cached = ctx.facts.borrow().inner.get(&position).cloned();
     let outcome = cached.unwrap_or_else(|| {
-        let outcome = std::rc::Rc::new((ctx.parser.borrow_mut())(inner));
+        let outcome = std::rc::Rc::new(ctx.control.borrow_mut().parse(inner));
         ctx.facts
             .borrow_mut()
             .inner
@@ -582,6 +636,9 @@ fn scan_parts_substitutions(
     depth: usize,
 ) {
     for part in parts {
+        if !ctx.check(asks) {
+            return;
+        }
         if let Part::Substitution(substitution) = part {
             if let Some(script) = &substitution.body {
                 let mut child = ctx.clone();

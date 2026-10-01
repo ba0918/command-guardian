@@ -252,3 +252,52 @@ fn req_039_a_child_death_from_the_input_blocks() {
     let code = verdict_code(&input, home.path());
     assert_eq!(code, 2, "入力に帰せる死は block になる: {}", label(&input));
 }
+
+// @kotowari[REQ-039, REQ-011]
+#[test]
+fn req_039_literal_loop_traversal_returns_a_reasoned_block() {
+    let home = temp_home();
+    let cwd = home.path().join("cwd");
+    std::fs::create_dir(&cwd).unwrap();
+    let input = format!(
+        "{}true{}",
+        "for x in a b; do ".repeat(40),
+        "; done".repeat(40)
+    );
+    let stdout = home.path().join("stdout");
+    let started = Instant::now();
+    let mut child = Command::new(bin())
+        .args(["check", &input, "--format", "json", "--cwd"])
+        .arg(&cwd)
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path().join("config"))
+        .env("TMPDIR", "/tmp")
+        .current_dir(&cwd)
+        .stdout(Stdio::from(std::fs::File::create(&stdout).unwrap()))
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if started.elapsed() > Duration::from_secs(12) {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("outer watchdog stopped literal-loop analysis after 12 seconds");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(status.code(), Some(2));
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(stdout).unwrap()).unwrap();
+    assert_eq!(json["verdict"], "block");
+    assert!(
+        json["reason"].as_str().unwrap().contains("判定の上限"),
+        "{json}"
+    );
+    assert!(
+        json["message"].as_str().unwrap().contains("判定の上限"),
+        "{json}"
+    );
+}

@@ -95,10 +95,14 @@ impl Engine {
         let mut runtime = self.runtime.borrow_mut();
         let mut session = runtime.judgment();
         let outcome = session.parse(command);
-        let facts = guardian_analysis::analyze(outcome, &env, &mut |input| session.parse(input));
+        let facts = guardian_analysis::analyze_with_control(outcome, &env, &mut session);
         let mut asks = facts.diagnostics;
         let mut effects = Vec::new();
         for effect in &facts.effects {
+            if session.over_budget() {
+                add_failure(&mut asks, Failure::Limit);
+                break;
+            }
             if !self.policy.enabled(effect.op) {
                 continue;
             }
