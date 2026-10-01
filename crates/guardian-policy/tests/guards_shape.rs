@@ -37,6 +37,21 @@ fn req_038_guard_collection_keeps_syntax_failures_from_literal_bodies() {
     assert_eq!(result.failures, vec![guardian_parser::Failure::Syntax]);
 }
 
+// @kotowari[REQ-035, REQ-027]
+#[test]
+fn req_035_shells_without_c_are_normal_guard_invocations() {
+    let (rs, _) = rules(
+        r#"
+[[commands.guard]]
+program = "bash"
+reason = "script の起動を確認"
+deny = [["script.sh"]]
+"#,
+    );
+    assert!(matches(&rs, "bash script.sh"));
+    assert!(matches(&rs, "sudo bash script.sh"));
+}
+
 // @kotowari[REQ-027, REQ-033, REQ-039]
 #[test]
 fn req_033_guards_inside_sixteen_and_seventeen_literal_evals_are_kept() {

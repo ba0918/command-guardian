@@ -640,7 +640,9 @@ fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usiz
         if let Some(inner) = shell_c_string(&args) {
             walk_inner(&inner, out, depth);
         }
-        return;
+        if parser::shell_c_index(args.iter().copied()).is_some() {
+            return;
+        }
     }
     if program == "eval" {
         let mut pieces = Vec::new();
