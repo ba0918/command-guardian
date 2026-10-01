@@ -80,6 +80,20 @@ fn req_002_literal_assignment_resolves() {
 
 // @kotowari[REQ-002]
 #[test]
+fn req_002_assignment_values_are_expanded_before_resolving_the_target_path() {
+    assert_eq!(effects("S=etc; rm -rf /$S/x"), vec![delete(p("/etc/x"))]);
+    assert_eq!(
+        effects("S=x; cd /etc; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(
+        effects("S=etc; T=/$S/x; rm \"$T\""),
+        vec![delete(p("/etc/x"))]
+    );
+}
+
+// @kotowari[REQ-002]
+#[test]
 fn req_002_literal_cd_moves_relative_paths() {
     assert_eq!(
         effects("cd /tmp/scratch && rm -rf build"),

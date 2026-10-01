@@ -40,7 +40,7 @@ impl Resolved {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
-    Path(PathBuf),
+    Text(String),
     Mktemp,
     UnknownSource,
     Unresolved(String),
@@ -365,7 +365,9 @@ fn extract_for(
             continue;
         }
         match resolve_word(word, ctx) {
-            Resolved::Path(path) | Resolved::Glob(path) => resolved.push(Value::Path(path)),
+            Resolved::Path(path) | Resolved::Glob(path) => {
+                resolved.push(Value::Text(path.to_string_lossy().into_owned()))
+            }
             Resolved::Mktemp => resolved.push(Value::Mktemp),
             _ => all_literal = false,
         }
@@ -1075,51 +1077,57 @@ fn is_fd_duplication_target(word: &Word) -> bool {
 
 /// 語から値だけを解決する。子の訪問はwalkerが担当する。
 fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
+    match resolve_value(word, ctx) {
+        Value::Text(text) => resolve_text(&text, word.has_glob, ctx),
+        Value::Mktemp => Resolved::Mktemp,
+        Value::UnknownSource => Resolved::UnknownSource,
+        Value::Unresolved(text) => Resolved::Unresolved(text),
+    }
+}
+
+fn resolve_value(word: &Word, ctx: &Context) -> Value {
     if word.parts.len() == 1 {
         match &word.parts[0] {
             Part::Substitution(substitution) => {
-                return substitution_target(substitution, word);
+                return if matches!(substitution_target(substitution, word), Resolved::Mktemp) {
+                    Value::Mktemp
+                } else {
+                    Value::Unresolved(word.text.clone())
+                };
             }
             Part::Var(name) => {
                 if let Some(value) = lookup_var(name, ctx) {
-                    return match value {
-                        Value::Path(path) => Resolved::Path(path),
-                        Value::Mktemp => Resolved::Mktemp,
-                        Value::UnknownSource => Resolved::UnknownSource,
-                        Value::Unresolved(text) => Resolved::Unresolved(text),
-                    };
+                    return value;
                 }
-                return Resolved::Unresolved(word.text.clone());
+                return Value::Unresolved(word.text.clone());
             }
-            Part::Opaque(_) => return Resolved::Unresolved(word.text.clone()),
+            Part::Opaque(_) => return Value::Unresolved(word.text.clone()),
             Part::Glob(_) => {}
-            Part::Literal(text) | Part::Quoted(text) => return resolve_text(text, false, ctx),
+            Part::Literal(text) | Part::Quoted(text) => return text_value(text, ctx),
         }
     }
 
     let mut text = String::new();
-    let mut has_glob = word.has_glob;
     let mut mktemp_prefix = false;
     for (index, part) in word.parts.iter().enumerate() {
         match part {
             Part::Literal(value) | Part::Quoted(value) => text.push_str(value),
             Part::Var(name) => match lookup_var(name, ctx) {
-                Some(Value::Path(path)) => text.push_str(&path.to_string_lossy()),
+                Some(Value::Text(value)) => text.push_str(&value),
                 // 先頭が mktemp の作ったパスなら、続く部分はその配下。
                 Some(Value::Mktemp) if index == 0 => mktemp_prefix = true,
-                _ => return Resolved::Unresolved(word.text.clone()),
+                _ => return Value::Unresolved(word.text.clone()),
             },
             Part::Substitution(substitution) => {
                 if matches!(substitution_target(substitution, word), Resolved::Mktemp) && index == 0
                 {
                     mktemp_prefix = true;
                 } else {
-                    return Resolved::Unresolved(word.text.clone());
+                    return Value::Unresolved(word.text.clone());
                 }
             }
-            Part::Opaque(_) => return Resolved::Unresolved(word.text.clone()),
+            Part::Opaque(_) => return Value::Unresolved(word.text.clone()),
             Part::Glob(glob) => {
-                has_glob = true;
                 text.push_str(glob);
             }
         }
@@ -1130,11 +1138,11 @@ fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
             .components()
             .any(|c| c == Component::ParentDir)
         {
-            return Resolved::Unresolved(word.text.clone());
+            return Value::Unresolved(word.text.clone());
         }
-        return Resolved::Mktemp;
+        return Value::Mktemp;
     }
-    resolve_text(&text, has_glob, ctx)
+    text_value(&text, ctx)
 }
 
 /// 置換そのものの解決結果。効果の抽出はしない（断片の語では先に読む）。
@@ -1169,30 +1177,47 @@ fn lookup_var(name: &str, ctx: &Context) -> Option<Value> {
         return Some(value.clone());
     }
     match name {
-        "PWD" => ctx.cwd.clone().map(Value::Path),
-        "HOME" => ctx.home.clone().map(Value::Path),
-        "TMPDIR" => ctx.tmpdir.clone().map(Value::Path),
+        "PWD" => ctx
+            .cwd
+            .as_ref()
+            .map(|p| Value::Text(p.to_string_lossy().into_owned())),
+        "HOME" => ctx
+            .home
+            .as_ref()
+            .map(|p| Value::Text(p.to_string_lossy().into_owned())),
+        "TMPDIR" => ctx
+            .tmpdir
+            .as_ref()
+            .map(|p| Value::Text(p.to_string_lossy().into_owned())),
         _ => None,
     }
 }
 
-/// 文字列をパスとして解決する。
-fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
+fn text_value(text: &str, ctx: &Context) -> Value {
+    match expand_tilde(text, ctx) {
+        Some(text) => Value::Text(text),
+        None => Value::Unresolved(text.to_string()),
+    }
+}
+
+fn expand_tilde(text: &str, ctx: &Context) -> Option<String> {
     let expanded = if text == "~" {
-        match &ctx.home {
-            Some(home) => home.to_string_lossy().to_string(),
-            None => return Resolved::Unresolved(text.to_string()),
-        }
+        ctx.home.as_ref()?.to_string_lossy().to_string()
     } else if let Some(rest) = text.strip_prefix("~/") {
-        match &ctx.home {
-            Some(home) => home.join(rest).to_string_lossy().to_string(),
-            None => return Resolved::Unresolved(text.to_string()),
-        }
+        ctx.home.as_ref()?.join(rest).to_string_lossy().to_string()
     } else if text.starts_with('~') {
         // "~user" や "~+" は解決しない。cwd 相対にはしない。
-        return Resolved::Unresolved(text.to_string());
+        return None;
     } else {
         text.to_string()
+    };
+    Some(expanded)
+}
+
+/// 文字列をパスとして解決する。
+fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
+    let Some(expanded) = expand_tilde(text, ctx) else {
+        return Resolved::Unresolved(text.to_string());
     };
 
     if has_glob {
@@ -1266,14 +1291,4 @@ fn clean_path(path: &Path) -> PathBuf {
         out.push(".");
     }
     out
-}
-
-fn resolve_value(word: &Word, ctx: &Context) -> Value {
-    match resolve_word(word, ctx) {
-        Resolved::Path(path) => Value::Path(path),
-        Resolved::Glob(path) => Value::Path(path),
-        Resolved::Mktemp => Value::Mktemp,
-        Resolved::UnknownSource => Value::UnknownSource,
-        Resolved::Unresolved(text) => Value::Unresolved(text),
-    }
 }
