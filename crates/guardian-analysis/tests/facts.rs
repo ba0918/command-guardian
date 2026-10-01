@@ -142,3 +142,39 @@ fn req_039_cpu_traversal_obeys_the_callers_deadline() {
     assert_eq!(facts.invocations.len(), 1);
     assert_eq!(facts.invocations[0].words, ["$x"]);
 }
+
+// @kotowari[REQ-001, REQ-002, REQ-031, REQ-037]
+#[test]
+fn req_002_declarations_propagate_assignments_before_later_substitutions() {
+    for builtin in ["export", "local", "declare", "readonly", "typeset"] {
+        for wrapper in ["", "sudo "] {
+            let input = format!("{wrapper}{builtin} S=/tmp/scratch T=$(rm $S) $(rm $S); rm $S");
+            let facts = facts(&input);
+            assert!(
+                facts.diagnostics.is_empty(),
+                "{input}: {:?}",
+                facts.diagnostics
+            );
+            assert_eq!(facts.effects.len(), 3, "{input}");
+            for effect in &facts.effects {
+                assert_eq!(
+                    effect.target,
+                    guardian_core::Target::Path {
+                        path: "/tmp/scratch".into(),
+                        dereference: false
+                    },
+                    "{input}"
+                );
+            }
+            assert_eq!(
+                facts
+                    .invocations
+                    .iter()
+                    .filter(|i| i.program == "rm")
+                    .count(),
+                3,
+                "{input}"
+            );
+        }
+    }
+}

@@ -390,14 +390,28 @@ fn extract_simple(
     // ラッパー（sudo / doas）を外す。外した語（値付きオプションの値など）の
     // 置換も読む（EX-047）。
     let (wrapper_names, stripped) = strip_wrapper(rest);
-    for word in rest {
-        scan_word_substitutions(word, ctx, out, asks, depth);
-    }
     let Some(program) = stripped.first() else {
+        for word in rest {
+            scan_word_substitutions(word, ctx, out, asks, depth);
+        }
         return Vec::new();
     };
     let name = basename(&program.text);
     let args = &stripped[1..];
+    // 宣言の引数は、先行する代入を登録してから次の語の子を読む。
+    let sequential = program.literal_value().is_some()
+        && matches!(
+            name,
+            "export" | "local" | "declare" | "readonly" | "typeset"
+        );
+    let prewalk = if sequential {
+        &rest[..rest.len() - args.len()]
+    } else {
+        rest
+    };
+    for word in prewalk {
+        scan_word_substitutions(word, ctx, out, asks, depth);
+    }
     let shell_body = crate::command::shell_kind(name) == crate::command::ShellKind::BashLike
         && crate::command::shell_c_index(args).is_some();
     if ctx.collect_invocations && name != "eval" && !shell_body {
@@ -556,6 +570,7 @@ fn extract_simple(
         }
         "export" | "local" | "declare" | "readonly" | "typeset" => {
             for word in args {
+                scan_word_substitutions(word, ctx, out, asks, depth);
                 if let Some((name, value)) = split_assignment(word) {
                     let value = resolve_value(&value, ctx);
                     ctx.vars.insert(name, value);
