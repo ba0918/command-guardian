@@ -15,10 +15,12 @@ M1 の成果物は、"command-guardian" という 1 つの実行ファイルで�
 ### REQ-017: check の契約
 
 - kind: event_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A34, docs/decision/records/2026-10-01-parser.md#A13
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A34, docs/decision/records/2026-10-01-parser.md#A13, docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
 - verification: unit
 
 "command-guardian check" が呼ばれたとき、command-guardian は、コマンド文字列と作業ディレクトリを受け取り、判定を標準出力に出す。既定は人が読む形式で、"--format json" のときは、"verdict" と "reason"（判定の理由）、効果ごとの "op"、"path"、"class"、"verdict"、"reason" を持つ JSON を出す。効果が無いときは、効果の一覧は空になる。終了コードは、"allow" が 0、"ask" が 1、"block" が 2、判定を出せない失敗が 3 にする。影実行のときも判定を出す。
+
+コマンド本文と解釈するオプション名・format値はUTF-8に限定し、非UTF-8なら終了コード3で拒否する。cwdはUnixのOSパスとして受理し、非UTF-8でも引数の読取でpanicしない。
 
 ### REQ-018: 影実行
 
@@ -175,4 +177,15 @@ Scenario: hook の終了コードを check と取り違えない
   When "command-guardian hook --help" を実行する
   Then 標準入力、"--agent claude|codex"、ヘルプのオプション、使用例が英語で説明される
   And 判定にかかわらず終了コードは 0 と説明される
+
+@id=EX-076 @about=REQ-017 @source=docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
+Scenario: 非UTF-8のcwdを入力として受理する
+  Given 存在する作業ディレクトリのOSパスに非UTF-8のバイトがある
+  When そのcwdで"true"をcheckに渡す
+  Then 判定はallowで終了コードは0になり、引数の読取でpanicしない
+
+@id=EX-077 @about=REQ-017 @source=docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
+Scenario: 非UTF-8の本文とformatを拒否する
+  When 本文またはformatに非UTF-8のバイトをcheckへ渡す
+  Then 終了コードは3になる
 ```

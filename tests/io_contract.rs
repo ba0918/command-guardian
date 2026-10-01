@@ -9,7 +9,7 @@ fn command(home: &std::path::Path) -> Command {
     command
 }
 
-// @kotowari[REQ-017, REQ-024]
+// @kotowari[REQ-017, REQ-024, EX-076, EX-077]
 #[test]
 fn req_017_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
     use std::os::unix::ffi::OsStringExt;
@@ -33,6 +33,12 @@ fn req_017_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
     assert_eq!(output.status.code(), Some(0), "{:?}", output);
     let output = command(home.path())
         .arg("check")
+        .arg(std::ffi::OsString::from_vec(vec![0xff]))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    let output = command(home.path())
+        .args(["check", "true", "--format"])
         .arg(std::ffi::OsString::from_vec(vec![0xff]))
         .output()
         .unwrap();
