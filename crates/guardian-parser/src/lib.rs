@@ -80,11 +80,14 @@ fn parse_inner(input: &str) -> Outcome {
             }
         }
         Err(Failure::Panic) => Outcome::failure(Failure::Panic),
-        Err(_) => {
+        Err(failure) => {
             // 解析に失敗した命令からは効果を返さない。読めている命令だけを拾う
             // （REQ-038・A20）。
             let mut failures = Vec::new();
             let script = recover(input, &options, &mut normalizer, &mut failures);
+            if !failures.contains(&failure) {
+                failures.push(failure);
+            }
             failures.extend(normalizer.failures);
             Outcome { script, failures }
         }
@@ -263,5 +266,16 @@ mod tests {
         assert!(strip_quotes("cat <<EOF\nbody\nEOF")
             .unwrap()
             .starts_with("cat << EOF"));
+    }
+
+    // @kotowari[REQ-038]
+    #[test]
+    fn req_038_recovery_keeps_the_missing_pipeline_failure() {
+        for input in ["true &&", "true ||"] {
+            let outcome = parse(input);
+            assert_eq!(outcome.failures, vec![Failure::Syntax], "{input}");
+            assert_eq!(outcome.script.items.len(), 1);
+        }
+        assert!(parse("true;").failures.is_empty());
     }
 }
