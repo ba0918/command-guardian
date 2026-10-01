@@ -286,6 +286,51 @@ fn req_008_glob_loop_binding_represents_children_not_the_source_root() {
     );
 }
 
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_unknown_loop_repetition_does_not_establish_the_following_directory() {
+    for values in ["/tmp/*", "$unknown", "/a /tmp/* /b"] {
+        let command =
+            format!("cd /etc; for x in {values}; do cd child; done; rm victim; rm /etc/absolute");
+        let result = effects(&command);
+        assert_eq!(result.len(), 2, "{command}: {result:?}");
+        assert!(
+            matches!(result[0].target, Target::Unresolved(_)),
+            "{command}: {result:?}"
+        );
+        assert_eq!(result[1], delete(p("/etc/absolute")));
+    }
+}
+
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_unknown_loop_assignments_do_not_replace_the_previous_certain_value() {
+    for values in ["/tmp/*", "$unknown"] {
+        let command = format!(
+            "S=/etc/x; T=/etc/unchanged; for x in {values}; do S=/tmp/x; done; rm \"$S\" \"$T\""
+        );
+        let result = effects(&command);
+        assert_eq!(result.len(), 2, "{command}: {result:?}");
+        assert!(
+            matches!(result[0].target, Target::Unresolved(_)),
+            "{command}: {result:?}"
+        );
+        assert_eq!(result[1], delete(p("/etc/unchanged")));
+    }
+}
+
+// @kotowari[REQ-002, REQ-008]
+#[test]
+fn req_002_unknown_loop_repetition_also_keeps_later_iteration_targets_uncertain() {
+    let result = effects("cd /tmp/inner; for x in /tmp/*; do cd ..; rm etc/x; done");
+    assert!(
+        result
+            .iter()
+            .any(|effect| matches!(effect.target, Target::Unresolved(_))),
+        "{result:?}"
+    );
+}
+
 // @kotowari[REQ-002, REQ-041]
 #[test]
 fn req_002_only_unquoted_tilde_is_expanded_to_home() {

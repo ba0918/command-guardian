@@ -401,6 +401,7 @@ fn extract_for(
 ) {
     let mut resolved = Vec::new();
     let mut all_literal = !values.is_empty();
+    let mut uncertain_repetition = false;
     for word in values {
         if !ctx.check(asks) {
             return;
@@ -411,7 +412,10 @@ fn extract_for(
         }
         match resolve_word(word, ctx) {
             Resolved::Path(_) => resolved.push(resolve_value(word, ctx)),
-            Resolved::Glob(base) | Resolved::Children(base) => resolved.push(Value::Children(base)),
+            Resolved::Glob(base) | Resolved::Children(base) => {
+                uncertain_repetition = true;
+                resolved.push(Value::Children(base));
+            }
             Resolved::Mktemp => resolved.push(Value::Mktemp),
             _ => all_literal = false,
         }
@@ -424,14 +428,41 @@ fn extract_for(
             }
             child.collect_invocations = ctx.collect_invocations && index == 0;
             child.vars.insert(var.to_string(), value);
-            extract_script(body, &mut child, out, asks, depth + 1);
+            if uncertain_repetition {
+                extract_repeated_body(body, &mut child, out, asks, depth + 1);
+            } else {
+                extract_script(body, &mut child, out, asks, depth + 1);
+            }
         }
-        ctx.vars = child.vars;
-        ctx.cwd = child.cwd;
+        if uncertain_repetition {
+            ctx.merge_state(&child);
+        } else {
+            ctx.vars = child.vars;
+            ctx.cwd = child.cwd;
+        }
     } else {
         let mut child = ctx.clone();
         child.vars.insert(var.to_string(), Value::UnknownSource);
-        extract_script(body, &mut child, out, asks, depth + 1);
+        extract_repeated_body(body, &mut child, out, asks, depth + 1);
+        ctx.merge_state(&child);
+    }
+}
+
+fn extract_repeated_body(
+    body: &Script,
+    ctx: &mut Context,
+    out: &mut Vec<Effect>,
+    asks: &mut Vec<Ask>,
+    depth: usize,
+) {
+    let before = ctx.clone();
+    extract_script(body, ctx, out, asks, depth);
+    if ctx.vars != before.vars || ctx.cwd != before.cwd {
+        ctx.merge_state(&before);
+        let mut repeated = ctx.clone();
+        repeated.collect_invocations = false;
+        extract_script(body, &mut repeated, out, asks, depth);
+        ctx.merge_state(&repeated);
     }
 }
 
