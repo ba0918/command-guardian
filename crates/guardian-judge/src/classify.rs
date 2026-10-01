@@ -146,20 +146,16 @@ impl Judge {
             ));
         }
 
-        // 一時領域。
-        for root in self.ephemeral_roots() {
-            if path == root {
-                if children {
-                    return Ok(Classification::new(Class::Ephemeral, Why::Ephemeral));
-                }
-                return Ok(Classification::new(
-                    Class::Protected,
-                    Why::Protected(ProtectedKind::EphemeralRoot),
-                ));
-            }
-            if path.starts_with(&root) {
-                return Ok(Classification::new(Class::Ephemeral, Why::Ephemeral));
-            }
+        let ephemeral_roots = self.ephemeral_roots();
+        // TMPDIR が別の一時ルート配下でも、ルート自体の保護が先に適用される。
+        if !children && ephemeral_roots.iter().any(|root| path == root) {
+            return Ok(Classification::new(
+                Class::Protected,
+                Why::Protected(ProtectedKind::EphemeralRoot),
+            ));
+        }
+        if ephemeral_roots.iter().any(|root| path.starts_with(root)) {
+            return Ok(Classification::new(Class::Ephemeral, Why::Ephemeral));
         }
 
         if !children {

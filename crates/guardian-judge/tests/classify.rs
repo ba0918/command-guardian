@@ -111,6 +111,28 @@ fn req_003_ephemeral_roots_are_protected() {
     );
 }
 
+// @kotowari[REQ-003, REQ-005]
+#[test]
+fn req_003_nested_tmpdir_root_is_protected_before_outer_ephemeral_region() {
+    for root in ["/tmp/session-temp", "/var/tmp/session-temp"] {
+        let j = Judge::new(JudgeEnv {
+            tmpdir: Some(PathBuf::from(root)),
+            ..judge_env()
+        });
+        let classification = j.classify_path(Path::new(root), false);
+        assert_eq!(classification.class, Class::Protected, "{root}");
+        assert_eq!(
+            classification.why,
+            guardian_core::Why::Protected(guardian_core::ProtectedKind::EphemeralRoot)
+        );
+        assert_eq!(
+            j.classify_path(&Path::new(root).join("child"), false).class,
+            Class::Ephemeral
+        );
+        assert_eq!(j.classify_children(Path::new(root)).class, Class::Ephemeral);
+    }
+}
+
 // @kotowari[REQ-005, EX-024]
 #[test]
 fn req_005_system_areas_are_protected_with_descendants() {
