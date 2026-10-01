@@ -649,7 +649,8 @@ fn extract_shell(
     if let Some(body) = crate::command::shell_c_index(args).and_then(|index| args.get(index + 1)) {
         match body.literal_value() {
             Some(inner) => {
-                extract_inner(&inner, position, ctx, out, asks, depth);
+                let mut child = ctx.clone();
+                extract_inner(&inner, position, &mut child, out, asks, depth);
             }
             None => {
                 asks.push(Ask::UnreadableShellBody(body.text.clone()));
@@ -682,8 +683,7 @@ fn extract_inner(
     for failure in &outcome.failures {
         asks.push(Ask::Parse(failure.clone()));
     }
-    let mut child = ctx.clone();
-    extract_script(&outcome.script, &mut child, out, asks, depth + 1);
+    extract_script(&outcome.script, ctx, out, asks, depth + 1);
 }
 
 /// 1 つの語のコマンド置換の内側だけを読む。

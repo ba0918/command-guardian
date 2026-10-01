@@ -211,3 +211,17 @@ fn req_002_subshell_and_function_definition_do_not_change_parent_bindings() {
     assert_eq!(effects("{ cd /tmp; }; rm x"), vec![delete(p("/tmp/x"))]);
     assert_eq!(effects("(rm /etc/x)"), vec![delete(p("/etc/x"))]);
 }
+
+// @kotowari[REQ-001, REQ-002]
+#[test]
+fn req_002_eval_updates_parent_state_but_shell_commands_do_not() {
+    assert_eq!(
+        effects("S=/tmp/x; eval 'S=/etc/x'; rm \"$S\""),
+        vec![delete(p("/etc/x"))]
+    );
+    assert_eq!(effects("eval 'cd /etc'; rm x"), vec![delete(p("/etc/x"))]);
+    assert_eq!(
+        effects("bash -c 'cd /etc'; rm x"),
+        vec![delete(p("/home/you/work/repo/x"))]
+    );
+}
