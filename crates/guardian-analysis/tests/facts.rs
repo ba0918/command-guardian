@@ -168,3 +168,44 @@ fn req_002_declarations_propagate_assignments_before_later_substitutions() {
         }
     }
 }
+
+// @kotowari[REQ-034, REQ-031, REQ-037, REQ-038]
+#[test]
+fn req_034_example_analysis_collects_syntax_without_materializing_effects() {
+    let input = "for x in /a /b; do for y in /c /d; do X=1 eval 'rm $x'; git push; git push; echo >file; find /a -delete | xargs rm; done; done";
+    let facts = guardian_analysis::analyze_invocations(
+        guardian_parser::parse(input),
+        &mut guardian_parser::parse,
+    );
+    assert!(facts.effects.is_empty());
+    assert!(facts.diagnostics.is_empty());
+    assert_eq!(facts.invocations.len(), 6);
+    assert_eq!(facts.invocations[0].program, "rm");
+    assert_eq!(facts.invocations[0].words, ["$x"]);
+    assert_eq!(facts.invocations[1], facts.invocations[2]);
+    assert_eq!(facts.invocations[1].program, "git");
+    assert_eq!(facts.invocations[1].words, ["push"]);
+}
+
+// @kotowari[REQ-034, REQ-031, REQ-035, REQ-037, REQ-038]
+#[test]
+fn req_034_example_analysis_preserves_apparent_invocations_and_diagnostics() {
+    for input in [
+        "OVERRIDE=1 sudo git '$ACTION'",
+        "X=$(git push)",
+        "export S=/tmp/scratch T=$(rm $S)",
+        "for x in $(git status) /a; do bash -c 'OVERRIDE=1 git \"$x\"'; done",
+        "(cd /work; rm file) >$(git status); cat <(git push)",
+        "eval 'git push; if'",
+        "fish -c x; bash -c \"$BODY\"; eval $COMMAND",
+    ] {
+        let full = facts(input);
+        let invocations = guardian_analysis::analyze_invocations(
+            guardian_parser::parse(input),
+            &mut guardian_parser::parse,
+        );
+        assert_eq!(invocations.invocations, full.invocations, "{input}");
+        assert_eq!(invocations.diagnostics, full.diagnostics, "{input}");
+        assert!(invocations.effects.is_empty(), "{input}");
+    }
+}

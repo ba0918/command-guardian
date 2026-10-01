@@ -301,3 +301,76 @@ fn req_039_literal_loop_traversal_returns_a_reasoned_block() {
         "{json}"
     );
 }
+
+// @kotowari[REQ-034, REQ-014, REQ-022, REQ-023]
+#[test]
+fn req_034_project_examples_visit_literal_loop_bodies_once() {
+    let home = temp_home();
+    let cwd = home.path().join("project");
+    std::fs::create_dir(&cwd).unwrap();
+    let example = format!(
+        "{}git push{}",
+        "for x in /a /b; do ".repeat(40),
+        "; done".repeat(40)
+    );
+    std::fs::write(
+        cwd.join(".command-guardian.toml"),
+        format!("[[commands.guard]]\nprogram='git'\nreason='push'\nverdict='block'\ndeny=[['push']]\n[commands.guard.examples]\ndeny=['{example}']\nallow=['git status']\n"),
+    )
+    .unwrap();
+    for agent in [None, Some("claude"), Some("codex")] {
+        let stdout = home.path().join("stdout");
+        let stderr = home.path().join("stderr");
+        let mut command = Command::new(bin());
+        if let Some(agent) = agent {
+            let stdin = home.path().join("stdin");
+            std::fs::write(
+                &stdin,
+                serde_json::json!({
+                    "tool_name": "Bash", "tool_input": {"command": "git push"}, "cwd": cwd
+                })
+                .to_string(),
+            )
+            .unwrap();
+            command
+                .args(["hook", "--agent", agent])
+                .stdin(Stdio::from(std::fs::File::open(stdin).unwrap()));
+        } else {
+            command
+                .args(["check", "git push", "--format", "json", "--cwd"])
+                .arg(&cwd);
+        }
+        let started = Instant::now();
+        let mut child = command
+            .env("HOME", home.path())
+            .env("XDG_CONFIG_HOME", home.path().join("config"))
+            .env("TMPDIR", "/tmp")
+            .current_dir(&cwd)
+            .stdout(Stdio::from(std::fs::File::create(&stdout).unwrap()))
+            .stderr(Stdio::from(std::fs::File::create(&stderr).unwrap()))
+            .spawn()
+            .unwrap();
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if started.elapsed() > Duration::from_secs(12) {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("outer watchdog stopped project-example validation after 12 seconds");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(status.code(), Some(if agent.is_some() { 0 } else { 2 }));
+        let warnings = std::fs::read_to_string(&stderr).unwrap();
+        assert!(!warnings.contains("無効"), "{warnings}");
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&stdout).unwrap()).unwrap();
+        if agent.is_some() {
+            assert_eq!(json["hookSpecificOutput"]["permissionDecision"], "deny");
+        } else {
+            assert_eq!(json["verdict"], "block");
+            assert_eq!(json["rules"][0]["program"], "git");
+        }
+    }
+}

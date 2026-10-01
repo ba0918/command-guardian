@@ -55,6 +55,13 @@ struct Context<'a> {
     control: SharedControl<'a>,
     facts: std::rc::Rc<std::cell::RefCell<WalkFacts>>,
     collect_invocations: bool,
+    mode: AnalysisMode,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnalysisMode {
+    Effects,
+    Invocations,
 }
 #[derive(Default)]
 struct WalkFacts {
@@ -65,6 +72,16 @@ struct WalkFacts {
 }
 type SharedControl<'a> = std::rc::Rc<std::cell::RefCell<&'a mut dyn AnalysisControl>>;
 
+struct Unbounded<'a>(&'a mut dyn FnMut(&str) -> guardian_parser::Outcome);
+impl AnalysisControl for Unbounded<'_> {
+    fn parse(&mut self, input: &str) -> guardian_parser::Outcome {
+        (self.0)(input)
+    }
+    fn check(&mut self) -> Result<(), guardian_parser::Failure> {
+        Ok(())
+    }
+}
+
 /// 内側の構文解析と走査の継続可否を、呼出元の判定sessionへ委ねる。
 pub trait AnalysisControl {
     fn parse(&mut self, input: &str) -> guardian_parser::Outcome;
@@ -72,7 +89,7 @@ pub trait AnalysisControl {
 }
 
 impl<'a> Context<'a> {
-    fn new(env: &Env, control: &'a mut dyn AnalysisControl) -> Context<'a> {
+    fn new(env: &Env, control: &'a mut dyn AnalysisControl, mode: AnalysisMode) -> Context<'a> {
         Context {
             home: env.home.clone(),
             tmpdir: env.tmpdir.clone(),
@@ -81,6 +98,7 @@ impl<'a> Context<'a> {
             control: std::rc::Rc::new(std::cell::RefCell::new(control)),
             facts: Default::default(),
             collect_invocations: true,
+            mode,
         }
     }
 
@@ -115,16 +133,25 @@ pub fn analyze(
     env: &Env,
     parser: &mut dyn FnMut(&str) -> guardian_parser::Outcome,
 ) -> Analysis {
-    struct Unbounded<'a>(&'a mut dyn FnMut(&str) -> guardian_parser::Outcome);
-    impl AnalysisControl for Unbounded<'_> {
-        fn parse(&mut self, input: &str) -> guardian_parser::Outcome {
-            (self.0)(input)
-        }
-        fn check(&mut self) -> Result<(), guardian_parser::Failure> {
-            Ok(())
-        }
-    }
     analyze_with_control(outcome, env, &mut Unbounded(parser))
+}
+
+/// 設定例用に構文位置ごとの起動と診断だけを集める。効果は生成せず、
+/// for の本文を値ごとに反復評価しない。起動の語はContextで展開しない。
+pub fn analyze_invocations(
+    outcome: guardian_parser::Outcome,
+    parser: &mut dyn FnMut(&str) -> guardian_parser::Outcome,
+) -> Analysis {
+    analyze_mode(
+        outcome,
+        &Env {
+            home: None,
+            tmpdir: None,
+            cwd: None,
+        },
+        &mut Unbounded(parser),
+        AnalysisMode::Invocations,
+    )
 }
 
 /// 解析済みの構文を、呼出元の継続確認に従って走査する。
@@ -133,7 +160,16 @@ pub fn analyze_with_control(
     env: &Env,
     control: &mut dyn AnalysisControl,
 ) -> Analysis {
-    let mut ctx = Context::new(env, control);
+    analyze_mode(outcome, env, control, AnalysisMode::Effects)
+}
+
+fn analyze_mode(
+    outcome: guardian_parser::Outcome,
+    env: &Env,
+    control: &mut dyn AnalysisControl,
+    mode: AnalysisMode,
+) -> Analysis {
+    let mut ctx = Context::new(env, control, mode);
     let mut effects = Vec::new();
     let mut asks: Vec<Ask> = outcome.failures.into_iter().map(Ask::Parse).collect();
     extract_script(&outcome.script, &mut ctx, &mut effects, &mut asks, 0);
@@ -325,13 +361,16 @@ fn extract_for(
             return;
         }
         scan_word_substitutions(word, ctx, out, asks, depth);
+        if ctx.mode == AnalysisMode::Invocations {
+            continue;
+        }
         match resolve_word(word, ctx) {
             Resolved::Path(path) | Resolved::Glob(path) => resolved.push(Value::Path(path)),
             Resolved::Mktemp => resolved.push(Value::Mktemp),
             _ => all_literal = false,
         }
     }
-    if all_literal {
+    if all_literal && ctx.mode == AnalysisMode::Effects {
         for (index, value) in resolved.into_iter().enumerate() {
             if !ctx.check(asks) {
                 return;
@@ -446,6 +485,15 @@ fn extract_simple(
             return Vec::new();
         }
         crate::command::ShellKind::Other => {}
+    }
+
+    if ctx.mode == AnalysisMode::Invocations
+        && !matches!(
+            name,
+            "eval" | "cd" | "export" | "local" | "declare" | "readonly" | "typeset"
+        )
+    {
+        return Vec::new();
     }
 
     match name {
@@ -981,29 +1029,32 @@ fn extract_redirects(
             scan_word_substitutions(word, ctx, out, asks, depth);
         }
         match &redirect.target {
-            RedirectTarget::Word(word) => match redirect.kind {
-                RedirectKind::Write
-                | RedirectKind::Clobber
-                | RedirectKind::OutputAndError(false) => {
-                    let res = resolve_word(word, ctx);
-                    out.push(Effect {
-                        op: Op::Truncate,
-                        target: res.into_target(word),
-                    });
+            RedirectTarget::Word(word) if ctx.mode == AnalysisMode::Effects => {
+                match redirect.kind {
+                    RedirectKind::Write
+                    | RedirectKind::Clobber
+                    | RedirectKind::OutputAndError(false) => {
+                        let res = resolve_word(word, ctx);
+                        out.push(Effect {
+                            op: Op::Truncate,
+                            target: res.into_target(word),
+                        });
+                    }
+                    // `>& file` は `&> file` の別の綴りで、ファイルを切り詰める。
+                    // 語が数字か "-" のときだけファイル記述子への複製になる。
+                    RedirectKind::DuplicateOutput
+                        if redirect.fd.is_none() && !is_fd_duplication_target(word) =>
+                    {
+                        let res = resolve_word(word, ctx);
+                        out.push(Effect {
+                            op: Op::Truncate,
+                            target: res.into_target(word),
+                        });
+                    }
+                    _ => {}
                 }
-                // `>& file` は `&> file` の別の綴りで、ファイルを切り詰める。
-                // 語が数字か "-" のときだけファイル記述子への複製になる。
-                RedirectKind::DuplicateOutput
-                    if redirect.fd.is_none() && !is_fd_duplication_target(word) =>
-                {
-                    let res = resolve_word(word, ctx);
-                    out.push(Effect {
-                        op: Op::Truncate,
-                        target: res.into_target(word),
-                    });
-                }
-                _ => {}
-            },
+            }
+            RedirectTarget::Word(_) => {}
             RedirectTarget::Fd(_) => {}
             RedirectTarget::ProcessSubstitution(substitution) => {
                 let mut child = ctx.clone();

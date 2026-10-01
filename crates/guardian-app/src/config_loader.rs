@@ -1,6 +1,6 @@
 //! 設定の探索・読込と、隔離された設定例の検証。
 use crate::runtime::ValidationSession;
-use guardian_core::{Env, Verdict};
+use guardian_core::Verdict;
 use guardian_policy::layers::{self, Layer};
 use guardian_policy::{Config, GuardRule};
 use std::path::{Path, PathBuf};
@@ -104,15 +104,9 @@ pub fn validate_examples(
         for (examples, deny) in [(&rule.examples_deny, true), (&rule.examples_allow, false)] {
             for example in examples {
                 let outcome = session.parse(example);
-                let facts = guardian_analysis::analyze(
-                    outcome,
-                    &Env {
-                        home: None,
-                        tmpdir: None,
-                        cwd: None,
-                    },
-                    &mut |input| session.parse(input),
-                );
+                let facts = guardian_analysis::analyze_invocations(outcome, &mut |input| {
+                    session.parse(input)
+                });
                 let error = match facts.invocations.as_slice() {
                     [inv] if rule.matches(inv) == deny => continue,
                     [_] if deny => "examples.deny に一致しない例がある",
