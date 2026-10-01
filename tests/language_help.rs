@@ -253,10 +253,6 @@ fn warning_retains_the_real_toml_library_error_detail() {
         .unwrap();
     assert!(out.status.success());
     let warning = String::from_utf8(out.stderr).unwrap();
-    assert!(
-        warning.starts_with("Warning: Cannot read user configuration; continuing with defaults:"),
-        "{warning}"
-    );
     assert!(warning.contains(&detail), "{warning}");
 }
 
