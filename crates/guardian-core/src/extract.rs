@@ -617,19 +617,47 @@ fn extract_process_substitutions(
     }
 }
 
-/// `of=...` のような前置きを外した語を作る。
+/// `of=...` のような前置きを外した語を作る。引用やエスケープで断片に
+/// 分かれた綴りでも、引用を外した見かけの前置きで判定する（REQ-001）。
 fn strip_prefix_word(word: &Word, prefix: &str) -> Option<Word> {
-    let first = match word.parts.first() {
-        Some(Part::Literal(text)) => text.as_str(),
-        _ => return None,
-    };
-    let rest = first.strip_prefix(prefix)?;
-    let mut parts = Vec::new();
-    if !rest.is_empty() {
-        parts.push(Part::Literal(rest.to_string()));
+    if !word.text.starts_with(prefix) {
+        return None;
     }
-    parts.extend(word.parts[1..].iter().cloned());
+    let mut remaining = prefix.len();
+    let mut parts = Vec::new();
+    for part in &word.parts {
+        if remaining == 0 {
+            parts.push(part.clone());
+            continue;
+        }
+        let rendered = rendered_len(part);
+        if rendered <= remaining {
+            remaining -= rendered;
+            continue;
+        }
+        let rest = match part {
+            Part::Literal(text) => Part::Literal(text[remaining..].to_string()),
+            Part::Quoted(text) => Part::Quoted(text[remaining..].to_string()),
+            Part::Opaque(text) => Part::Opaque(text[remaining..].to_string()),
+            Part::Glob(text) => Part::Glob(text[remaining..].to_string()),
+            // 前置き（ASCII の綴り）が展開の断片の途中で切れることはない。
+            Part::Var(_) | Part::Substitution(_) => return None,
+        };
+        parts.push(rest);
+        remaining = 0;
+    }
     Some(Word::from_parts(parts))
+}
+
+/// 断片が語の見かけの文字列に占める長さ。
+fn rendered_len(part: &Part) -> usize {
+    match part {
+        Part::Literal(text) | Part::Quoted(text) | Part::Opaque(text) | Part::Glob(text) => {
+            text.len()
+        }
+        Part::Var(name) => name.len() + 1,
+        Part::Substitution(substitution) => substitution.body_text.len() + 3,
+    }
 }
 
 const TRUNCATE_VALUED: &[&str] = &["-s", "--size", "-r", "--reference"];

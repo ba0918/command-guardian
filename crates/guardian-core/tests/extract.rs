@@ -300,6 +300,34 @@ fn req_001_four_excluded_operations_have_no_effects() {
 
 // @kotowari[REQ-001]
 #[test]
+fn req_001_dd_quoted_of_prefix_is_read() {
+    // `of=` が引用やエスケープで分かれていても、dd が受け取る綴りで読む。
+    for cmd in [
+        "dd \"of=/tmp/scratch/img\"",
+        "dd 'of=''/tmp/scratch/img'",
+        "dd of\\=/tmp/scratch/img",
+    ] {
+        assert_eq!(
+            effects(cmd),
+            vec![Effect {
+                op: Op::Truncate,
+                target: path("/tmp/scratch/img")
+            }],
+            "{cmd}"
+        );
+    }
+    // ブロックデバイスへの書き込みは形式の効果。
+    assert_eq!(
+        effects("dd \"of=/dev/sda\""),
+        vec![Effect {
+            op: Op::Format,
+            target: path("/dev/sda")
+        }]
+    );
+}
+
+// @kotowari[REQ-001]
+#[test]
 fn req_001_option_values_are_not_targets() {
     // shred の値付きオプション（-n/--iterations、-s/--size）は削除の対象ではない。
     assert_eq!(
