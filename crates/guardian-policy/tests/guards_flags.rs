@@ -13,6 +13,24 @@ fn matches(rules: &[GuardRule], command: &str) -> bool {
     rules.iter().any(|r| invs.iter().any(|i| r.matches(i)))
 }
 
+// @kotowari[REQ-030]
+#[test]
+fn req_030_non_ascii_single_character_flags_match_bundles_and_equals() {
+    let rs = rules(
+        r#"
+[[commands.guard]]
+program = "tool"
+reason = "flag needs confirmation"
+deny-flags = ["-é"]
+"#,
+    );
+    for command in ["tool -é", "tool -éx", "tool -xé=value"] {
+        assert!(matches(&rs, command), "{command}");
+    }
+    assert!(!matches(&rs, "tool -- -éx"));
+    assert!(!matches(&rs, "tool -x"));
+}
+
 // @kotowari[REQ-030, EX-039]
 #[test]
 fn req_030_deny_option_values_match_by_name_and_value() {

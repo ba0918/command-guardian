@@ -352,7 +352,9 @@ fn before_ddash(words: &[String]) -> &[String] {
 }
 
 fn flag_hit(flag: &str, words: &[String]) -> bool {
-    let single = flag.len() == 2 && flag.starts_with('-');
+    let single = flag
+        .strip_prefix('-')
+        .is_some_and(|value| value.chars().count() == 1);
     for w in before_ddash(words) {
         let head = w.split('=').next().unwrap_or(w);
         if single {
