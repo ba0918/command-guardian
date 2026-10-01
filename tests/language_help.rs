@@ -33,6 +33,26 @@ fn json_check(home: &std::path::Path, text: &str) -> (i32, serde_json::Value) {
     )
 }
 
+// @kotowari[REQ-011, REQ-017, EX-058]
+#[test]
+fn non_allow_text_output_including_verdict_stays_within_four_lines() {
+    let home = fixture();
+    let output = command(home.path())
+        .args(["check", "rm /etc/a /etc/b", "--cwd", "/tmp"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!((2..=4).contains(&text.lines().count()), "{text}");
+    let (code, json) = json_check(home.path(), "rm /etc/a /etc/b");
+    assert_eq!(code, 2);
+    let message = json["message"].as_str().unwrap();
+    for line in message.lines() {
+        assert!(text.contains(line), "Missing explanation: {line}");
+    }
+    assert!(text.lines().next().unwrap().contains("Verdict: block"));
+}
+
 // @kotowari[REQ-044, EX-066, EX-067]
 #[test]
 fn help_at_each_entry_exits_without_reading_open_stdin_or_broken_config() {
@@ -222,7 +242,7 @@ fn check_defaults_to_current_directory_and_text_without_changing_argument_contra
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.starts_with("Verdict: block\n"));
+    assert!(text.starts_with("Verdict: block"));
     assert!(text.contains(home.path().to_str().unwrap()));
     assert!(text.contains("working directory"));
     for args in [

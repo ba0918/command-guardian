@@ -7,10 +7,12 @@ allow 以外の判定を返すときの文面と、製品が生成する説明�
 ### REQ-011: 非 allow の文面
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A15, docs/decision/records/2026-09-30-hook-guardian-scope.md#A26, docs/decision/records/2026-09-30-hook-guardian-scope.md#A28, docs/decision/records/2026-09-30-hook-guardian-scope.md#A30, docs/decision/records/2026-10-01-parser.md#A7, docs/decision/records/2026-10-01-parser.md#A12, docs/decision/records/2026-10-01-parser.md#A16, docs/decision/records/2026-10-01-parser.md#A22, docs/decision/records/2026-10-01-parser.md#A23
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A15, docs/decision/records/2026-09-30-hook-guardian-scope.md#A26, docs/decision/records/2026-09-30-hook-guardian-scope.md#A28, docs/decision/records/2026-09-30-hook-guardian-scope.md#A30, docs/decision/records/2026-10-01-parser.md#A7, docs/decision/records/2026-10-01-parser.md#A12, docs/decision/records/2026-10-01-parser.md#A16, docs/decision/records/2026-10-01-parser.md#A22, docs/decision/records/2026-10-01-parser.md#A23, docs/decision/records/2026-10-02-check-text-layout.md#A1
 - verification: unit
 
 command-guardian は、`allow` 以外の判定を返すとき、何の操作が、どのパスに対して行われるのか、なぜ止めるのか、代わりに何ができるのかを示す。理由には、分類と、失われるもの（未追跡で戻せない、未コミットの変更が失われる、パスを解決できない、管理外で戻せない、保護領域である）、操作の無い ask の理由（構文を読めない、読めないシェル、判定の内部で失敗した）、上限を超えた block の理由（大きすぎる、深すぎる、判定の上限を超えた）を含める。操作とパスが無い ask と、上限を超えた block では、それらに代えてその理由を示す。代替には、先にコミットする、リテラルのパスで指定し直す、一時領域や作業場所へ移してから消す、許可ルートに追加する、のうち当てはまるものを示し、当てはまるものが無いときは、無いと書く。文面は 2 行から 4 行にする。
+
+"check" の通常出力では、判定と説明の最初の行を同じ行にまとめ、判定を含む出力全体を2行から4行にする。JSONの説明とhookの拒否理由の配置は変更しない。
 
 ### REQ-012: 宛先に応じた書き分け
 

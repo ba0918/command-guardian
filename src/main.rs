@@ -220,11 +220,14 @@ fn print_text(report: &Report) -> std::io::Result<()> {
     if report.verdict == Verdict::Allow {
         return output(format_args!("Verdict: allow"));
     }
-    output(format_args!("Verdict: {}", report.verdict))?;
-    if !report.message.is_empty() {
-        output(format_args!("{}", report.message))?;
+    if report.message.is_empty() {
+        output(format_args!("Verdict: {}", report.verdict))
+    } else {
+        output(format_args!(
+            "Verdict: {} — {}",
+            report.verdict, report.message
+        ))
     }
-    Ok(())
 }
 
 fn print_json(report: &Report) -> std::io::Result<()> {
