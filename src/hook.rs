@@ -45,7 +45,9 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
     }
     // 影実行ではフックとして何も返さず、判定をログに残す（REQ-018）。
     if !engine.config().enforce {
-        let _ = crate::log::write_shadow(&report, &input.command);
+        if crate::log::write_shadow(&report, &input.command).is_err() {
+            crate::diagnostic(format_args!("Warning: Could not write shadow log."));
+        }
         return 0;
     }
     if let Some(decision) = decision(agent, report.verdict, input.permission_mode.as_deref()) {

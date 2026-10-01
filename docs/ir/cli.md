@@ -23,18 +23,22 @@ M1 の成果物は、"command-guardian" という 1 つの実行ファイルで�
 ### REQ-018: 影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2
 - verification: unit
 
 "mode.enforce" が false のとき、command-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
 
+ログの保存場所がない、または保存できないときは、その記録を省略して標準エラーへ警告する。hookの標準出力は空で、終了コードは0にする。
+
 ### REQ-019: 影実行のログ
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2
 - verification: unit
 
 影実行のログは、"XDG_STATE_HOME" が指すディレクトリの "command-guardian" の下（"XDG_STATE_HOME" が無いときは "~/.local/state/command-guardian"）に、所有者だけが読める権限で書く。1 行に、時刻、判定、理由、対象パス、コマンド本文を含める。
+
+専用ディレクトリ"command-guardian"とログ末尾要素"shadow.log"がsymlinkの場合、およびログが通常ファイルでない場合は、保存先として拒否する。拒否・保存失敗時はREQ-018の警告と継続を使う。この拒否条件は、その親経路の全symlinkやhardlinkの拒否を保証しない。
 
 ### REQ-020: git の起動条件
 

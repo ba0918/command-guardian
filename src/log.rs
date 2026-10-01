@@ -26,7 +26,7 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
     let xdg_state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let Some(path) = shadow_log_path(xdg_state_home.as_deref(), home.as_deref()) else {
-        return Ok(());
+        return Err(std::io::Error::other("No shadow log location"));
     };
     let dir = path.parent().expect("ログのパスには親がある");
     let base = dir.parent().expect("ログのディレクトリには親がある");

@@ -79,6 +79,11 @@ fn req_019_shadow_file_symlink_does_not_modify_its_target() {
     );
     assert_eq!(result.code, 0);
     assert!(result.stdout.is_empty());
+    assert!(
+        result.stderr.to_lowercase().contains("shadow log"),
+        "{}",
+        result.stderr
+    );
     assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "unchanged");
     assert_eq!(
         std::fs::metadata(sentinel).unwrap().permissions().mode() & 0o777,
@@ -106,9 +111,55 @@ fn req_019_shadow_directory_symlink_does_not_modify_its_target() {
     assert_eq!(result.code, 0);
     assert!(result.stdout.is_empty());
     assert!(!sentinel.join("shadow.log").exists());
+    assert!(
+        result.stderr.to_lowercase().contains("shadow log"),
+        "{}",
+        result.stderr
+    );
     assert_eq!(
         std::fs::metadata(sentinel).unwrap().permissions().mode() & 0o777,
         0o750
+    );
+}
+
+// @kotowari[REQ-018, REQ-019]
+#[test]
+fn req_019_unusable_shadow_log_warns_without_returning_a_hook_decision() {
+    let home = temp_dir("shadow-failure-home-");
+    let state = temp_dir("shadow-failure-state-");
+    let xdg = home.path().join("config");
+    write_shadow_config(&xdg);
+    let dir = state.path().join("command-guardian");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::create_dir(dir.join("shadow.log")).unwrap();
+    let result = run_hook(
+        &bash_input("rm /etc/x", "/tmp"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(result.code, 0);
+    assert!(result.stdout.is_empty());
+    assert!(
+        result.stderr.to_lowercase().contains("shadow log"),
+        "{}",
+        result.stderr
+    );
+}
+
+// @kotowari[REQ-018, REQ-019]
+#[test]
+fn req_019_missing_shadow_log_location_warns_instead_of_silently_omitting_the_record() {
+    let home = temp_dir("shadow-failure-home-");
+    let xdg = home.path().join("config");
+    write_shadow_config(&xdg);
+    let result = run_hook(&bash_input("rm /etc/x", "/tmp"), Path::new(""), &xdg, None);
+    assert_eq!(result.code, 0);
+    assert!(result.stdout.is_empty());
+    assert!(
+        result.stderr.to_lowercase().contains("shadow log"),
+        "{}",
+        result.stderr
     );
 }
 
