@@ -923,6 +923,17 @@ fn extract_redirects(
                         target: res.into_target(word),
                     });
                 }
+                // `>& file` は `&> file` の別の綴りで、ファイルを切り詰める。
+                // 語が数字か "-" のときだけファイル記述子への複製になる。
+                RedirectKind::DuplicateOutput
+                    if redirect.fd.is_none() && !is_fd_duplication_target(word) =>
+                {
+                    let res = resolve_word(word, ctx, out, asks, depth);
+                    out.push(Effect {
+                        op: Op::Truncate,
+                        target: res.into_target(word),
+                    });
+                }
                 _ => scan_word_substitutions(word, ctx, out, asks, depth),
             },
             RedirectTarget::Fd(_) => {}
@@ -935,6 +946,12 @@ fn extract_redirects(
             }
         }
     }
+}
+
+/// `>&word` の語がファイル記述子への複製か。数字か "-" だけが複製で、
+/// それ以外の語はファイル名として切り詰められる（REQ-001）。
+fn is_fd_duplication_target(word: &Word) -> bool {
+    word.text == "-" || (!word.text.is_empty() && word.text.chars().all(|c| c.is_ascii_digit()))
 }
 
 /// 語を解決する。コマンド置換の内側の効果もここで取り出す。

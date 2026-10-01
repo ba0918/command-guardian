@@ -524,6 +524,22 @@ fn req_001_inout_redirect_is_not_truncate() {
     );
 }
 
+// @kotowari[REQ-001]
+#[test]
+fn req_001_fd_less_duplicate_output_to_a_filename_truncates() {
+    // `>& file` は `&> file` の別の綴りで、ファイルを切り詰める。
+    assert_eq!(
+        effects("echo x >& /etc/foo"),
+        vec![Effect {
+            op: Op::Truncate,
+            target: path("/etc/foo")
+        }]
+    );
+    // 数字の語はファイル記述子への複製で、切り詰めではない。
+    assert_eq!(effects("echo x >&1"), vec![]);
+    assert_eq!(effects("echo x >&-"), vec![]);
+}
+
 // @kotowari[REQ-005]
 #[test]
 fn req_005_parent_dir_at_the_root_is_clamped() {
