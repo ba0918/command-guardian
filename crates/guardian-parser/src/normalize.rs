@@ -597,6 +597,9 @@ impl Normalizer {
                 word::Parameter::NamedWithIndex { name, index }
                     if !indirect && !index.contains('$') && !index.contains('`') =>
                 {
+                    if depth + 1 + paren_nesting(index) > LIMIT_DEPTH {
+                        return Err(Failure::TooDeep);
+                    }
                     parts.push(Part::Var(format!("{name}[{index}]")));
                     return Ok(());
                 }
@@ -968,5 +971,32 @@ fn decode_escape_in_double(raw: &str) -> String {
         Some('\n') => String::new(),
         Some(c @ ('$' | '`' | '"' | '\\')) => c.to_string(),
         Some(c) => format!("\\{c}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @kotowari[REQ-039]
+    #[test]
+    fn req_039_array_index_parentheses_count_with_enclosing_syntax_depth() {
+        let source = "${a[((1))]}";
+        let pieces = word::parse(source, &options()).unwrap();
+        let word::WordPiece::ParameterExpansion(expression) = &pieces[0].piece else {
+            panic!("expected a parameter expansion");
+        };
+        let mut normalizer = Normalizer::new(1024);
+        let mut parts = Vec::new();
+        assert_eq!(
+            normalizer.parameter_parts(expression, source, LIMIT_DEPTH - 2, &mut parts),
+            Err(Failure::TooDeep)
+        );
+        let mut parts = Vec::new();
+        assert_eq!(
+            normalizer.parameter_parts(expression, source, LIMIT_DEPTH - 3, &mut parts),
+            Ok(())
+        );
+        assert_eq!(parts, vec![Part::Var("a[((1))]".into())]);
     }
 }
