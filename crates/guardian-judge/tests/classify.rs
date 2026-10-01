@@ -3,7 +3,8 @@
 //! 分類から判定への対応は policy の責務だが、この段では仕様の対応表
 //! (REQ-006) をテスト側の写像で固定し、分類そのものを確かめる。
 
-use guardian_core::{extract_effects, Class, Effect, Env, Op, Target, Verdict};
+use guardian_analysis::extract_effects;
+use guardian_core::{Class, Effect, Env, Op, Target, Verdict};
 use guardian_judge::{Classification, Judge, JudgeEnv};
 use std::path::{Path, PathBuf};
 

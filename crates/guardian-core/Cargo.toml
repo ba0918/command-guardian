@@ -2,10 +2,4 @@
 name = "guardian-core"
 version = "0.1.0"
 edition = "2021"
-description = "シェル構文の解析・破壊的効果の抽出・パス解決"
-
-[dependencies]
-guardian-parser = { path = "../guardian-parser" }
-
-[dev-dependencies]
-tempfile = { workspace = true }
+description = "判定と解析が共有する値と純粋な操作"

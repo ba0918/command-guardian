@@ -1,6 +1,7 @@
 //! S4: git による分類（REQ-004, REQ-020）。
 
-use guardian_core::{extract_effects, Class, Target, Verdict, Why};
+use guardian_analysis::extract_effects;
+use guardian_core::{Class, Target, Verdict, Why};
 use guardian_judge::{Classification, GitError, GitRunner, Judge, JudgeEnv};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;

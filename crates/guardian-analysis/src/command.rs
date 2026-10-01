@@ -1,7 +1,7 @@
 //! 語の意味づけ。プログラム名の取り出し、代入の分解、ラッパーの除去、
 //! シェル起動の認識（REQ-035）を扱う。
 
-use crate::ast::{Part, Word};
+use guardian_parser::{Part, Word};
 
 /// 語の basename。
 pub fn basename(text: &str) -> &str {

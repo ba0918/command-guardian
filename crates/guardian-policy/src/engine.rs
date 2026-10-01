@@ -3,7 +3,8 @@
 use crate::config::{self, Config};
 use crate::guard;
 use crate::message;
-use guardian_core::{analyze, Ask, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
+use guardian_analysis::analyze;
+use guardian_core::{Ask, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
 use guardian_judge::{GitRunner, Judge, JudgeEnv};
 use regex::Regex;
 use std::path::{Path, PathBuf};

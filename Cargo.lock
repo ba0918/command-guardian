@@ -298,17 +298,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "guardian-core"
+name = "guardian-analysis"
 version = "0.1.0"
 dependencies = [
+ "guardian-core",
  "guardian-parser",
  "tempfile",
 ]
 
 [[package]]
+name = "guardian-core"
+version = "0.1.0"
+
+[[package]]
 name = "guardian-judge"
 version = "0.1.0"
 dependencies = [
+ "guardian-analysis",
  "guardian-core",
  "tempfile",
 ]
@@ -318,12 +324,14 @@ name = "guardian-parser"
 version = "0.1.0"
 dependencies = [
  "brush-parser",
+ "guardian-core",
 ]
 
 [[package]]
 name = "guardian-policy"
 version = "0.1.0"
 dependencies = [
+ "guardian-analysis",
  "guardian-core",
  "guardian-judge",
  "guardian-parser",

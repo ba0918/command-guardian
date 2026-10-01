@@ -1,6 +1,7 @@
 //! S7: 非 allow の文面（REQ-011）。
 
-use guardian_core::{extract_effects, Ask, Class, Env, Op, ProtectedKind, Target, Why};
+use guardian_analysis::extract_effects;
+use guardian_core::{Ask, Class, Env, Op, ProtectedKind, Target, Why};
 use guardian_parser::Failure;
 use guardian_policy::message::{ask_message, ask_reason, non_allow_message};
 use std::path::PathBuf;

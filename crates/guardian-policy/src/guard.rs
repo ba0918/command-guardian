@@ -627,7 +627,7 @@ fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usiz
     }
     // ラッパーの外し方は parser と共有する（A44）。外した範囲にある代入の
     // 名前も拾う（REQ-031）。
-    let (names, stripped) = parser::strip_wrapper(&words[index..]);
+    let (names, stripped) = guardian_analysis::strip_wrapper(&words[index..]);
     env_names.extend(names);
     index = words.len() - stripped.len();
     let Some(first) = words.get(index) else {
@@ -636,11 +636,11 @@ fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usiz
     let program = basename(&first.text).to_string();
     let args: Vec<&Word> = words[index + 1..].to_vec();
 
-    if parser::shell_kind(&first.text) == parser::ShellKind::BashLike {
+    if guardian_analysis::shell_kind(&first.text) == guardian_analysis::ShellKind::BashLike {
         if let Some(inner) = shell_c_string(&args) {
             walk_inner(&inner, out, depth);
         }
-        if parser::shell_c_index(args.iter().copied()).is_some() {
+        if guardian_analysis::shell_c_index(args.iter().copied()).is_some() {
             return;
         }
     }
@@ -703,7 +703,7 @@ fn assignment_name(w: &Word) -> Option<(String, &Word)> {
 
 fn shell_c_string(args: &[&Word]) -> Option<String> {
     // `-c` の位置の読み方は parser と共有する（A16）。
-    let index = parser::shell_c_index(args.iter().copied())?;
+    let index = guardian_analysis::shell_c_index(args.iter().copied())?;
     args.get(index + 1).and_then(|w| w.literal_value())
 }
 

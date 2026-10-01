@@ -1,6 +1,7 @@
 //! S5: 対象集合が未知の効果（REQ-008）。
 
-use guardian_core::{extract_effects, Class, Effect, Target, Verdict};
+use guardian_analysis::extract_effects;
+use guardian_core::{Class, Effect, Target, Verdict};
 use guardian_judge::{Classification, Judge};
 use std::path::Path;
 

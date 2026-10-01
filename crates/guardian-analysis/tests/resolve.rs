@@ -1,6 +1,7 @@
 //! S2: パスの解決（REQ-002）。
 
-use guardian_core::{extract_effects, Effect, Env, Op, Target};
+use guardian_analysis::extract_effects;
+use guardian_core::{Effect, Env, Op, Target};
 use std::path::PathBuf;
 
 fn env() -> Env {

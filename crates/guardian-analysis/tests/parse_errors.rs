@@ -1,6 +1,7 @@
 //! S6: 解析の失敗の検出（REQ-010）。
 
-use guardian_core::{analyze, Ask, Env};
+use guardian_analysis::analyze;
+use guardian_core::{Ask, Env};
 use std::path::PathBuf;
 
 fn env() -> Env {

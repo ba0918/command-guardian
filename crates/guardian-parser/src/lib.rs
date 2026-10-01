@@ -21,14 +21,9 @@ mod budget;
 mod depth;
 mod normalize;
 mod wire;
-mod words;
 mod worker;
 
 pub use ast::*;
-pub use words::{
-    basename, shell_c_index, shell_invocation, shell_kind, split_assignment,
-    split_prefix_assignments, strip_wrapper, ShellInvocation, ShellKind,
-};
 pub use worker::run_if_child;
 
 use brush_parser::{ParserOptions, Token};
@@ -49,26 +44,7 @@ pub const LIMIT_JUDGMENT_TIME: std::time::Duration = std::time::Duration::from_s
 /// 読み直しの試行の上限。壊れた入力を読み続けないための歯止め。
 const MAX_RECOVERY_ATTEMPTS: usize = 64;
 
-/// 解析の失敗の種類（REQ-038・REQ-039）。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Failure {
-    /// 入力が上限（1 MiB）を超えた。
-    TooLarge,
-    /// 入れ子が上限（128 段）を超えた。
-    TooDeep,
-    /// 構文解析に失敗した。
-    Syntax,
-    /// 知らない形のノードに出会った。
-    UnknownNode(String),
-    /// 構文解析が panic した（子が捕まえて報告したもの）。
-    Panic,
-    /// 自分に帰せる失敗。隔離した子を起動できない、応答を読めない、死を入力に
-    /// 帰せないのいずれか（REQ-039・A23）。
-    Internal,
-    /// 入力に帰せる子の死（スタックオーバーフロー、時間の上限の超過）か、
-    /// 判定の上限（回数・時間）の超過。
-    Limit,
-}
+pub use guardian_core::Failure;
 
 /// 解析の結果。読めた構文木と、読めなかった理由。
 #[derive(Debug, Clone, PartialEq, Eq)]

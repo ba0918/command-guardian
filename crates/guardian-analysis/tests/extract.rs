@@ -1,6 +1,7 @@
 //! S1: 破壊的効果の抽出（REQ-001）。
 
-use guardian_core::{analyze, extract_effects, Effect, Env, Op, Target};
+use guardian_analysis::{analyze, extract_effects};
+use guardian_core::{Effect, Env, Op, Target};
 use std::path::PathBuf;
 
 fn env() -> Env {

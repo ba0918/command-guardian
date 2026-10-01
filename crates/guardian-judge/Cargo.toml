@@ -8,4 +8,5 @@ description = "fs と git によるパスの分類"
 guardian-core = { path = "../guardian-core" }
 
 [dev-dependencies]
+guardian-analysis = { path = "../guardian-analysis" }
 tempfile = { workspace = true }

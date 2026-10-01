@@ -1,0 +1,12 @@
+[package]
+name = "guardian-analysis"
+version = "0.1.0"
+edition = "2021"
+description = "正規化したシェル構文からの効果と起動情報の抽出"
+
+[dependencies]
+guardian-core = { path = "../guardian-core" }
+guardian-parser = { path = "../guardian-parser" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -4,36 +4,14 @@
 //! 1 回ずつ訪問する（REQ-037）。読めなかった命令からは効果を取り出さない
 //! （REQ-038）。
 
-use crate::types::{Effect, Op, Target};
+use crate::command::{basename, split_assignment, strip_wrapper};
+use guardian_core::{Ask, Effect, Env, Op, Target};
 use guardian_parser::{
-    basename, split_assignment, strip_wrapper, Command, Compound, Part, Pipeline, Redirect,
-    RedirectKind, RedirectTarget, Script, SimpleCommand, Substitution, Word,
+    Command, Compound, Part, Pipeline, Redirect, RedirectKind, RedirectTarget, Script,
+    SimpleCommand, Substitution, Word,
 };
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
-
-/// 解決に使う環境。テストから差し替えられる。
-#[derive(Debug, Clone, Default)]
-pub struct Env {
-    pub home: Option<PathBuf>,
-    pub tmpdir: Option<PathBuf>,
-    pub cwd: Option<PathBuf>,
-}
-
-impl Env {
-    pub fn from_process() -> Env {
-        // 空文字列は「無い」として扱う。空のパスはすべてのパスに一致してしまう。
-        Env {
-            home: std::env::var_os("HOME")
-                .filter(|v| !v.is_empty())
-                .map(PathBuf::from),
-            tmpdir: std::env::var_os("TMPDIR")
-                .filter(|v| !v.is_empty())
-                .map(PathBuf::from),
-            cwd: std::env::current_dir().ok(),
-        }
-    }
-}
 
 /// パスの解決の結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,37 +75,6 @@ pub fn extract_effects(command: &str, env: &Env) -> Vec<Effect> {
 pub struct Analysis {
     pub effects: Vec<Effect>,
     pub parse_errors: Vec<Ask>,
-}
-
-/// 効果を取り出せない理由。判定は ask に落ちる（REQ-038）。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Ask {
-    /// 構文解析の失敗。
-    Parse(guardian_parser::Failure),
-    /// プログラムの語がリテラルでない。
-    UnreadableProgram(String),
-    /// bash 系の `-c` の本文がリテラルでない。
-    UnreadableShellBody(String),
-    /// `eval` の本文がリテラルでない。
-    UnreadableEval,
-    /// 知っているが読まないシェルの起動（REQ-035）。
-    UnsupportedShell(String),
-}
-
-impl Ask {
-    /// 上限の超過か、入力に帰せる子の死か（REQ-039）。判定は block になる。
-    /// 上限の内側で読めないものと、自分に帰せる死（panic、起動とプロトコルの
-    /// 失敗）は ask のまま（REQ-038・REQ-010・A23）。
-    pub fn is_limit(&self) -> bool {
-        matches!(
-            self,
-            Ask::Parse(
-                guardian_parser::Failure::TooLarge
-                    | guardian_parser::Failure::TooDeep
-                    | guardian_parser::Failure::Limit
-            )
-        )
-    }
 }
 
 /// コマンド文字列を解析して効果を取り出す。判定できない理由も返す。
@@ -390,19 +337,19 @@ fn extract_simple(
     let args = &stripped[1..];
 
     // シェルの起動（REQ-035）。
-    match guardian_parser::shell_kind(name) {
-        guardian_parser::ShellKind::NonPosix => {
+    match crate::command::shell_kind(name) {
+        crate::command::ShellKind::NonPosix => {
             asks.push(Ask::UnsupportedShell(name.to_string()));
             for word in stripped {
                 scan_word_substitutions(word, ctx, out, asks, depth);
             }
             return Vec::new();
         }
-        guardian_parser::ShellKind::BashLike => {
+        crate::command::ShellKind::BashLike => {
             extract_shell(args, ctx, out, asks, depth);
             return Vec::new();
         }
-        guardian_parser::ShellKind::Other => {}
+        crate::command::ShellKind::Other => {}
     }
 
     match name {
@@ -553,7 +500,7 @@ fn extract_shell(
     asks: &mut Vec<Ask>,
     depth: usize,
 ) {
-    match guardian_parser::shell_c_index(args) {
+    match crate::command::shell_c_index(args) {
         Some(index) => match args.get(index + 1) {
             Some(body) => match body.literal_value() {
                 Some(inner) => {

@@ -1,6 +1,7 @@
 //! S6: symlink・合成・内部エラー（REQ-007, REQ-009, REQ-010）。
 
-use guardian_core::{analyze, extract_effects, Class, Env, Target, Verdict, Why};
+use guardian_analysis::{analyze, extract_effects};
+use guardian_core::{Class, Env, Target, Verdict, Why};
 use guardian_judge::{Classification, Judge, JudgeEnv};
 use std::path::PathBuf;
 

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/guardian-analysis",
     "crates/guardian-core",
     "crates/guardian-judge",
     "crates/guardian-parser",
