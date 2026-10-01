@@ -1,9 +1,7 @@
 //! コマンドの見張り（REQ-027〜REQ-034）。規則の形と語の照合を扱う。
 
+pub use guardian_core::Invocation;
 use guardian_core::Verdict;
-use guardian_parser::{
-    self as parser, Command, Compound, Part, Redirect, Script, SimpleCommand, Word,
-};
 use regex::Regex;
 
 /// 1 つの語の照合。`/.../` は語全体への正規表現、それ以外は完全一致。
@@ -72,14 +70,6 @@ pub struct GuardRule {
     pub examples_allow: Vec<String>,
 }
 
-/// 1 つの起動。program とその引数、先頭の代入。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Invocation {
-    pub program: String,
-    pub words: Vec<String>,
-    pub env_names: Vec<String>,
-}
-
 /// 設定の `commands.guard` を読む（REQ-027）。
 ///
 /// 見本:
@@ -103,7 +93,7 @@ pub struct Invocation {
 pub fn parse_guards(
     root: &toml::Value,
     warnings: &mut Vec<String>,
-    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+    examples: &mut dyn FnMut(&str) -> Vec<Invocation>,
 ) -> Vec<GuardRule> {
     let Some(value) = root.get("commands").and_then(|c| c.get("guard")) else {
         return Vec::new();
@@ -124,7 +114,7 @@ pub fn parse_guards(
             Err(e) => warnings.push(format!("見張りの規則を無効にします（{name}）: {e}")),
         }
     }
-    validate_examples(&mut rules, warnings, parse);
+    validate_examples(&mut rules, warnings, examples);
     rules
 }
 
@@ -132,14 +122,14 @@ pub fn parse_guards(
 fn validate_examples(
     rules: &mut Vec<GuardRule>,
     warnings: &mut Vec<String>,
-    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+    examples: &mut dyn FnMut(&str) -> Vec<Invocation>,
 ) {
     rules.retain(|rule| {
         if rule.examples_deny.is_empty() && rule.examples_allow.is_empty() {
             return true;
         }
         for example in &rule.examples_deny {
-            match example_matches(rule, example, parse) {
+            match example_matches(rule, example, examples) {
                 Ok(true) => {}
                 Ok(false) => {
                     warnings.push(format!(
@@ -158,7 +148,7 @@ fn validate_examples(
             }
         }
         for example in &rule.examples_allow {
-            match example_matches(rule, example, parse) {
+            match example_matches(rule, example, examples) {
                 Ok(false) => {}
                 Ok(true) => {
                     warnings.push(format!(
@@ -183,9 +173,9 @@ fn validate_examples(
 fn example_matches(
     rule: &GuardRule,
     example: &str,
-    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+    examples: &mut dyn FnMut(&str) -> Vec<Invocation>,
 ) -> Result<bool, String> {
-    let invs = invocations(example, parse);
+    let invs = examples(example);
     match invs.as_slice() {
         [inv] => Ok(rule.matches(inv)),
         _ => Err("例を 1 つの起動として読めない".to_string()),
@@ -195,11 +185,11 @@ fn example_matches(
 /// テスト用に TOML の文書から読む。
 pub fn parse_guard_rules_document(
     text: &str,
-    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+    examples: &mut dyn FnMut(&str) -> Vec<Invocation>,
 ) -> Result<(Vec<GuardRule>, Vec<String>), toml::de::Error> {
     let value: toml::Value = toml::from_str(text)?;
     let mut warnings = Vec::new();
-    let rules = parse_guards(&value, &mut warnings, parse);
+    let rules = parse_guards(&value, &mut warnings, examples);
     Ok((rules, warnings))
 }
 
@@ -460,287 +450,4 @@ fn option_value_hit(name: &str, values: &[WordMatch], words: &[String]) -> bool 
         i += 1;
     }
     false
-}
-
-/// コマンド文字列から起動を集める。ラッパーと `bash -c`・`eval` の内側、
-/// コマンド置換の内側も展開する（REQ-044 の調査済みの範囲）。
-pub struct InvocationAnalysis {
-    pub invocations: Vec<Invocation>,
-    pub failures: Vec<parser::Failure>,
-}
-struct Walker<'a> {
-    out: InvocationAnalysis,
-    parse: &'a mut dyn FnMut(&str) -> parser::Outcome,
-}
-impl std::ops::Deref for Walker<'_> {
-    type Target = InvocationAnalysis;
-    fn deref(&self) -> &Self::Target {
-        &self.out
-    }
-}
-impl std::ops::DerefMut for Walker<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.out
-    }
-}
-
-impl std::ops::Deref for InvocationAnalysis {
-    type Target = [Invocation];
-
-    fn deref(&self) -> &Self::Target {
-        &self.invocations
-    }
-}
-
-impl InvocationAnalysis {
-    fn push(&mut self, invocation: Invocation) {
-        self.invocations.push(invocation);
-    }
-
-    fn as_slice(&self) -> &[Invocation] {
-        &self.invocations
-    }
-}
-
-pub fn invocations(
-    command: &str,
-    parse: &mut dyn FnMut(&str) -> parser::Outcome,
-) -> InvocationAnalysis {
-    let outcome = parse(command);
-    let mut out = Walker {
-        out: InvocationAnalysis {
-            invocations: Vec::new(),
-            failures: outcome.failures,
-        },
-        parse,
-    };
-    walk_script(&outcome.script, &mut out, 0);
-    out.out
-}
-
-fn walk_script(script: &Script, out: &mut Walker, depth: usize) {
-    if depth > parser::LIMIT_DEPTH {
-        out.failures.push(parser::Failure::TooDeep);
-        return;
-    }
-    for item in &script.items {
-        walk_pipeline(&item.first, out, depth);
-        for (_, pipeline) in &item.rest {
-            walk_pipeline(pipeline, out, depth);
-        }
-    }
-}
-
-fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut Walker, depth: usize) {
-    for command in &pipeline.commands {
-        walk_command(command, out, depth);
-    }
-}
-
-fn walk_command(command: &Command, out: &mut Walker, depth: usize) {
-    match command {
-        Command::Simple(simple) => walk_simple(simple, out, depth),
-        Command::Compound {
-            compound,
-            redirects,
-        } => {
-            walk_redirects(redirects, out, depth);
-            walk_compound(compound, out, depth);
-        }
-        Command::Function(function) => {
-            walk_redirects(&function.redirects, out, depth);
-            walk_word_subst(&function.name, out, depth);
-            walk_compound(&function.body, out, depth);
-        }
-        Command::Test(test) => {
-            walk_redirects(&test.redirects, out, depth);
-            for word in &test.words {
-                walk_word_subst(word, out, depth);
-            }
-        }
-    }
-}
-
-fn walk_redirects(redirects: &[Redirect], out: &mut Walker, depth: usize) {
-    for redirect in redirects {
-        match &redirect.target {
-            parser::RedirectTarget::Word(word) => walk_word_subst(word, out, depth),
-            parser::RedirectTarget::Fd(_) => {}
-            parser::RedirectTarget::ProcessSubstitution(substitution) => {
-                walk_script(&substitution.body, out, depth);
-            }
-            parser::RedirectTarget::HereDocument { doc, .. } => walk_word_subst(doc, out, depth),
-        }
-    }
-}
-
-fn walk_compound(compound: &Compound, out: &mut Walker, depth: usize) {
-    match compound {
-        Compound::If {
-            condition,
-            then,
-            elses,
-        } => {
-            walk_script(condition, out, depth);
-            walk_script(then, out, depth);
-            for clause in elses {
-                if let Some(condition) = &clause.condition {
-                    walk_script(condition, out, depth);
-                }
-                walk_script(&clause.body, out, depth);
-            }
-        }
-        Compound::While {
-            condition, body, ..
-        } => {
-            walk_script(condition, out, depth);
-            walk_script(body, out, depth);
-        }
-        Compound::For { values, body, .. } => {
-            for word in values {
-                walk_word_subst(word, out, depth);
-            }
-            walk_script(body, out, depth);
-        }
-        Compound::ArithmeticFor {
-            initializer,
-            condition,
-            updater,
-            body,
-        } => {
-            for word in [initializer, condition, updater].into_iter().flatten() {
-                walk_word_subst(word, out, depth);
-            }
-            walk_script(body, out, depth)
-        }
-        Compound::Case { value, arms } => {
-            walk_word_subst(value, out, depth);
-            for arm in arms {
-                for pattern in &arm.patterns {
-                    walk_word_subst(pattern, out, depth);
-                }
-                if let Some(body) = &arm.body {
-                    walk_script(body, out, depth);
-                }
-            }
-        }
-        Compound::BraceGroup(script) | Compound::Subshell(script) => {
-            walk_script(script, out, depth)
-        }
-        Compound::Arithmetic(word) => walk_word_subst(word, out, depth),
-        Compound::Coprocess { name, body } => {
-            if let Some(name) = name {
-                walk_word_subst(name, out, depth);
-            }
-            walk_command(body, out, depth);
-        }
-    }
-}
-
-fn walk_simple(simple: &SimpleCommand, out: &mut Walker, depth: usize) {
-    for word in &simple.words {
-        walk_word_subst(word, out, depth);
-    }
-    walk_redirects(&simple.redirects, out, depth);
-    for substitution in &simple.process_substitutions {
-        walk_script(&substitution.body, out, depth);
-    }
-
-    let words: Vec<&Word> = simple.words.iter().collect();
-    let mut index = 0;
-    let mut env_names = Vec::new();
-    while index < words.len() {
-        match assignment_name(words[index]) {
-            Some((name, value_word)) => {
-                env_names.push(name);
-                walk_word_subst(value_word, out, depth);
-                index += 1;
-            }
-            None => break,
-        }
-    }
-    // ラッパーの外し方は parser と共有する（A44）。外した範囲にある代入の
-    // 名前も拾う（REQ-031）。
-    let (names, stripped) = guardian_analysis::strip_wrapper(&words[index..]);
-    env_names.extend(names);
-    index = words.len() - stripped.len();
-    let Some(first) = words.get(index) else {
-        return;
-    };
-    let program = basename(&first.text).to_string();
-    let args: Vec<&Word> = words[index + 1..].to_vec();
-
-    if guardian_analysis::shell_kind(&first.text) == guardian_analysis::ShellKind::BashLike {
-        if let Some(inner) = shell_c_string(&args) {
-            walk_inner(&inner, out, depth);
-        }
-        if guardian_analysis::shell_c_index(args.iter().copied()).is_some() {
-            return;
-        }
-    }
-    if program == "eval" {
-        let mut pieces = Vec::new();
-        for w in &args {
-            match w.literal_value() {
-                Some(s) => pieces.push(s),
-                None => return,
-            }
-        }
-        if !pieces.is_empty() {
-            walk_inner(&pieces.join(" "), out, depth);
-        }
-        return;
-    }
-    out.push(Invocation {
-        program,
-        words: args.iter().map(|w| w.text.clone()).collect(),
-        env_names,
-    });
-}
-
-fn walk_inner(inner: &str, out: &mut Walker, depth: usize) {
-    let outcome = (out.parse)(inner);
-    out.failures.extend(outcome.failures);
-    walk_script(&outcome.script, out, depth + 1);
-}
-
-fn walk_word_subst(word: &Word, out: &mut Walker, depth: usize) {
-    for part in &word.parts {
-        if let Part::Substitution(substitution) = part {
-            if let Some(body) = &substitution.body {
-                walk_script(body, out, depth);
-            }
-        }
-    }
-}
-
-fn assignment_name(w: &Word) -> Option<(String, &Word)> {
-    let first = match w.parts.first() {
-        Some(Part::Literal(s)) => s,
-        _ => return None,
-    };
-    let eq = first.find('=')?;
-    if eq == 0 {
-        return None;
-    }
-    let name = &first[..eq];
-    if !name
-        .chars()
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
-        return None;
-    }
-    Some((name.to_string(), w))
-}
-
-fn shell_c_string(args: &[&Word]) -> Option<String> {
-    // `-c` の位置の読み方は parser と共有する（A16）。
-    let index = guardian_analysis::shell_c_index(args.iter().copied())?;
-    args.get(index + 1).and_then(|w| w.literal_value())
-}
-
-fn basename(text: &str) -> &str {
-    text.rsplit('/').next().unwrap_or(text)
 }

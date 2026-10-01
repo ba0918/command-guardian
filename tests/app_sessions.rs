@@ -93,3 +93,14 @@ fn req_039_failed_start_is_internal_and_children_are_reaped() {
     }
     assert_eq!(children(), before);
 }
+
+// @kotowari[REQ-034, REQ-037]
+#[test]
+fn req_034_assignment_substitution_is_one_example_invocation() {
+    let dir = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let file = dir.path().join("config.toml");
+    std::fs::write(&file, "[[commands.guard]]\nprogram='git'\nreason='push'\ndeny=[['push']]\n[commands.guard.examples]\ndeny=['X=$(git push)']\n").unwrap();
+    let engine = Engine::load(Some(&file), env());
+    assert_eq!(engine.config().guard.len(), 1);
+    assert_eq!(engine.check("X=$(git push)").verdict, Verdict::Ask);
+}

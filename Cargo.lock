@@ -132,6 +132,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 name = "command-guardian"
 version = "0.1.0"
 dependencies = [
+ "guardian-analysis",
  "guardian-app",
  "guardian-core",
  "guardian-judge",
@@ -349,7 +350,6 @@ version = "0.1.0"
 dependencies = [
  "guardian-analysis",
  "guardian-core",
- "guardian-judge",
  "guardian-parser",
  "regex",
  "serde",

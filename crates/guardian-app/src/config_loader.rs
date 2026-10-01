@@ -177,7 +177,18 @@ fn read_layer(
         &mut layer.warnings,
     );
     read_custom_rules(root, &mut layer.rules_custom, &mut layer.warnings);
-    layer.guard = guard::parse_guards(root, &mut layer.warnings, parse);
+    layer.guard = guard::parse_guards(root, &mut layer.warnings, &mut |input| {
+        guardian_analysis::analyze(
+            parse(input),
+            &guardian_core::Env {
+                home: None,
+                tmpdir: None,
+                cwd: None,
+            },
+            parse,
+        )
+        .invocations
+    });
     layer.git_enabled = read_bool(root, "git", "enabled", &mut layer.warnings);
     layer.enforce = read_bool(root, "mode", "enforce", &mut layer.warnings);
     read_path_list(

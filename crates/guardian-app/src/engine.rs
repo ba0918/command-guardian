@@ -4,7 +4,7 @@ use crate::config_loader as config;
 use guardian_analysis::analyze;
 use guardian_core::{Ask, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
 use guardian_judge::{GitRunner, Judge, JudgeEnv};
-use guardian_policy::{config::Config, guard, message};
+use guardian_policy::{config::Config, message};
 use regex::Regex;
 use std::path::{Path, PathBuf};
 
@@ -153,7 +153,7 @@ impl Engine {
         let outcome = session.parse(command);
         let analysis = analyze(outcome, &core_env, &mut |input| session.parse(input));
         // 構文解析の ask。引用の除去の失敗も同じ列に足す（REQ-039・A23）。
-        let mut asks = analysis.parse_errors;
+        let mut asks = analysis.diagnostics;
         let mut effects = Vec::new();
         for e in &analysis.effects {
             // 無効にした組み込みルールの効果は取り出さない（REQ-026）。
@@ -191,16 +191,8 @@ impl Engine {
 
         // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
         if !self.config.guard.is_empty() {
-            let mut parse = |input: &str| session.parse(input);
-            let invocations = guard::invocations(command, &mut parse);
-            for failure in &invocations.failures {
-                let ask = Ask::Parse(failure.clone());
-                if !asks.contains(&ask) {
-                    asks.push(ask);
-                }
-            }
             for rule in &self.config.guard {
-                if invocations.iter().any(|inv| rule.matches(inv)) {
+                if analysis.invocations.iter().any(|inv| rule.matches(inv)) {
                     rules.push(RuleReport {
                         name: rule.program.clone(),
                         reason: rule.reason.clone(),

@@ -694,9 +694,9 @@ fn req_037_subscript_operand_is_read_in_textual_order() {
     // 取れなくなり、効果が消えて ask に落ちる（REQ-006・REQ-037）。
     let analysis = analyze("rm -rf ${a[1]:-y}", &env());
     assert!(
-        analysis.parse_errors.is_empty(),
+        analysis.diagnostics.is_empty(),
         "{:?}",
-        analysis.parse_errors
+        analysis.diagnostics
     );
     assert_eq!(
         analysis.effects,
@@ -709,17 +709,17 @@ fn req_037_subscript_operand_is_read_in_textual_order() {
     for cmd in ["echo ${a[1]:-y}", "echo ${a[$x]:-y}", "echo ${a[b]:-y}"] {
         let analysis = analyze(cmd, &env());
         assert!(
-            analysis.parse_errors.is_empty(),
+            analysis.diagnostics.is_empty(),
             "{cmd}: {:?}",
-            analysis.parse_errors
+            analysis.diagnostics
         );
     }
 
     let analysis = analyze("rm -rf ${a[$(rm -rf /etc/x)]:-y}", &env());
     assert!(
-        analysis.parse_errors.is_empty(),
+        analysis.diagnostics.is_empty(),
         "{:?}",
-        analysis.parse_errors
+        analysis.diagnostics
     );
     assert!(
         analysis.effects.contains(&Effect {
@@ -762,9 +762,9 @@ fn req_037_substitutions_in_expansion_operands_are_read() {
             "{cmd}"
         );
         assert!(
-            analysis.parse_errors.is_empty(),
+            analysis.diagnostics.is_empty(),
             "{cmd}: {:?}",
-            analysis.parse_errors
+            analysis.diagnostics
         );
     }
 }

@@ -29,6 +29,7 @@ guardian-policy = { path = "crates/guardian-policy" }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+guardian-analysis = { path = "crates/guardian-analysis" }
 toml = { workspace = true }
 tempfile = { workspace = true }
 

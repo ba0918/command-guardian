@@ -1,8 +1,19 @@
-pub fn invocations(command: &str) -> guardian_policy::guard::InvocationAnalysis {
-    guardian_policy::guard::invocations(command, &mut guardian_parser::parse)
+pub fn facts(command: &str) -> guardian_core::CommandFacts {
+    guardian_analysis::analyze(
+        guardian_parser::parse(command),
+        &guardian_core::Env {
+            home: None,
+            tmpdir: None,
+            cwd: None,
+        },
+        &mut guardian_parser::parse,
+    )
+}
+pub fn invocations(command: &str) -> Vec<guardian_core::Invocation> {
+    facts(command).invocations
 }
 pub fn parse_guard_rules_document(
     text: &str,
 ) -> Result<(Vec<guardian_policy::GuardRule>, Vec<String>), toml::de::Error> {
-    guardian_policy::guard::parse_guard_rules_document(text, &mut guardian_parser::parse)
+    guardian_policy::guard::parse_guard_rules_document(text, &mut invocations)
 }

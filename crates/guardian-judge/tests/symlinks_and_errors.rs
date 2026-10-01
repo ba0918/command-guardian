@@ -129,7 +129,7 @@ fn req_010_parse_failure_is_reported() {
         "rm -rf $(rm /etc/foo",
     ] {
         let a = analyze(cmd, &core_env());
-        assert!(!a.parse_errors.is_empty(), "{cmd}");
+        assert!(!a.diagnostics.is_empty(), "{cmd}");
     }
 }
 
@@ -138,5 +138,5 @@ fn req_010_parse_failure_is_reported() {
 fn req_010_unclosed_substitution_is_an_error() {
     // 閉じないコマンド置換も解析の失敗として報告する。
     let a = analyze("rm -rf $(cat /tmp/list", &core_env());
-    assert!(!a.parse_errors.is_empty());
+    assert!(!a.diagnostics.is_empty());
 }

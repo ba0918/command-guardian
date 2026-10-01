@@ -1,7 +1,7 @@
 //! 非 allow の文面。「何を・なぜ・代替」を 2〜4 行で組み立てる。
 
+use guardian_core::Failure;
 use guardian_core::{Ask, Class, Op, ProtectedKind, Target, Why};
-use guardian_parser::Failure;
 
 /// 対象を人が読める形にする。
 pub fn display_target(target: &Target) -> String {

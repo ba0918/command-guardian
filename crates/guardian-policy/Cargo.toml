@@ -5,14 +5,13 @@ edition = "2021"
 description = "設定・ルール・見張り・判定の合成・文面"
 
 [dependencies]
-guardian-analysis = { path = "../guardian-analysis" }
 guardian-core = { path = "../guardian-core" }
-guardian-judge = { path = "../guardian-judge" }
-guardian-parser = { path = "../guardian-parser" }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
+guardian-analysis = { path = "../guardian-analysis" }
+guardian-parser = { path = "../guardian-parser" }
 tempfile = { workspace = true }
