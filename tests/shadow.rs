@@ -58,6 +58,60 @@ fn run_check(command: &str, home: &Path, xdg: &Path, state: Option<&Path>) -> Ru
     )
 }
 
+// @kotowari[REQ-019]
+#[test]
+fn req_019_shadow_file_symlink_does_not_modify_its_target() {
+    let home = temp_dir("shadow-safe-home-");
+    let state = temp_dir("shadow-safe-state-");
+    let xdg = home.path().join("config");
+    write_shadow_config(&xdg);
+    let sentinel = state.path().join("sentinel");
+    std::fs::write(&sentinel, "unchanged").unwrap();
+    std::fs::set_permissions(&sentinel, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let dir = state.path().join("command-guardian");
+    std::fs::create_dir(&dir).unwrap();
+    std::os::unix::fs::symlink(&sentinel, dir.join("shadow.log")).unwrap();
+    let result = run_hook(
+        &bash_input("rm /etc/x", "/tmp"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(result.code, 0);
+    assert!(result.stdout.is_empty());
+    assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "unchanged");
+    assert_eq!(
+        std::fs::metadata(sentinel).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+}
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_shadow_directory_symlink_does_not_modify_its_target() {
+    let home = temp_dir("shadow-safe-home-");
+    let state = temp_dir("shadow-safe-state-");
+    let xdg = home.path().join("config");
+    write_shadow_config(&xdg);
+    let sentinel = state.path().join("sentinel-dir");
+    std::fs::create_dir(&sentinel).unwrap();
+    std::fs::set_permissions(&sentinel, std::fs::Permissions::from_mode(0o750)).unwrap();
+    std::os::unix::fs::symlink(&sentinel, state.path().join("command-guardian")).unwrap();
+    let result = run_hook(
+        &bash_input("rm /etc/x", "/tmp"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(result.code, 0);
+    assert!(result.stdout.is_empty());
+    assert!(!sentinel.join("shadow.log").exists());
+    assert_eq!(
+        std::fs::metadata(sentinel).unwrap().permissions().mode() & 0o777,
+        0o750
+    );
+}
+
 fn run_bin(
     args: &[&str],
     input: Option<&str>,

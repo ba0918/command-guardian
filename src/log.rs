@@ -2,9 +2,9 @@
 
 use guardian_app::Report;
 use guardian_policy::message;
-use std::fs::{DirBuilder, OpenOptions};
+use std::fs::{DirBuilder, File};
 use std::io::Write;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -29,13 +29,36 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
         return Ok(());
     };
     let dir = path.parent().expect("ログのパスには親がある");
-    DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
-    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .mode(0o600)
-        .open(&path)?;
+    let base = dir.parent().expect("ログのディレクトリには親がある");
+    DirBuilder::new().recursive(true).mode(0o700).create(base)?;
+    let base = File::open(base)?;
+    use rustix::fs::{mkdirat, openat, Mode, OFlags};
+    let private_mode = Mode::from_bits_truncate(0o700);
+    match mkdirat(&base, "command-guardian", private_mode) {
+        Ok(()) | Err(rustix::io::Errno::EXIST) => {}
+        Err(error) => return Err(error.into()),
+    }
+    let dir = openat(
+        &base,
+        "command-guardian",
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    rustix::fs::fchmod(&dir, private_mode)?;
+    let mut file = File::from(openat(
+        &dir,
+        "shadow.log",
+        OFlags::WRONLY
+            | OFlags::CREATE
+            | OFlags::APPEND
+            | OFlags::NOFOLLOW
+            | OFlags::NONBLOCK
+            | OFlags::CLOEXEC,
+        Mode::from_bits_truncate(0o600),
+    )?);
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::other("Shadow log is not a regular file"));
+    }
     file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

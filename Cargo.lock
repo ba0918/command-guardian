@@ -138,6 +138,7 @@ dependencies = [
  "guardian-judge",
  "guardian-parser",
  "guardian-policy",
+ "rustix",
  "serde_json",
  "tempfile",
  "toml",

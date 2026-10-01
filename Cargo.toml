@@ -25,6 +25,7 @@ guardian-app = { path = "crates/guardian-app" }
 guardian-core = { path = "crates/guardian-core" }
 guardian-policy = { path = "crates/guardian-policy" }
 serde_json = { workspace = true }
+rustix = { version = "1.1", features = ["fs"] }
 
 [dev-dependencies]
 guardian-judge = { path = "crates/guardian-judge" }
