@@ -897,7 +897,7 @@ fn find_effects(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>) -> Vec<
     }
     let mut sources = Vec::new();
     if starts.is_empty() {
-        let base = resolve_text(".", false, ctx);
+        let base = resolve_text(".", ctx);
         if let Some(source) = find_source(base, false, has_delete, out) {
             sources.push(source);
         }
@@ -1094,7 +1094,8 @@ fn is_fd_duplication_target(word: &Word) -> bool {
 /// 語から値だけを解決する。子の訪問はwalkerが担当する。
 fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
     match resolve_value(word, ctx) {
-        Value::Text(text) => resolve_text(&text, word.has_glob, ctx),
+        Value::Text(_) if word.has_glob => resolve_glob(word, ctx),
+        Value::Text(text) => resolve_text(&text, ctx),
         Value::Children(base) => Resolved::Children(base),
         Value::Mktemp => Resolved::Mktemp,
         Value::UnknownSource => Resolved::UnknownSource,
@@ -1104,6 +1105,35 @@ fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
 
 fn dereferences(word: &Word, ctx: &Context) -> bool {
     matches!(resolve_value(word, ctx), Value::Text(text) if text.ends_with('/'))
+}
+
+fn resolve_glob(word: &Word, ctx: &Context) -> Resolved {
+    let Some(first_glob) = word
+        .parts
+        .iter()
+        .position(|part| matches!(part, Part::Glob(_)))
+    else {
+        return Resolved::Unresolved(word.text.clone());
+    };
+    let prefix = Word::from_parts(word.parts[..first_glob].to_vec());
+    let Value::Text(prefix) = resolve_value(&prefix, ctx) else {
+        return Resolved::Unresolved(word.text.clone());
+    };
+    let base = match prefix.rsplit_once('/') {
+        Some(("", _)) => "/",
+        Some((base, _)) => base,
+        None => "",
+    };
+    if base.is_empty() {
+        return ctx
+            .cwd
+            .clone()
+            .map_or_else(|| Resolved::Unresolved(word.text.clone()), Resolved::Glob);
+    }
+    match resolve_text(base, ctx) {
+        Resolved::Path(path) => Resolved::Glob(path),
+        _ => Resolved::Unresolved(word.text.clone()),
+    }
 }
 
 fn resolve_value(word: &Word, ctx: &Context) -> Value {
@@ -1241,26 +1271,8 @@ fn expand_tilde(text: &str, ctx: &Context) -> Option<String> {
 }
 
 /// 文字列をパスとして解決する。
-fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
+fn resolve_text(text: &str, ctx: &Context) -> Resolved {
     let expanded = text;
-
-    if has_glob {
-        let base = glob_base(expanded);
-        let path = if base.is_empty() {
-            match &ctx.cwd {
-                Some(cwd) => cwd.clone(),
-                None => return Resolved::Unresolved(text.to_string()),
-            }
-        } else if Path::new(&base).is_absolute() {
-            clean_path(Path::new(&base))
-        } else {
-            match &ctx.cwd {
-                Some(cwd) => clean_path(&cwd.join(&base)),
-                None => return Resolved::Unresolved(text.to_string()),
-            }
-        };
-        return Resolved::Glob(path);
-    }
 
     if expanded.is_empty() {
         return Resolved::Unresolved(text.to_string());
@@ -1273,28 +1285,6 @@ fn resolve_text(text: &str, has_glob: bool, ctx: &Context) -> Resolved {
             None => Resolved::Unresolved(text.to_string()),
         }
     }
-}
-
-/// glob が広がり得る最も外側のディレクトリ。最初に glob 文字を含む要素より前。
-fn glob_base(text: &str) -> String {
-    let mut base = String::new();
-    for comp in text.split('/') {
-        if comp.contains(['*', '?', '[']) {
-            break;
-        }
-        if !base.is_empty() || text.starts_with('/') {
-            base.push('/');
-        }
-        base.push_str(comp);
-    }
-    if base.is_empty() {
-        return String::new();
-    }
-    // 末尾の空要素（glob が最後）を除く。
-    while base.len() > 1 && base.ends_with('/') {
-        base.pop();
-    }
-    base
 }
 
 fn clean_path(path: &Path) -> PathBuf {

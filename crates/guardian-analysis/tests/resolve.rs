@@ -298,3 +298,20 @@ fn req_002_only_unquoted_tilde_is_expanded_to_home() {
         vec![delete(p("/home/you/x"))]
     );
 }
+
+// @kotowari[REQ-002, REQ-041]
+#[test]
+fn req_002_quoted_glob_characters_are_literal_components_of_the_glob_base() {
+    for name in ["a*b", "a?b", "a[b]"] {
+        assert_eq!(
+            effects(&format!("rm '/tmp/{name}/'*")),
+            vec![delete(Target::GlobBase(PathBuf::from(format!(
+                "/tmp/{name}"
+            ))))]
+        );
+    }
+    assert_eq!(
+        effects("rm '/tmp/a*b/'suffix*"),
+        vec![delete(Target::GlobBase(PathBuf::from("/tmp/a*b")))]
+    );
+}
