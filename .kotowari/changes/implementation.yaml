@@ -1,0 +1,30 @@
+version: 1
+entries:
+  - id: change-conformance-adoption-implementation
+    base: cf2117167ff42533c647b86e50426df6eef5adaa
+    role: implementer
+    files:
+      - path: .ignore
+        before: null
+        after: sha256:6ea373279673b4f4aadd9f27fd47011e0f298bf878108c9a5ad704a17739bc3a
+      - path: AGENTS.md
+        before: sha256:8178e5128304e5f016f4c4a80cc1e8a77e5473c817cd803b78d2a122a6218577
+        after: sha256:e95843dbcd2c31e0c02dfbd0fef0221557c06866d50dd2e04f85906ba88cd7cb
+      - path: PROJECT.md
+        before: sha256:08a4cd3a47e680f9dc5f8cbd1adbb294b10074f76592e1cc53a4039fc58334e4
+        after: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
+    ir: []
+    conclusion: new
+    reason: >-
+      Introduces repository-local change-conformance checks and independent records
+      under the requested adoption scope. The product's accepted inputs, judgments,
+      output formats and runtime constraints are unchanged; no product IR addition
+      is needed. The decision record states the development procedure and the
+      boundary for grounded IR additions without automatic ratification of code.
+    requirements: []
+    decisions:
+      - docs/decision/records/2026-10-02-change-conformance.md#A1
+      - docs/decision/records/2026-10-02-change-conformance.md#A2
+      - docs/decision/records/2026-10-02-change-conformance.md#A3
+    handoff: null
+    gaps: []

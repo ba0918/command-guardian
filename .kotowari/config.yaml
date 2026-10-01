@@ -2,6 +2,27 @@ ir: docs/ir
 decisions:
   records: docs/decision/records
   adr: docs/decision/adr
+changes:
+  files:
+    - "src/**/*.rs"
+    - "crates/**/src/**/*.rs"
+    - "tests/**/*.rs"
+    - "crates/**/tests/**/*.rs"
+    - "Cargo.toml"
+    - "crates/**/Cargo.toml"
+    - "scripts/**/*"
+    - "lefthook.yml"
+    - ".github/workflows/**/*"
+    - ".githooks/**/*"
+    - "AGENTS.md"
+    - "PROJECT.md"
+    - ".gitignore"
+    - ".ignore"
+  exclude:
+    - "Cargo.lock"
+  records:
+    - ".kotowari/changes/implementation.yaml"
+    - ".kotowari/changes/review.yaml"
 tests:
   files:
     - "src/**/*.rs"

@@ -46,6 +46,33 @@ cargo run --locked -- check 'rm -rf /etc/x' --cwd /tmp --format json
 
 ## Conventions specific to this project
 
+### 変更とIRの照合
+
+kotowari 0.3.0以降の、"changes" コマンドを持つ版を使う。
+これはIRを自動生成する機能ではなく、Gitの変更と判断記録の対応・鮮度を検査する。
+今回の導入より前の変更を、自動で仕様適合とみなすものではない。
+
+1. 呼出元がブランチ全体の比較元と候補先をGitから確定し、完全なコミットIDを記録する。記録ファイルの自己申告から比較元を選ばない。
+2. 実装者が ".kotowari/changes/implementation.yaml" を作る。既存要求内なら要求と関連IR、仕様の穴を埋めるなら根拠・判断者・決定記録と必要なIRを残す。実装をそのまま正しい仕様として取り込まない。
+3. 実装と別のコンテキストのレビュー担当が根拠・意味・承認範囲を確認し、同じ変更と実装者が挙げた全IRを含む ".kotowari/changes/review.yaml" を自分で作る。役割ラベルだけを変えてコピーしない。
+4. 両記録をコミットし、呼出元が最終HEADを再確定する。下記の両検査と既存の製品チェックが成功した場合だけ統合する。未処理の仕様判断をdeferredにしたまま統合しない。
+
+```sh
+BASE=<呼出元がGitから確定したブランチ全体の比較元の完全なID>
+HEAD_SHA=$(git rev-parse HEAD)
+kotowari check --format json
+kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
+```
+
+コード・IR・決定の意味の変更、rebase、cherry-pick、並行統合で最終記録が無効になったら、両記録を除いて該当entry全体を照合し直し、独立レビュー後に作り直す。
+記録は上記2ファイルに現在の比較だけを保持し、過去分はGit履歴で読む。
+中間コミットとpre-commitフックには "changes" を要求しない。
+任意の実装者自己検査には "kotowari changes --base HEAD --staged --phase implementation" を使えるが、独立レビューの代わりにはならない。
+"status" のcompleteだけでは変更照合の完了とは扱わない。
+CIは現時点で追加しない。公開する際は、PRのmerge-baseと実head、またはpushイベントのbefore/afterを使い、新規ブランチのゼロbeforeから比較元を推測しない。
+
+### 製品の実装と試験
+
 - 本番の入力由来の解析は app の session を通す。main の先頭で同一バイナリの子を dispatch する。親での直接解析 fallback は置かない。
 - 純粋な parser と analysis の試験には浅い入力を使う。子の死亡と深い入力は root の実バイナリ試験へ置く。libtest の main を worker として再起動しない。
 - git fixture は `CARGO_TARGET_TMPDIR` に置く。target を `/tmp` へ移すと一時領域の分類に変わるため、検証時に移さない。
