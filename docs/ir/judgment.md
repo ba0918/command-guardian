@@ -79,10 +79,10 @@ hook-guardian は、対象パスの分類に応じて判定を決める。`ephem
 ### REQ-010: 内部エラーで止めない
 
 - kind: prohibition
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A14, docs/decision/records/2026-10-01-parser.md#A22
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A14, docs/decision/records/2026-10-01-parser.md#A22, docs/decision/records/2026-10-01-parser.md#A23
 - verification: unit
 
-hook-guardian は、判定の内部エラー、git の失敗、入力の解析の失敗によって `block` しない。判定できないときは `ask` にする。この `ask` は、上限の内側で読めないものを指す。上限の超過と、隔離した子プロセスの異常終了は `block` になる（REQ-039 が扱う）。
+hook-guardian は、判定の内部エラー、git の失敗、入力の解析の失敗によって `block` しない。判定できないときは `ask` にする。この `ask` は、上限の内側で読めないものを指す。上限の超過と、隔離した子プロセスの死のうち入力に帰せるものは `block` になり、自分に帰せるものは `ask` のままになる（REQ-039 が扱う）。
 
 ## Examples
 
