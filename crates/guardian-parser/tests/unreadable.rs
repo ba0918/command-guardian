@@ -1,6 +1,6 @@
 //! S8: 読めない構文は ask のコーパス（REQ-038）。
 
-use guardian_parser::{parse, Failure};
+use guardian_parser::{parse, Failure, LIMIT_DEPTH};
 
 /// 読めない入力のコーパス。
 const UNREADABLE: &[&str] = &[
@@ -173,6 +173,66 @@ fn req_039_keyword_words_in_arguments_do_not_hide_depth() {
     let outcome = parse(&input);
     assert_eq!(outcome.failures, vec![Failure::TooDeep]);
     assert!(outcome.script.is_empty());
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_arithmetic_parentheses_do_not_hide_depth() {
+    // 算術式の中の括弧は、正規化した構文木では平坦な断片になる。断片のテキストの
+    // 括弧を数える過大評価で、128 段を超える入れ子を深さとして数える。
+    let over = "(".repeat(LIMIT_DEPTH + 1);
+    let close = ")".repeat(LIMIT_DEPTH + 1);
+    for input in [
+        format!("echo $(( {over}1{close} ))"),
+        format!("(( {over}1{close} ))"),
+        format!("echo $[ {over}1{close} ]"),
+        format!("for (( i=0; {over}1{close}; i++ )); do true; done"),
+        format!("cat <<EOF\n$(( {over}1{close} ))\nEOF\n"),
+    ] {
+        let outcome = parse(&input);
+        assert_eq!(outcome.failures, vec![Failure::TooDeep], "{input}");
+        assert!(outcome.script.is_empty(), "{input}");
+    }
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_arithmetic_depth_at_the_limit_is_read() {
+    let at = "(".repeat(LIMIT_DEPTH);
+    let close = ")".repeat(LIMIT_DEPTH);
+    for input in [
+        format!("echo $(( {at}1{close} ))"),
+        format!("echo $[ {at}1{close} ]"),
+    ] {
+        let outcome = parse(&input);
+        assert!(
+            outcome.failures.is_empty(),
+            "{input}: {:?}",
+            outcome.failures
+        );
+    }
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_conditional_parentheses_do_not_hide_depth() {
+    // `[[ ]]` の括弧も同じ過大評価で数える。
+    let over = format!(
+        "[[ {}-n x{} ]]",
+        "(".repeat(LIMIT_DEPTH + 1),
+        ")".repeat(LIMIT_DEPTH + 1)
+    );
+    let outcome = parse(&over);
+    assert_eq!(outcome.failures, vec![Failure::TooDeep], "{over}");
+    assert!(outcome.script.is_empty());
+
+    let at = format!(
+        "[[ {}-n x{} ]]",
+        "(".repeat(LIMIT_DEPTH),
+        ")".repeat(LIMIT_DEPTH)
+    );
+    let outcome = parse(&at);
+    assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
 }
 
 // @kotowari[REQ-039]

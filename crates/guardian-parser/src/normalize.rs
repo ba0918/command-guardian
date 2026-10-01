@@ -133,7 +133,7 @@ impl Normalizer {
             }
             raw::Command::ExtendedTest(test, redirects) => {
                 let mut words = Vec::new();
-                self.test_expr(&test.expr, depth, &mut words)?;
+                self.test_expr(&test.expr, depth, 0, &mut words)?;
                 let redirects = self.redirects(redirects.as_ref(), depth)?;
                 Ok(Command::Test(TestCommand { words, redirects }))
             }
@@ -312,15 +312,21 @@ impl Normalizer {
         &mut self,
         expr: &raw::ExtendedTestExpr,
         depth: usize,
+        nesting: usize,
         out: &mut Vec<Word>,
     ) -> Result<(), Failure> {
+        // `[[ ]]` の括弧は正規化した構文木では語に平坦化される。ここで数える
+        // 過大評価で、128 段を超える入れ子を深さとして数える（REQ-039）。
+        if depth + nesting > LIMIT_DEPTH {
+            return Err(Failure::TooDeep);
+        }
         match expr {
             raw::ExtendedTestExpr::And(left, right) | raw::ExtendedTestExpr::Or(left, right) => {
-                self.test_expr(left, depth, out)?;
-                self.test_expr(right, depth, out)
+                self.test_expr(left, depth, nesting, out)?;
+                self.test_expr(right, depth, nesting, out)
             }
             raw::ExtendedTestExpr::Not(inner) | raw::ExtendedTestExpr::Parenthesized(inner) => {
-                self.test_expr(inner, depth, out)
+                self.test_expr(inner, depth, nesting + 1, out)
             }
             raw::ExtendedTestExpr::UnaryTest(_, word) => {
                 out.push(self.word(word, depth)?);
@@ -601,6 +607,9 @@ impl Normalizer {
     }
 
     /// 算術式。外側の綴りを保ち、中の置換だけを読む（REQ-037）。
+    ///
+    /// 式の内側の括弧は、正規化した構文木では平坦な断片になる。断片のテキストの
+    /// 括弧を数える過大評価で入れ子を測る（REQ-039）。
     fn arithmetic_parts(
         &mut self,
         expression: &raw::UnexpandedArithmeticExpr,
@@ -608,7 +617,7 @@ impl Normalizer {
         parts: &mut Vec<Part>,
     ) -> Result<(), Failure> {
         parts.push(Part::Opaque("$((".to_string()));
-        self.fragment_parts(&expression.value, depth + 1, parts)?;
+        self.fragment_parts(&expression.value, depth, parts)?;
         parts.push(Part::Opaque("))".to_string()));
         Ok(())
     }
@@ -654,7 +663,8 @@ impl Normalizer {
     ///
     /// パラメータ展開と算術のオペランドの再帰読みは、正規化した構文木では
     /// 平坦な断片になるため、事後の走査では段数を測れない。ここで再帰読みの
-    /// 段数を測り、上限を超えたら TooDeep にする（REQ-039）。
+    /// 段数と、断片のテキストにある括弧の入れ子を測り、上限を超えたら
+    /// TooDeep にする（REQ-039）。括弧は数え落としの起きない過大評価で数える。
     fn fragment_parts(
         &mut self,
         raw: &str,
@@ -664,7 +674,7 @@ impl Normalizer {
         if raw.is_empty() {
             return Ok(());
         }
-        if depth > LIMIT_DEPTH {
+        if depth + paren_nesting(raw) > LIMIT_DEPTH {
             return Err(Failure::TooDeep);
         }
         let pieces = match catch(|| word::parse(raw, &self.options)) {
@@ -755,6 +765,27 @@ fn is_glob_char(c: char) -> bool {
 /// 語の中で部品が占める原文。
 fn raw_text<'a>(source: &'a str, piece: &word::WordPieceWithSource) -> &'a str {
     source.get(piece.start_index..piece.end_index).unwrap_or("")
+}
+
+/// 断片のテキストにある丸括弧の入れ子の最大値（REQ-039）。
+///
+/// 正規化した構文木では算術式などが平坦な断片になるため、事後の走査では
+/// 段数を測れない。断片のテキストに現れた括弧をそのまま数え、入れ子の最大値を
+/// 返す。引用や入れ子の断片の内側も数える過大評価とし、数え落としを起こさない。
+fn paren_nesting(text: &str) -> usize {
+    let mut depth = 0usize;
+    let mut max = 0usize;
+    for c in text.chars() {
+        match c {
+            '(' => {
+                depth += 1;
+                max = max.max(depth);
+            }
+            ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    max
 }
 
 /// パラメータ展開が持つオペランドの原文（既定値、パターン、算術式など）。
