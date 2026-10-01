@@ -6,18 +6,19 @@ mod log;
 use guardian_app::{Engine, EngineEnv, Report};
 use guardian_core::Verdict;
 use guardian_policy::message;
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 fn main() {
     // 入力由来の解析の子プロセスとして起動されたときは、何よりも先に解析を務める。
     // 子は stdin を要求のソケットとして使うため、フックの入力より先にここへ来る。
     guardian_app::runtime::run_if_child();
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     std::process::exit(run(&args));
 }
 
-fn run(args: &[String]) -> i32 {
-    match args.first().map(|s| s.as_str()) {
+fn run(args: &[OsString]) -> i32 {
+    match args.first().and_then(|s| s.to_str()) {
         Some("--help" | "-h") => {
             println!("{ROOT_HELP}");
             0
@@ -88,7 +89,7 @@ struct CheckArgs {
     format: Format,
 }
 
-fn cmd_check(args: &[String]) -> i32 {
+fn cmd_check(args: &[OsString]) -> i32 {
     let parsed = match parse_check(args) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -119,14 +120,17 @@ fn cmd_check(args: &[String]) -> i32 {
     }
 }
 
-fn parse_check(args: &[String]) -> Result<Option<CheckArgs>, String> {
+fn parse_check(args: &[OsString]) -> Result<Option<CheckArgs>, String> {
     let mut command: Option<String> = None;
     let mut cwd: Option<PathBuf> = None;
     let mut format = Format::Text;
     let mut i = 0;
     let mut options = true;
     while i < args.len() {
-        match args[i].as_str() {
+        match args[i]
+            .to_str()
+            .ok_or("Command and option names must be valid UTF-8")?
+        {
             "--help" | "-h" if options => return Ok(None),
             "--" if options => {
                 options = false;
@@ -139,7 +143,7 @@ fn parse_check(args: &[String]) -> Result<Option<CheckArgs>, String> {
             }
             "--format" if options => {
                 let value = args.get(i + 1).ok_or("Missing value for --format")?;
-                format = match value.as_str() {
+                format = match value.to_str().ok_or("Output format must be valid UTF-8")? {
                     "text" => Format::Text,
                     "json" => Format::Json,
                     other => return Err(format!("Unknown --format: {other}")),

@@ -20,7 +20,7 @@ struct HookInput {
 }
 
 /// stdin のフック入力を判定し、エージェントごとの出力を返す。`hook` は常に 0 で終わる。
-pub fn run(args: &[String]) -> i32 {
+pub fn run(args: &[std::ffi::OsString]) -> i32 {
     let agent = match parse_agent(args) {
         HookArgs::Help => {
             println!("{HELP}");
@@ -85,14 +85,14 @@ enum HookArgs {
 }
 
 /// `--agent claude|codex` を読む。
-fn parse_agent(args: &[String]) -> HookArgs {
+fn parse_agent(args: &[std::ffi::OsString]) -> HookArgs {
     let mut agent = None;
     let mut i = 0;
     while i < args.len() {
-        if matches!(args[i].as_str(), "--help" | "-h") {
+        if matches!(args[i].to_str(), Some("--help" | "-h")) {
             return HookArgs::Help;
         } else if args[i] == "--agent" {
-            agent = match args.get(i + 1).map(|s| s.as_str()) {
+            agent = match args.get(i + 1).and_then(|s| s.to_str()) {
                 Some("claude") => Some(Agent::Claude),
                 Some("codex") => Some(Agent::Codex),
                 _ => None,
