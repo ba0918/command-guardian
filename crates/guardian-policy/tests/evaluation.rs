@@ -75,6 +75,57 @@ fn req_003_nested_tmpdir_root_is_not_allowed_by_an_outer_temporary_root() {
     }
 }
 
+// @kotowari[REQ-005, REQ-006, REQ-013]
+#[test]
+fn req_005_configured_roots_with_parent_components_match_resolved_targets() {
+    for root in ["../valuable", "/work/repo/../valuable"] {
+        let layer = guardian_policy::layers::parse_layer(
+            &format!("[paths]\nprotected_roots = [\"{root}\"]"),
+            std::path::Path::new("/work/repo"),
+            None,
+        )
+        .unwrap();
+        let mut config = Config::builtin(None);
+        guardian_policy::layers::merge(&mut config, &layer);
+        let policy = Policy::new(config, vec![]);
+        for path in ["/work/valuable", "/work/valuable/file"] {
+            assert_eq!(
+                policy
+                    .apply_roots(&ObservedPath {
+                        path: path.into(),
+                        children: false,
+                    })
+                    .map(|value| value.2),
+                Some(Verdict::Block)
+            );
+        }
+        assert!(policy
+            .apply_roots(&ObservedPath {
+                path: "/work/valuable-other/file".into(),
+                children: false,
+            })
+            .is_none());
+    }
+    let mut config = Config::builtin(None);
+    config.allowed_roots.push("/work/repo/../scratch".into());
+    let policy = Policy::new(config, vec![]);
+    assert_eq!(
+        policy
+            .apply_roots(&ObservedPath {
+                path: "/work/scratch/file".into(),
+                children: false,
+            })
+            .map(|value| value.2),
+        Some(Verdict::Allow)
+    );
+    assert!(policy
+        .apply_roots(&ObservedPath {
+            path: "/work/scratch".into(),
+            children: false,
+        })
+        .is_none());
+}
+
 // @kotowari[REQ-009, REQ-026, REQ-033, REQ-038, REQ-039]
 #[test]
 fn req_009_allow_rules_never_overwrite_heavier_diagnostics_or_rules() {

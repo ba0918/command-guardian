@@ -1,13 +1,31 @@
 //! マージ後の設定値。
 use crate::guard::GuardRule;
 use guardian_core::Verdict;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomRule {
     pub name: String,
     pub pattern: String,
     pub verdict: Verdict,
+}
+
+pub(crate) fn normalize_root(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if out.file_name().is_some_and(|name| name != "..") {
+                    out.pop();
+                } else if !out.has_root() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

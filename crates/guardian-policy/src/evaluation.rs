@@ -40,7 +40,14 @@ pub struct Policy {
     custom_rules: Vec<CompiledRule>,
 }
 impl Policy {
-    pub fn new(config: Config, mut warnings: Vec<String>) -> Self {
+    pub fn new(mut config: Config, mut warnings: Vec<String>) -> Self {
+        for root in config
+            .allowed_roots
+            .iter_mut()
+            .chain(&mut config.protected_roots)
+        {
+            *root = crate::config::normalize_root(root);
+        }
         let mut custom_rules = Vec::new();
         for rule in &config.rules_custom {
             match Regex::new(&rule.pattern) {
