@@ -13,24 +13,36 @@
 - A1 条件分岐を含むloopの状態伝播は、修正と再照合まで適合判定を保留し、利用者へ引き渡す。既存REQ-002を誤った確定値へ読み替えない。
   - why: `S=/etc/x; for x in /a; do if false; then S=/tmp/x; fi; done; rm "$S"`を実バイナリが`/tmp/x`のallowと判定した。条件付き代入が確定値として伝播し、[REQ-002](../../ir/judgment.md#REQ-002)と衝突する。
   - decided_by: 照合担当、検証依頼の範囲で未解決事項を引渡し
+  - superseded_by: [分岐状態の合流](./2026-10-02-ir-friction-fixes.md#A1)
 - A2 未知のglob反復後のcwd・変数の確定伝播は、修正と再照合まで適合判定を保留し、利用者へ引き渡す。
   - why: `for x in /tmp/*; do cd child; done; rm victim`を実バイナリが一段だけ移動した`/tmp/child/victim`として判定した。未知の反復回数を一回として扱う根拠がなく、[REQ-002](../../ir/judgment.md#REQ-002)の確定値条件を満たさない。
   - decided_by: 照合担当、検証依頼の範囲で未解決事項を引渡し
+  - superseded_by: [未知反復状態の合流](./2026-10-02-ir-friction-fixes.md#A2)
 - A3 findのexecdir固定相対引数の子集合への吸収は、対応条件の判断と修正・再照合まで適合判定を保留し、利用者へ引き渡す。
   - why: `find /tmp -execdir rm -rf etc {} +`を実バイナリが`children of /tmp`だけのallowと判定した。起点自身を訪問した場合の固定対象`/etc`はその子集合に入らず、[REQ-001](../../ir/judgment.md#REQ-001)・[REQ-002](../../ir/judgment.md#REQ-002)・[REQ-008](../../ir/judgment.md#REQ-008)から吸収を導けない。コマンド本文そのものは実行していない。
   - decided_by: 照合担当、検証依頼の範囲で未解決事項を引渡し
+  - superseded_by: [固定相対対象の保持](./2026-10-02-ir-friction-fixes.md#A3)
 - A4 壊れた一般設定の正常部分を保持する復旧単位は、利用者の判断まで保留する。ファイル・セクション・キーのどれを単位とするかを決め、修正または承認された要求改訂の後に再照合する。
   - why: 新規layers試験は誤型セクションがあっても`mode.enforce=false`等を保持する。[REQ-015](../../ir/config.md#REQ-015)の組み込み既定復帰と、[REQ-034](../../ir/guards.md#REQ-034)の規則単位無効化を黙って一般化できない。
   - decided_by: 照合担当、意味の選択は利用者へ引渡し
+  - superseded_by: [ファイル単位の不採用](./2026-10-02-ir-friction-contracts.md#A1)
 - A5 影ログ保存先のリンク・非通常ファイルの拒否条件と保存不能時の扱いは、利用者の判断まで保留する。リンク先を変更する旧動作を復活させず、受理条件と失敗時の契約を決めて再照合する。
   - why: 追加されたshadow試験は保存先のリンクを拒否して無出力・終了0で続ける。[REQ-018](../../ir/cli.md#REQ-018)・[REQ-019](../../ir/cli.md#REQ-019)の記録要求には保存を省略する条件がない。全パスのリンクやhardlinkを拒否する保証もない。
   - decided_by: 照合担当、意味の選択は利用者へ引渡し
+  - superseded_by: [保存失敗時の警告](./2026-10-02-ir-friction-contracts.md#A2)
 - A6 パイプ各段の状態分離のshell・実行モード前提は、適用範囲の判断まで保留する。通常bashの漏出修正とlastpipe等の未定義前提を分けて、利用者へ引き渡す。
   - why: [REQ-001](../../ir/judgment.md#REQ-001)・[REQ-002](../../ir/judgment.md#REQ-002)・[REQ-035](../../ir/parser.md#REQ-035)は、最終段が親状態を変更するモードの扱いまで定めていない。実装者側が候補として指摘し、追加の意味照合が必要である。
   - decided_by: 照合担当、未確定の前提を引渡し
+  - superseded_by: [最終段の両状態の合流](./2026-10-02-ir-friction-contracts.md#A3)
 - A7 check本文・オプションとOSパスのUTF-8受理境界は、決定記録とIRへの明記の判断まで保留し、利用者へ引き渡す。
   - why: io_contract試験は非UTF-8 cwdを受理し、非UTF-8本文を終了3で拒否する。[REQ-017](../../ir/cli.md#REQ-017)の失敗時終了コードだけでは入力の対応範囲を一意に決められない。パス表示のlossy変換まで承認したとは扱わない。
   - decided_by: 照合担当、意味の選択は利用者へ引渡し
+  - superseded_by: [入力文字コード境界](./2026-10-02-ir-friction-contracts.md#A4)
+
 - A8 A1からA7が未解決の間は、照合結果をdeferredとして保持し、統合ゲートを通過したとは扱わない。既存要求を変えず、今回の検証ブランチをmainへ統合しない。
   - why: 記録の形式・鮮度・網羅性と、意味の適合は別である。未解決を記録するだけでは修正も仕様承認も完了しない。
   - decided_by: 照合担当、検証依頼の範囲で統合停止を記録
+
+## Revisions
+
+A1〜A7は、それぞれの修正または利用者の選択に基づく契約へ引き渡した。単に保留を承認済みへ読み替えたものではない。A8の統合停止は、両役の再照合と機械検査が成功するまで有効である。
