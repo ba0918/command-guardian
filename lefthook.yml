@@ -1,0 +1,22 @@
+# Git フック（lefthook）。クローンごとに一度 `lefthook install` で有効にする。
+pre-commit:
+  piped: true
+  commands:
+    fmt:
+      priority: 1
+      glob: "*.rs"
+      run: cargo fmt --all --check
+    lint:
+      priority: 2
+      glob: "*.{rs,toml}"
+      run: cargo clippy --workspace --all-targets --locked -- -D warnings
+    test:
+      priority: 3
+      glob: "*.{rs,toml}"
+      # git はフックに GIT_DIR や GIT_INDEX_FILE を渡す。テストが起動する
+      # git がそれに引きずられないよう、外してから走らせる。
+      run: unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR; cargo test --workspace --locked
+    kotowari:
+      priority: 4
+      glob: "*.{rs,md,yaml}"
+      run: scripts/kotowari-check.sh

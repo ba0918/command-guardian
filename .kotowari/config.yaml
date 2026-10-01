@@ -6,6 +6,8 @@ tests:
   files:
     - "src/**/*.rs"
     - "tests/**/*.rs"
+    - "crates/**/src/**/*.rs"
+    - "crates/**/tests/**/*.rs"
   rust:
     attributes: []
     macros: []

@@ -1,0 +1,8 @@
+[package]
+name = "guardian-parser"
+version = "0.1.0"
+edition = "2021"
+description = "コマンド文字列の字句解析と構文解析。正規化した構文木を公開する"
+
+[dependencies]
+brush-parser = { workspace = true }

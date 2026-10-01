@@ -1,0 +1,17 @@
+[package]
+name = "guardian-policy"
+version = "0.1.0"
+edition = "2021"
+description = "設定・ルール・見張り・判定の合成・文面"
+
+[dependencies]
+guardian-core = { path = "../guardian-core" }
+guardian-judge = { path = "../guardian-judge" }
+guardian-parser = { path = "../guardian-parser" }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

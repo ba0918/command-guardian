@@ -1,0 +1,257 @@
+//! S16: 影実行とログ（REQ-018, REQ-019）。
+
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+struct Run {
+    code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+fn bin() -> &'static str {
+    env!("CARGO_BIN_EXE_hook-guardian")
+}
+
+fn temp_dir(prefix: &str) -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .unwrap()
+}
+
+/// `[mode] enforce = false` の利用者設定を置く。
+fn write_shadow_config(xdg: &Path) {
+    let path = xdg.join("hook-guardian/config.toml");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, "[mode]\nenforce = false\n").unwrap();
+}
+
+fn bash_input(command: &str, cwd: &str) -> String {
+    format!(
+        r#"{{"tool_name":"Bash","tool_input":{{"command":{}}},"cwd":{}}}"#,
+        serde_json::to_string(command).unwrap(),
+        serde_json::to_string(cwd).unwrap()
+    )
+}
+
+/// XDG_STATE_HOME を渡す（`None` のときは環境から外す）。
+fn run_hook(input: &str, home: &Path, xdg: &Path, state: Option<&Path>) -> Run {
+    run_bin(
+        &["hook", "--agent", "claude"],
+        Some(input),
+        home,
+        xdg,
+        state,
+    )
+}
+
+fn run_check(command: &str, home: &Path, xdg: &Path, state: Option<&Path>) -> Run {
+    run_bin(
+        &["check", command, "--cwd", "/tmp/scratch"],
+        None,
+        home,
+        xdg,
+        state,
+    )
+}
+
+fn run_bin(
+    args: &[&str],
+    input: Option<&str>,
+    home: &Path,
+    xdg: &Path,
+    state: Option<&Path>,
+) -> Run {
+    let mut cmd = Command::new(bin());
+    cmd.args(args)
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", xdg)
+        .env("TMPDIR", "/tmp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    match state {
+        Some(s) => cmd.env("XDG_STATE_HOME", s),
+        None => cmd.env_remove("XDG_STATE_HOME"),
+    };
+    let mut child = cmd.spawn().unwrap();
+    if let Some(input) = input {
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+    }
+    let out = child.wait_with_output().unwrap();
+    Run {
+        code: out.status.code().unwrap_or(-1),
+        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+    }
+}
+
+// @kotowari[REQ-018, EX-018]
+#[test]
+fn req_018_shadow_returns_nothing_and_logs() {
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    write_shadow_config(xdg.path());
+    let r = run_hook(
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.trim().is_empty(), "{}", r.stdout);
+    let log = std::fs::read_to_string(state.path().join("hook-guardian/shadow.log")).unwrap();
+    assert!(log.contains("block"), "{log}");
+    assert!(log.contains("/etc/nginx"), "{log}");
+    assert!(log.contains("rm -rf /etc/nginx"), "{log}");
+    assert!(log.contains("システムの領域"), "{log}");
+}
+
+// @kotowari[REQ-019, EX-026]
+#[test]
+fn req_019_shadow_log_is_one_line_with_owner_only_permissions() {
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    write_shadow_config(xdg.path());
+    run_hook(
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    let path = state.path().join("hook-guardian/shadow.log");
+    let log = std::fs::read_to_string(&path).unwrap();
+    let line = log.trim_end();
+    assert!(!line.contains('\n'), "{log}");
+    let fields: Vec<&str> = line.split('\t').collect();
+    assert_eq!(fields.len(), 5, "{line}");
+    assert!(fields[0].parse::<u64>().unwrap() > 0, "{line}");
+    assert_eq!(fields[1], "block", "{line}");
+    assert!(fields[2].contains("システムの領域"), "{line}");
+    assert_eq!(fields[3], "/etc/nginx", "{line}");
+    assert_eq!(fields[4], "rm -rf /etc/nginx", "{line}");
+    let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600, "{mode:o}");
+}
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_state_home_falls_back_to_home_local_state() {
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = home.path().join(".config");
+    write_shadow_config(&xdg);
+    run_hook(
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        None,
+    );
+    assert!(home
+        .path()
+        .join(".local/state/hook-guardian/shadow.log")
+        .is_file());
+}
+
+// @kotowari[REQ-018]
+#[test]
+fn req_018_enforce_true_does_not_write_a_log() {
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    let r = run_hook(
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0);
+    assert!(r.stdout.contains("deny"), "{}", r.stdout);
+    assert!(!state.path().join("hook-guardian").exists());
+}
+
+// @kotowari[REQ-018, EX-034]
+#[test]
+fn req_018_check_still_prints_the_verdict_in_shadow() {
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    write_shadow_config(xdg.path());
+    let r = run_check(
+        "rm -rf /etc/nginx",
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
+    assert!(r.stdout.contains("block"), "{}", r.stdout);
+    assert!(!state.path().join("hook-guardian").exists());
+}
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_empty_state_home_falls_back_to_home_local_state() {
+    // XDG_STATE_HOME が空文字列のときは ~/.local/state に書き、cwd 相対には書かない。
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let scratch = temp_dir("hook-guardian-shadow-cwd-");
+    write_shadow_config(xdg.path());
+    let input = bash_input("rm -rf /etc/nginx", "/tmp/scratch");
+    let mut child = Command::new(bin())
+        .args(["hook", "--agent", "claude"])
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", xdg.path())
+        .env("XDG_STATE_HOME", "")
+        .env("TMPDIR", "/tmp")
+        .current_dir(scratch.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(home
+        .path()
+        .join(".local/state/hook-guardian/shadow.log")
+        .is_file());
+    assert!(!scratch.path().join("hook-guardian/shadow.log").exists());
+}
+
+// @kotowari[REQ-019]
+#[test]
+fn req_019_multiline_command_stays_one_record() {
+    // コマンド本文の改行とタブをエスケープし、1 判定 1 行 5 フィールドを守る。
+    let home = temp_dir("hook-guardian-shadow-home-");
+    let xdg = temp_dir("hook-guardian-shadow-xdg-");
+    let state = temp_dir("hook-guardian-shadow-state-");
+    write_shadow_config(xdg.path());
+    run_hook(
+        &bash_input("echo a\tb\nrm -rf /tmp/scratch/x", "/tmp/scratch"),
+        home.path(),
+        xdg.path(),
+        Some(state.path()),
+    );
+    let path = state.path().join("hook-guardian/shadow.log");
+    let log = std::fs::read_to_string(&path).unwrap();
+    let line = log.trim_end();
+    assert!(!line.contains('\n'), "{log}");
+    assert_eq!(line.split('\t').count(), 5, "{line}");
+    assert!(line.contains("\\n"), "{line}");
+    assert!(line.contains("\\t"), "{line}");
+}
