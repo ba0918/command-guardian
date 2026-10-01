@@ -92,9 +92,10 @@ Scenario: 応答時間の目標
   When 判定の時間を計測する
   Then 100ms 未満である
 
-@id=EX-031 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A7,docs/decision/records/2026-09-30-hook-guardian-scope.md#A8,docs/decision/records/2026-09-30-hook-guardian-scope.md#A15,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
+@id=EX-031 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A7,docs/decision/records/2026-09-30-hook-guardian-scope.md#A8,docs/decision/records/2026-09-30-hook-guardian-scope.md#A9,docs/decision/records/2026-09-30-hook-guardian-scope.md#A15,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: ask の終了コード
-  Given git の作業ツリーに未追跡のファイルがある
+  Given "/home/you/work/repo" は一時領域ではない git の作業ツリーである
+  And その作業ツリーの直下の "notes.txt" 自体が未追跡である
   When "command-guardian check 'rm notes.txt' --cwd /home/you/work/repo" を実行する
   Then 判定は ask で、終了コードは 1 になる
 

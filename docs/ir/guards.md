@@ -112,8 +112,9 @@ Scenario: 期待と違う例ではその規則だけを無効にする
 @id=EX-042 @about=REQ-032 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A42,docs/decision/records/2026-09-30-hook-guardian-scope.md#A48
 Scenario: only に書いた使い方だけを通す
   Given git の規則が "only" に "status" と "commit" を持つ
-  When "git status" と "git push" を判定する
-  Then "git status" は止まらず、"git push" はその規則の verdict になる
+  And 判定する起動は、その規則の "deny"、"deny-flags"、"deny-option-values"、"deny-env" のどれにも当たらない
+  When "git status" と "git commit" と "git push" を判定する
+  Then "git status" と "git commit" はその規則に一致せず、"git push" は "only" に当たらないため、その規則の "verdict" になる
 
 @id=EX-043 @about=REQ-034 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A45
 Scenario: 壊れた正規表現の規則だけを無効にする
@@ -123,7 +124,7 @@ Scenario: 壊れた正規表現の規則だけを無効にする
 
 @id=EX-044 @about=REQ-027 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A42,docs/decision/records/2026-09-30-hook-guardian-scope.md#A45,docs/decision/records/2026-09-30-hook-guardian-scope.md#A47
 Scenario: 形の誤りの規則だけを無効にする
-  Given "deny" も "only" も持たない規則がある
+  Given "deny"、"deny-flags"、"deny-option-values"、"deny-env"、"only" のどれも持たない規則がある
   When 設定を読み込む
   Then その規則は無効になり、警告が出る
 
