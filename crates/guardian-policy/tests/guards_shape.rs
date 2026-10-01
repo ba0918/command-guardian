@@ -163,6 +163,37 @@ deny = [["push"]]
     assert!(!warnings.is_empty());
 }
 
+// @kotowari[REQ-027, REQ-034]
+#[test]
+fn req_027_wrong_verdict_and_examples_types_disable_only_the_invalid_rules() {
+    let (rs, warnings) = rules(
+        r#"
+[[commands.guard]]
+program = "git"
+reason = "invalid verdict"
+verdict = false
+deny = [["push"]]
+[[commands.guard]]
+program = "git"
+reason = "invalid examples"
+examples = "git push"
+deny = [["push"]]
+[[commands.guard]]
+program = "git"
+reason = "valid"
+deny = [["push"]]
+examples = { deny = ["git push"], allow = ["git status"] }
+"#,
+    );
+    assert_eq!(rs.len(), 1);
+    assert_eq!(warnings.len(), 2);
+    assert_eq!(rs[0].reason, "valid");
+    assert_eq!(rs[0].verdict, guardian_core::Verdict::Ask);
+    assert_eq!(rs[0].examples_deny, vec!["git push"]);
+    assert_eq!(rs[0].examples_allow, vec!["git status"]);
+    assert!(matches(&rs, "git push"));
+}
+
 // @kotowari[REQ-028]
 #[test]
 fn req_028_words_match_whole_and_regex_is_anchored() {

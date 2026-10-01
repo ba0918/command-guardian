@@ -126,10 +126,14 @@ fn parse_guard(item: &toml::Value) -> Result<GuardRule, String> {
         .filter(|s| !s.is_empty())
         .ok_or("Empty reason")?
         .to_string();
-    let verdict = match item.get("verdict").and_then(|v| v.as_str()) {
-        None | Some("ask") => Verdict::Ask,
-        Some("block") => Verdict::Block,
-        Some(other) => return Err(format!("Invalid verdict ({other})")),
+    let verdict = match item.get("verdict") {
+        None => Verdict::Ask,
+        Some(value) => match value.as_str() {
+            Some("ask") => Verdict::Ask,
+            Some("block") => Verdict::Block,
+            Some(other) => return Err(format!("Invalid verdict ({other})")),
+            None => return Err("verdict: expected a string".into()),
+        },
     };
     let options_with_value = string_list(item.get("options-with-value"), "options-with-value")?;
     let for_ = word_seq_list(item.get("for"), "for")?;
@@ -258,6 +262,9 @@ fn examples(value: Option<&toml::Value>) -> Result<(Vec<String>, Vec<String>), S
     let Some(value) = value else {
         return Ok((Vec::new(), Vec::new()));
     };
+    if value.as_table().is_none() {
+        return Err("examples: expected a table".into());
+    }
     let deny = string_list(value.get("deny"), "examples.deny")?;
     let allow = string_list(value.get("allow"), "examples.allow")?;
     Ok((deny, allow))
