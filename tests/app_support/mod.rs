@@ -40,5 +40,13 @@ pub fn invocations(command: &str) -> Vec<guardian_core::Invocation> {
 pub fn parse_guard_rules_document(
     text: &str,
 ) -> Result<(Vec<guardian_policy::GuardRule>, Vec<String>), toml::de::Error> {
-    guardian_policy::guard::parse_guard_rules_document(text, &mut invocations)
+    let value: toml::Value = toml::from_str(text)?;
+    let mut warnings = Vec::new();
+    let mut rules = guardian_policy::guard::parse_guards(&value, &mut warnings);
+    guardian_app::config_loader::validate_examples(
+        &mut rules,
+        &mut warnings,
+        &mut runtime().validation(),
+    );
+    Ok((rules, warnings))
 }

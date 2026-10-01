@@ -10,5 +10,3 @@ guardian-parser = { path = "../guardian-parser" }
 guardian-analysis = { path = "../guardian-analysis" }
 guardian-judge = { path = "../guardian-judge" }
 guardian-policy = { path = "../guardian-policy" }
-regex = { workspace = true }
-toml = { workspace = true }

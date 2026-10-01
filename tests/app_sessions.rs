@@ -30,6 +30,16 @@ fn req_034_many_valid_examples_and_later_checks_are_independent() {
         assert!(report.parse_errors.is_empty(), "{:?}", report.parse_errors);
         assert!(report.warnings.is_empty(), "{:?}", report.warnings);
     }
+    let first = std::fs::read_to_string(&file).unwrap();
+    let second = "[[commands.guard]]\nprogram='cargo'\nreason='publish'\ndeny=[['publish']]\n[commands.guard.examples]\ndeny=['cargo publish']\n";
+    for text in [format!("{first}\n{second}"), format!("{second}\n{first}")] {
+        std::fs::write(&file, text).unwrap();
+        let loaded = Engine::load(Some(&file), env());
+        assert_eq!(loaded.config().guard.len(), 2);
+        assert_eq!(loaded.check("git push").verdict, Verdict::Ask);
+        assert_eq!(loaded.check("cargo publish").verdict, Verdict::Ask);
+        assert!(loaded.check("true").parse_errors.is_empty());
+    }
 }
 
 // @kotowari[REQ-039, EX-050]
