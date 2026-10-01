@@ -267,3 +267,21 @@ fn req_007_variable_trailing_slash_is_preserved_for_dereferencing() {
         })]
     );
 }
+
+// @kotowari[REQ-008]
+#[test]
+fn req_008_glob_loop_binding_represents_children_not_the_source_root() {
+    for base in ["/tmp", "/etc"] {
+        assert_eq!(
+            effects(&format!("for x in {base}/*; do rm \"$x\"; done")),
+            vec![delete(Target::Children {
+                base: PathBuf::from(base),
+                dereference: false,
+            })]
+        );
+    }
+    assert_eq!(
+        effects("for x in /tmp/*; do rm \"$x/child\"; done"),
+        vec![delete(Target::Unresolved("$x/child".into()))]
+    );
+}

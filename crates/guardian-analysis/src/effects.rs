@@ -18,6 +18,7 @@ use std::path::{Component, Path, PathBuf};
 enum Resolved {
     Path(PathBuf),
     Glob(PathBuf),
+    Children(PathBuf),
     Mktemp,
     UnknownSource,
     Unresolved(String),
@@ -31,6 +32,10 @@ impl Resolved {
                 dereference: dereferences(word, ctx),
             },
             Resolved::Glob(base) => Target::GlobBase(base),
+            Resolved::Children(base) => Target::Children {
+                base,
+                dereference: false,
+            },
             Resolved::Mktemp => Target::Mktemp,
             Resolved::UnknownSource => Target::UnknownSource,
             Resolved::Unresolved(text) => Target::Unresolved(text),
@@ -41,6 +46,7 @@ impl Resolved {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
     Text(String),
+    Children(PathBuf),
     Mktemp,
     UnknownSource,
     Unresolved(String),
@@ -370,9 +376,8 @@ fn extract_for(
             continue;
         }
         match resolve_word(word, ctx) {
-            Resolved::Path(path) | Resolved::Glob(path) => {
-                resolved.push(Value::Text(path.to_string_lossy().into_owned()))
-            }
+            Resolved::Path(path) => resolved.push(Value::Text(path.to_string_lossy().into_owned())),
+            Resolved::Glob(base) | Resolved::Children(base) => resolved.push(Value::Children(base)),
             Resolved::Mktemp => resolved.push(Value::Mktemp),
             _ => all_literal = false,
         }
@@ -917,10 +922,12 @@ fn find_source(
 ) -> Option<(PathBuf, bool)> {
     if has_delete {
         let target = match &res {
-            Resolved::Path(path) | Resolved::Glob(path) => Target::Children {
-                base: path.clone(),
-                dereference,
-            },
+            Resolved::Path(path) | Resolved::Glob(path) | Resolved::Children(path) => {
+                Target::Children {
+                    base: path.clone(),
+                    dereference,
+                }
+            }
             Resolved::Mktemp => Target::Mktemp,
             Resolved::UnknownSource => Target::UnknownSource,
             Resolved::Unresolved(text) => Target::Unresolved(text.clone()),
@@ -931,7 +938,9 @@ fn find_source(
         });
     }
     match res {
-        Resolved::Path(path) | Resolved::Glob(path) => Some((path, dereference)),
+        Resolved::Path(path) | Resolved::Glob(path) | Resolved::Children(path) => {
+            Some((path, dereference))
+        }
         _ => None,
     }
 }
@@ -1086,6 +1095,7 @@ fn is_fd_duplication_target(word: &Word) -> bool {
 fn resolve_word(word: &Word, ctx: &Context) -> Resolved {
     match resolve_value(word, ctx) {
         Value::Text(text) => resolve_text(&text, word.has_glob, ctx),
+        Value::Children(base) => Resolved::Children(base),
         Value::Mktemp => Resolved::Mktemp,
         Value::UnknownSource => Resolved::UnknownSource,
         Value::Unresolved(text) => Resolved::Unresolved(text),
