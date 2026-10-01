@@ -318,6 +318,7 @@ dependencies = [
  "guardian-judge",
  "guardian-parser",
  "guardian-policy",
+ "tempfile",
 ]
 
 [[package]]

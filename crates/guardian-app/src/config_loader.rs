@@ -19,6 +19,7 @@ pub fn user_config_path(xdg: Option<&Path>, home: Option<&Path>) -> Option<PathB
         })
 }
 pub fn find_project_config(cwd: &Path) -> Option<PathBuf> {
+    let cwd = std::path::absolute(cwd).ok()?;
     cwd.ancestors()
         .map(|dir| dir.join(".command-guardian.toml"))
         .find(|candidate| candidate.is_file())
