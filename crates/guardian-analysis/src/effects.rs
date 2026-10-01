@@ -1053,15 +1053,10 @@ fn rm_fixed_effects(
             if let Value::Text(text) = resolve_value(word, ctx) {
                 let path = Path::new(&text);
                 if !path.is_absolute() {
-                    if path
-                        .components()
-                        .any(|component| component == Component::ParentDir)
-                    {
-                        out.push(Effect {
-                            op: Op::Delete,
-                            target: Target::Unresolved(word.text.clone()),
-                        });
-                    }
+                    out.push(Effect {
+                        op: Op::Delete,
+                        target: Target::Unresolved(word.text.clone()),
+                    });
                     continue;
                 }
             }

@@ -83,7 +83,13 @@ fn req_008_execdir_relative_targets_use_the_source_directory_not_parent_cwd() {
     };
     assert_eq!(
         effects("find /tmp/scratch -type f -execdir rm -f victim {} \\;"),
-        vec![children.clone()]
+        vec![
+            Effect {
+                op: Op::Delete,
+                target: Target::Unresolved("victim".into()),
+            },
+            children.clone(),
+        ]
     );
     assert_eq!(
         effects("find /tmp/scratch -exec rm victim {} +"),
@@ -108,6 +114,48 @@ fn req_008_execdir_relative_targets_use_the_source_directory_not_parent_cwd() {
     assert!(effects("find /tmp/scratch -execdir rm ../outside {} +")
         .iter()
         .any(|effect| matches!(effect.target, Target::Unresolved(_))));
+}
+
+// @kotowari[REQ-001, REQ-002, REQ-008]
+#[test]
+fn req_002_execdir_fixed_relative_targets_cannot_be_absorbed_into_source_children() {
+    for command in [
+        "find /tmp -execdir rm -rf etc {} +",
+        "find /tmp /var/tmp -execdir rm -rf etc {} +",
+        "find /tmp -execdir rm -rf ./etc {} +",
+        "find /tmp -execdir rm -rf etc/* {} +",
+        "S=etc; find /tmp -execdir rm -rf \"$S\" {} +",
+    ] {
+        let result = effects(command);
+        assert!(
+            result
+                .iter()
+                .any(|effect| matches!(effect.target, Target::Unresolved(_))),
+            "{command}: {result:?}"
+        );
+        assert!(
+            result
+                .iter()
+                .any(|effect| matches!(effect.target, Target::Children { .. })),
+            "{command}: {result:?}"
+        );
+    }
+}
+
+// @kotowari[REQ-001, REQ-002]
+#[test]
+fn req_002_execdir_expanded_absolute_targets_remain_separate_from_source_children() {
+    let result = effects("S=/etc/x; find /tmp -execdir rm -rf \"$S\" {} +");
+    assert!(result.contains(&Effect {
+        op: Op::Delete,
+        target: path("/etc/x")
+    }));
+    assert!(
+        !result
+            .iter()
+            .any(|effect| matches!(effect.target, Target::Unresolved(_))),
+        "{result:?}"
+    );
 }
 
 // @kotowari[REQ-001]
