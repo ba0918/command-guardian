@@ -1,6 +1,6 @@
 # TODO
 
-`m1-guard-cli`（コマンドの読み方の再実装）を main にマージした時点の残件。
+コマンドの読み方の再実装を main にマージした時点の残件。
 詳細な記録は findings ファイル（`.agents/artifacts/reviews/m1-guard-cli.json`、git 管理外）にある。
 このファイルはその写しとして、判断待ちと次の作業を並べたもの。
 
@@ -20,8 +20,8 @@
 
 ## 検証・リリース
 
-- [ ] **S17**: メッセージと遅延の体感レビュー（人間）
-- [ ] **S19・配備**: リリース（Linux x86_64 の単体バイナリ、GitHub Releases + mise）と、dotfiles のフック差し替え（`block_dangerous_command.py` → `command-guardian`）。git remote が無いため未実施
+- [ ] **文面と応答時間のレビュー（人間）**: 代表的な 5 つの文面（拒否 2 件・ask 3 件）を読み、エージェントが次の一手を打てるか、利用者がその場で判断できるかを確かめる。代表的な入力 100 件で判定の時間を計測し、git の起動を含めて 100ms 未満であることを確かめる（REQ-012・REQ-021）
+- [ ] **配布**: Linux x86_64 の単体バイナリを GitHub Releases に置き、`mise use -g github:ba0918/command-guardian` で導入できるようにする。導入した `command-guardian check` が動き、CI がビルドとテストを回す（REQ-025）。dotfiles のフック差し替え（`block_dangerous_command.py` → `command-guardian`）もここで行う。前提: GitHub のリポジトリと remote、CI の土台
 - [ ] 実測 355 コマンドのコーパスでの再判定（コーパスはリポジトリに無い）
 
 ## 将来の方向（決まったら小さな決定から）
