@@ -12,12 +12,12 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_hook-guardian")
+    env!("CARGO_BIN_EXE_command-guardian")
 }
 
 fn temp_home() -> tempfile::TempDir {
     tempfile::Builder::new()
-        .prefix("hook-guardian-isolation-home-")
+        .prefix("command-guardian-isolation-home-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap()
 }

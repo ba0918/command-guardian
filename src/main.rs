@@ -1,4 +1,4 @@
-//! hook-guardian の実行ファイル。`check` と `hook` の 2 つのコマンドを持つ。
+//! command-guardian の実行ファイル。`check` と `hook` の 2 つのコマンドを持つ。
 
 mod hook;
 mod log;
@@ -21,11 +21,11 @@ fn run(args: &[String]) -> i32 {
         Some("hook") => hook::run(&args[1..]),
         Some(other) => {
             eprintln!("知らないコマンドです: {other}");
-            eprintln!("使い方: hook-guardian <check|hook> ...");
+            eprintln!("使い方: command-guardian <check|hook> ...");
             3
         }
         None => {
-            eprintln!("使い方: hook-guardian <check|hook> ...");
+            eprintln!("使い方: command-guardian <check|hook> ...");
             3
         }
     }

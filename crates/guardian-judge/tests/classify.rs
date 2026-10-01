@@ -147,7 +147,7 @@ fn req_005_repo_root_itself_is_protected() {
     // EX-029: glob は base の分類で判定する。
     // 一時領域（/tmp）の中では ephemeral が勝つため、作業ツリーの外の場所に作る。
     let dir = tempfile::Builder::new()
-        .prefix("hook-guardian-repo-")
+        .prefix("command-guardian-repo-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap();
     std::fs::create_dir(dir.path().join(".git")).unwrap();

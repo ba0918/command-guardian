@@ -42,7 +42,7 @@ pub fn clear_git_env(command: &mut Command) {
 /// .git と 1 コミットだけを持つフィクスチャ。
 pub fn fixture() -> Fixture {
     let dir = tempfile::Builder::new()
-        .prefix("hook-guardian-git-")
+        .prefix("command-guardian-git-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap();
     let root = dir.path().canonicalize().unwrap();

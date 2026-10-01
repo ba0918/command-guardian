@@ -10,7 +10,7 @@
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
 - verification: unit
 
-M1 の成果物は、"hook-guardian" という 1 つの実行ファイルであり、"hook" と "check" の 2 つのコマンドを持つ。"hook" は "--agent claude" か "--agent codex" を引数に取る。
+M1 の成果物は、"command-guardian" という 1 つの実行ファイルであり、"hook" と "check" の 2 つのコマンドを持つ。"hook" は "--agent claude" か "--agent codex" を引数に取る。
 
 ### REQ-017: check の契約
 
@@ -18,7 +18,7 @@ M1 の成果物は、"hook-guardian" という 1 つの実行ファイルであ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A34, docs/decision/records/2026-10-01-parser.md#A13
 - verification: unit
 
-"hook-guardian check" が呼ばれたとき、hook-guardian は、コマンド文字列と作業ディレクトリを受け取り、判定を標準出力に出す。既定は人が読む形式で、"--format json" のときは、"verdict" と "reason"（判定の理由）、効果ごとの "op"、"path"、"class"、"verdict"、"reason" を持つ JSON を出す。効果が無いときは、効果の一覧は空になる。終了コードは、"allow" が 0、"ask" が 1、"block" が 2、判定を出せない失敗が 3 にする。影実行のときも判定を出す。
+"command-guardian check" が呼ばれたとき、command-guardian は、コマンド文字列と作業ディレクトリを受け取り、判定を標準出力に出す。既定は人が読む形式で、"--format json" のときは、"verdict" と "reason"（判定の理由）、効果ごとの "op"、"path"、"class"、"verdict"、"reason" を持つ JSON を出す。効果が無いときは、効果の一覧は空になる。終了コードは、"allow" が 0、"ask" が 1、"block" が 2、判定を出せない失敗が 3 にする。影実行のときも判定を出す。
 
 ### REQ-018: 影実行
 
@@ -26,7 +26,7 @@ M1 の成果物は、"hook-guardian" という 1 つの実行ファイルであ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
 - verification: unit
 
-"mode.enforce" が false のとき、hook-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
+"mode.enforce" が false のとき、command-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
 
 ### REQ-019: 影実行のログ
 
@@ -34,7 +34,7 @@ M1 の成果物は、"hook-guardian" という 1 つの実行ファイルであ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
 - verification: unit
 
-影実行のログは、"XDG_STATE_HOME" が指すディレクトリの "hook-guardian" の下（"XDG_STATE_HOME" が無いときは "~/.local/state/hook-guardian"）に、所有者だけが読める権限で書く。1 行に、時刻、判定、理由、対象パス、コマンド本文を含める。
+影実行のログは、"XDG_STATE_HOME" が指すディレクトリの "command-guardian" の下（"XDG_STATE_HOME" が無いときは "~/.local/state/command-guardian"）に、所有者だけが読める権限で書く。1 行に、時刻、判定、理由、対象パス、コマンド本文を含める。
 
 ### REQ-020: git の起動条件
 
@@ -42,7 +42,7 @@ M1 の成果物は、"hook-guardian" という 1 つの実行ファイルであ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A16
 - verification: unit
 
-hook-guardian は、git のコマンドを、対象のパスが git の作業ツリーの中にあるときだけ起動する。
+command-guardian は、git のコマンドを、対象のパスが git の作業ツリーの中にあるときだけ起動する。
 
 ### REQ-021: 応答時間
 
@@ -58,7 +58,7 @@ hook-guardian は、git のコマンドを、対象のパスが git の作業ツ
 ```gherkin
 @id=EX-017 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A7,docs/decision/records/2026-09-30-hook-guardian-scope.md#A17,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27
 Scenario: check の終了コード
-  When "hook-guardian check 'rm -rf /tmp/scratch/x' --cwd /tmp/scratch" を実行する
+  When "command-guardian check 'rm -rf /tmp/scratch/x' --cwd /tmp/scratch" を実行する
   Then 判定は allow で、終了コードは 0 になる
 
 @id=EX-018 @about=REQ-018 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
@@ -76,8 +76,8 @@ Scenario: 作業ツリーの外では git を起動しない
 @id=EX-025 @about=REQ-016 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A19,docs/decision/records/2026-09-30-hook-guardian-scope.md#A40
 Scenario: 2 つのコマンドを受け付ける
   Given M1 の実行ファイルがある
-  When "hook-guardian check 'true' --cwd /tmp" を実行する
-  And "hook-guardian hook --agent claude" に "tool_name" が "Write" の入力を与える
+  When "command-guardian check 'true' --cwd /tmp" を実行する
+  And "command-guardian hook --agent claude" に "tool_name" が "Write" の入力を与える
   Then どちらもコマンドとして受け付けられる
 
 @id=EX-026 @about=REQ-019 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
@@ -95,22 +95,22 @@ Scenario: 応答時間の目標
 @id=EX-031 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A7,docs/decision/records/2026-09-30-hook-guardian-scope.md#A8,docs/decision/records/2026-09-30-hook-guardian-scope.md#A15,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: ask の終了コード
   Given git の作業ツリーに未追跡のファイルがある
-  When "hook-guardian check 'rm notes.txt' --cwd /home/you/work/repo" を実行する
+  When "command-guardian check 'rm notes.txt' --cwd /home/you/work/repo" を実行する
   Then 判定は ask で、終了コードは 1 になる
 
 @id=EX-032 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A17,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: block の終了コード
-  When "hook-guardian check 'rm -rf /etc/nginx' --cwd /tmp/scratch" を実行する
+  When "command-guardian check 'rm -rf /etc/nginx' --cwd /tmp/scratch" を実行する
   Then 判定は block で、終了コードは 2 になる
 
 @id=EX-033 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: 失敗の終了コード
-  When "hook-guardian check" をコマンド文字列なしで実行する
+  When "command-guardian check" をコマンド文字列なしで実行する
   Then 終了コードは 3 になる
 
 @id=EX-034 @about=REQ-018 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A17,docs/decision/records/2026-09-30-hook-guardian-scope.md#A22,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: 影実行でも check は判定を出す
   Given "mode.enforce" が false である
-  When "hook-guardian check 'rm -rf /etc/nginx' --cwd /tmp/scratch" を実行する
+  When "command-guardian check 'rm -rf /etc/nginx' --cwd /tmp/scratch" を実行する
   Then 判定は block として表示される
 ```

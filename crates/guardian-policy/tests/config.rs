@@ -39,12 +39,12 @@ fn verdict_of(engine: &Engine, command: &str) -> Verdict {
 // @kotowari[REQ-013, REQ-005, EX-015]
 #[test]
 fn req_013_project_config_is_found_from_a_parent_of_cwd() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let child = root.join("child");
     std::fs::create_dir_all(&child).unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         "[paths]\nprotected_roots = [\"/home/you/scratch/protected\"]\n",
     );
     let e = engine(None, &child);
@@ -57,7 +57,7 @@ fn req_013_project_config_is_found_from_a_parent_of_cwd() {
 // @kotowari[REQ-013]
 #[test]
 fn req_013_lists_append_and_scalars_take_the_later_layer() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -66,7 +66,7 @@ fn req_013_lists_append_and_scalars_take_the_later_layer() {
     );
     // 信頼していないプロジェクトの緩和は無視される。
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         "[paths]\nprotected_roots = [\"/home/you/b\"]\n[unknown]\nverdict = \"ask\"\n",
     );
     let e = engine(Some(&user), &root);
@@ -83,7 +83,7 @@ fn req_013_lists_append_and_scalars_take_the_later_layer() {
 // @kotowari[REQ-015, EX-016]
 #[test]
 fn req_015_broken_user_config_keeps_builtin_defaults_and_warns() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(&user, "これは TOML ではない [ paths\n");
@@ -101,10 +101,10 @@ fn req_015_broken_user_config_keeps_builtin_defaults_and_warns() {
 // @kotowari[REQ-014, EX-014]
 #[test]
 fn req_014_untrusted_project_settings_only_tighten() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         r#"
 [paths]
 allowed_roots = ["/"]
@@ -157,10 +157,10 @@ enforce = false
 // @kotowari[REQ-014, EX-030]
 #[test]
 fn req_014_project_trusted_projects_cannot_trust_itself() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         &format!(
             "trusted_projects = [\"{}\"]\n[paths]\nallowed_roots = [\"/\"]\n",
             root.display()
@@ -184,7 +184,7 @@ fn req_014_project_trusted_projects_cannot_trust_itself() {
 // @kotowari[REQ-014]
 #[test]
 fn req_014_trusted_project_settings_apply_fully() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -192,7 +192,7 @@ fn req_014_trusted_project_settings_apply_fully() {
         &format!("trusted_projects = [\"{}\"]\n", root.display()),
     );
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         "[paths]\nallowed_roots = [\"/home/you/scratch\"]\n[unknown]\nverdict = \"ask\"\n",
     );
     let e = engine(Some(&user), &root);
@@ -205,7 +205,7 @@ fn req_014_trusted_project_settings_apply_fully() {
 // @kotowari[REQ-005, REQ-006]
 #[test]
 fn req_005_006_configured_protected_and_allowed_roots_apply() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -229,7 +229,7 @@ fn req_005_006_configured_protected_and_allowed_roots_apply() {
 // @kotowari[REQ-006]
 #[test]
 fn req_006_unknown_verdict_can_be_block() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(&user, "[unknown]\nverdict = \"block\"\n");
@@ -272,21 +272,21 @@ fn req_006_git_enabled_false_does_not_invoke_git_or_classify_vcs() {
 // @kotowari[REQ-013]
 #[test]
 fn req_013_user_config_relative_paths_resolve_against_its_directory() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
-    let user = root.join("hook-guardian/config.toml");
+    let user = root.join("command-guardian/config.toml");
     write(&user, "[paths]\nprotected_roots = [\"prot\"]\n");
     let e = Engine::load(Some(&user), env(&root));
-    let expected = root.join("hook-guardian/prot");
+    let expected = root.join("command-guardian/prot");
     assert!(e.config().protected_roots.contains(&expected));
 }
 
 // @kotowari[REQ-015]
 #[test]
 fn req_015_broken_project_config_is_ignored_with_a_warning() {
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
-    write(&root.join(".hook-guardian.toml"), "= broken");
+    write(&root.join(".command-guardian.toml"), "= broken");
     let e = engine(None, &root);
     let r = e.check("rm -rf /home/you/x");
     assert!(
@@ -310,7 +310,7 @@ fn git(root: &Path) -> Command {
 }
 
 fn git_repo() -> tempfile::TempDir {
-    let dir = fixture_dir("hook-guardian-policy-git-");
+    let dir = fixture_dir("command-guardian-policy-git-");
     let root = dir.path();
     std::fs::write(root.join("tracked.txt"), "x").unwrap();
     for args in [
@@ -356,10 +356,10 @@ fn req_006_user_git_enabled_false_makes_worktree_paths_unknown() {
 fn req_027_untrusted_project_guard_rule_warning_is_kept() {
     // reason の無い規則は形の誤り。信頼していないプロジェクト設定でも
     // 無効にした警告を落とさない。
-    let dir = fixture_dir("hook-guardian-conf-");
+    let dir = fixture_dir("command-guardian-conf-");
     let root = dir.path().canonicalize().unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         "[[commands.guard]]\nprogram = \"git\"\ndeny = [[\"push\"]]\n",
     );
     let e = engine(None, &root);

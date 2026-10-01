@@ -27,7 +27,7 @@ fn fixture_dir(prefix: &str) -> tempfile::TempDir {
 // @kotowari[REQ-026, EX-035]
 #[test]
 fn req_026_disabled_effect_is_not_extracted() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(&user, "[rules]\ndisable = [\"truncate\"]\n");
@@ -44,7 +44,7 @@ fn req_026_disabled_effect_is_not_extracted() {
 // @kotowari[REQ-026]
 #[test]
 fn req_026_disabled_delete_effect_is_not_extracted() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(&user, "[rules]\ndisable = [\"delete\"]\n");
@@ -56,7 +56,7 @@ fn req_026_disabled_delete_effect_is_not_extracted() {
 // @kotowari[REQ-026, EX-036]
 #[test]
 fn req_026_custom_rule_verdict_joins_the_composition() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -84,7 +84,7 @@ verdict = "ask"
 // @kotowari[REQ-026]
 #[test]
 fn req_026_allow_custom_rule_is_only_effective_from_user_config() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -106,7 +106,7 @@ verdict = "allow"
     let project = root.join("proj");
     std::fs::create_dir_all(&project).unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         r#"
 [[rules.custom]]
 name = "proj-allow"
@@ -141,10 +141,10 @@ verdict = "allow"
 // @kotowari[REQ-026]
 #[test]
 fn req_026_custom_rule_from_untrusted_project_tightens() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         r#"
 [[rules.custom]]
 name = "no-push"
@@ -161,7 +161,7 @@ verdict = "block"
 // @kotowari[REQ-026]
 #[test]
 fn req_026_broken_custom_pattern_is_ignored_with_a_warning() {
-    let dir = fixture_dir("hook-guardian-rules-");
+    let dir = fixture_dir("command-guardian-rules-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(

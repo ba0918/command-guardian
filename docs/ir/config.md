@@ -10,7 +10,7 @@
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18
 - verification: unit
 
-hook-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディレクトリの "hook-guardian/config.toml"（"XDG_CONFIG_HOME" が無いときは "~/.config/hook-guardian/config.toml"）から、プロジェクトの設定を作業中のディレクトリから上へ探して最初に見つかった ".hook-guardian.toml" から読む。マージは組み込み、利用者、プロジェクトの順に行い、リストは足し合わせ、それ以外は後のものが勝つ。
+command-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディレクトリの "command-guardian/config.toml"（"XDG_CONFIG_HOME" が無いときは "~/.config/command-guardian/config.toml"）から、プロジェクトの設定を作業中のディレクトリから上へ探して最初に見つかった ".command-guardian.toml" から読む。マージは組み込み、利用者、プロジェクトの順に行い、リストは足し合わせ、それ以外は後のものが勝つ。
 
 ### REQ-014: プロジェクト設定の信頼
 
@@ -26,7 +26,7 @@ hook-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディレ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5
 - verification: unit
 
-設定が読めない、または壊れているとき、hook-guardian は、組み込みの既定で判定を続け、警告を出す。
+設定が読めない、または壊れているとき、command-guardian は、組み込みの既定で判定を続け、警告を出す。
 
 ### REQ-026: ルールの意味論
 
@@ -34,7 +34,7 @@ hook-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディレ�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A4, docs/decision/records/2026-09-30-hook-guardian-scope.md#A32
 - verification: unit
 
-hook-guardian のルールは、名前を持つ判定の単位である。組み込みのルールは効果の取り出しの単位であり、"delete"、"truncate"、"format" の名前を持ち、"rules.disable" で無効化すると、その効果は取り出さない。カスタムのルールは名前、正規表現のパターン、判定を持ち、引用とヒアドキュメントを外したコマンド本文に照合し、一致した判定を合成に加える。allow を返すカスタムのルールは、利用者設定でのみ有効とする。
+command-guardian のルールは、名前を持つ判定の単位である。組み込みのルールは効果の取り出しの単位であり、"delete"、"truncate"、"format" の名前を持ち、"rules.disable" で無効化すると、その効果は取り出さない。カスタムのルールは名前、正規表現のパターン、判定を持ち、引用とヒアドキュメントを外したコマンド本文に照合し、一致した判定を合成に加える。allow を返すカスタムのルールは、利用者設定でのみ有効とする。
 
 ## Decision tables
 
@@ -59,13 +59,13 @@ hook-guardian のルールは、名前を持つ判定の単位である。組み
 ```gherkin
 @id=EX-014 @about=REQ-014 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A20
 Scenario: 信頼していないプロジェクト設定の緩和は無視する
-  Given リポジトリの ".hook-guardian.toml" が許可ルートに "/" を追加している
+  Given リポジトリの ".command-guardian.toml" が許可ルートに "/" を追加している
   When そのリポジトリの中で削除の効果を判定する
   Then 許可ルートの追加は無視され、警告が出る
 
 @id=EX-015 @about=REQ-013 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A18
 Scenario: 親ディレクトリのプロジェクト設定を読む
-  Given 親ディレクトリに ".hook-guardian.toml" がある
+  Given 親ディレクトリに ".command-guardian.toml" がある
   When 子ディレクトリで判定する
   Then その設定がプロジェクトの層として読まれる
 

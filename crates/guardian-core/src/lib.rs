@@ -1,4 +1,4 @@
-//! hook-guardian の core。正規化した構文木からの破壊的効果の抽出、パスの解決、
+//! command-guardian の core。正規化した構文木からの破壊的効果の抽出、パスの解決、
 //! 判定の共通の型を持つ。字句解析と構文解析は guardian-parser が担う。
 
 pub mod extract;

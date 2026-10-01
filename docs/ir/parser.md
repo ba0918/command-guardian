@@ -10,7 +10,7 @@
 - source: docs/decision/records/2026-10-01-parser.md#A1, docs/decision/records/2026-10-01-parser.md#A16
 - verification: unit
 
-コマンドを読むとき、hook-guardian は bash と POSIX sh の文法を対象にする。bash 系のシェル（"bash"、"sh"、"dash"、"zsh"、"ksh"、"mksh"）を "-c" で起動するコマンド（"-lc" のようなまとめ書きを含む）は、その本体を bash 互換の文法として読む。"-c" を伴わない起動（"bash script.sh"、"sh < file"）は、本体がコマンド文字列の外にあるため読まず、通常のコマンドとして判定する。知っている非 POSIX 系のシェル（"fish"、"csh"、"tcsh"、"elvish"、"xonsh"、"nu"、"pwsh"）は、本体の有無にかかわらず ask にする。知らないプログラムはシェルとみなさない。シェルの起動の認識は、ラッパー（sudo と doas）を外した後のプログラムの語で行う。
+コマンドを読むとき、command-guardian は bash と POSIX sh の文法を対象にする。bash 系のシェル（"bash"、"sh"、"dash"、"zsh"、"ksh"、"mksh"）を "-c" で起動するコマンド（"-lc" のようなまとめ書きを含む）は、その本体を bash 互換の文法として読む。"-c" を伴わない起動（"bash script.sh"、"sh < file"）は、本体がコマンド文字列の外にあるため読まず、通常のコマンドとして判定する。知っている非 POSIX 系のシェル（"fish"、"csh"、"tcsh"、"elvish"、"xonsh"、"nu"、"pwsh"）は、本体の有無にかかわらず ask にする。知らないプログラムはシェルとみなさない。シェルの起動の認識は、ラッパー（sudo と doas）を外した後のプログラムの語で行う。
 
 ### REQ-036: 構文解析の担い手と境界
 
@@ -45,7 +45,7 @@
 - source: docs/decision/records/2026-10-01-parser.md#A2, docs/decision/records/2026-10-01-parser.md#A7, docs/decision/records/2026-10-01-parser.md#A11, docs/decision/records/2026-10-01-parser.md#A14, docs/decision/records/2026-10-01-parser.md#A20
 - verification: unit
 
-構文解析が失敗したとき、知らないノードの形に出会ったとき、置換の再帰読みの途中で読めなくなったとき、hook-guardian は ask の判定を出す。解析が失敗した命令からは効果を取り出さない。この ask はほかの効果の判定と合成し、より重い判定（block）があればそれが勝つ。
+構文解析が失敗したとき、知らないノードの形に出会ったとき、置換の再帰読みの途中で読めなくなったとき、command-guardian は ask の判定を出す。解析が失敗した命令からは効果を取り出さない。この ask はほかの効果の判定と合成し、より重い判定（block）があればそれが勝つ。
 
 ### REQ-039: 入力の上限
 

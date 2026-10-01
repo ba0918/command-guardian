@@ -2,7 +2,7 @@
 
 ## Goal
 
-危険な Bash コマンドをパスの意味論と program ごとの見張りで判定し、消えると戻せないと確信できる操作だけを止め、確信が持てないときは止めずに確認を返す `hook-guardian` が、Claude Code と Codex のフックとして動き、mise で導入できる。
+危険な Bash コマンドをパスの意味論と program ごとの見張りで判定し、消えると戻せないと確信できる操作だけを止め、確信が持てないときは止めずに確認を返す `command-guardian` が、Claude Code と Codex のフックとして動き、mise で導入できる。
 
 ## Specification
 
@@ -276,7 +276,7 @@ cargo test --workspace
 - Specification: docs/ir/cli.md#REQ-018, docs/ir/cli.md#REQ-019
 - Prerequisites: S15
 - May change: src/**
-- Done when: enforce が false のときフックが何も返さず、XDG_STATE_HOME の hook-guardian の下（無いときは ~/.local/state/hook-guardian）に所有者だけが読める権限で、時刻・判定・理由・対象パス・コマンド本文が 1 行ずつ書かれること、enforce が true のときはログを書かないこと、check は影実行でも判定を出すことがテストで確かめられている
+- Done when: enforce が false のときフックが何も返さず、XDG_STATE_HOME の command-guardian の下（無いときは ~/.local/state/command-guardian）に所有者だけが読める権限で、時刻・判定・理由・対象パス・コマンド本文が 1 行ずつ書かれること、enforce が true のときはログを書かないこと、check は影実行でも判定を出すことがテストで確かめられている
 - Shown by: test — EX-018, EX-026, EX-034
 - Left to the implementer: ログのファイル名
 - Stop and hand back if: ログの置き場が要件と実行環境で合わない
@@ -309,7 +309,7 @@ cargo test --workspace
 - Specification: docs/ir/release.md#REQ-025
 - Prerequisites: S18、GitHub のリポジトリが作られ remote が設定されている、CI の土台（.github/workflows）が置ける
 - May change: .github/workflows/**, Cargo.toml（リリース用の設定だけ）
-- Done when: リリースのページに Linux x86_64 向けの実行ファイルがあり、`mise use -g github:ba0918/hook-guardian` で導入でき、導入した `hook-guardian check` が動き、CI がビルドとテストを回している
-- Shown by: external — 公開は人が行う（ドッグフーディングの後。A6）。人はリリースのページと、mise で導入した実行ファイルで `hook-guardian check` が動くことを確かめる
+- Done when: リリースのページに Linux x86_64 向けの実行ファイルがあり、`mise use -g github:ba0918/command-guardian` で導入でき、導入した `command-guardian check` が動き、CI がビルドとテストを回している
+- Shown by: external — 公開は人が行う（ドッグフーディングの後。A6）。人はリリースのページと、mise で導入した実行ファイルで `command-guardian check` が動くことを確かめる
 - Left to the implementer: ワークフローの分け方（テストとリリースを同じファイルにするか分けるか）、アセットの名前
 - Stop and hand back if: remote が無い、ドッグフーディングが済んでいない、リリースの形式が mise の GitHub バックエンドと合わない

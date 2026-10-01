@@ -10,7 +10,7 @@ struct Run {
 }
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_hook-guardian")
+    env!("CARGO_BIN_EXE_command-guardian")
 }
 
 fn run(args: &[&str], home: &Path) -> Run {
@@ -50,7 +50,7 @@ fn run_env(args: &[&str], envs: &[(&str, &str)]) -> Run {
 
 fn temp_home() -> tempfile::TempDir {
     tempfile::Builder::new()
-        .prefix("hook-guardian-home-")
+        .prefix("command-guardian-home-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap()
 }
@@ -69,7 +69,7 @@ fn git(root: &Path) -> Command {
 
 fn git_repo() -> tempfile::TempDir {
     let dir = tempfile::Builder::new()
-        .prefix("hook-guardian-cli-git-")
+        .prefix("command-guardian-cli-git-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap();
     let root = dir.path();
@@ -181,7 +181,7 @@ fn req_017_json_has_verdict_and_effect_fields() {
 #[test]
 fn req_017_json_reports_rules_and_text_reports_the_message() {
     let home = temp_home();
-    let config = home.path().join(".config/hook-guardian/config.toml");
+    let config = home.path().join(".config/command-guardian/config.toml");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(
         &config,
@@ -275,8 +275,8 @@ fn req_004_check_ignores_the_callers_git_environment() {
             ("HOME", real_home.to_str().unwrap()),
             ("XDG_CONFIG_HOME", xdg.path().to_str().unwrap()),
             ("TMPDIR", "/tmp"),
-            ("GIT_DIR", "/nonexistent/hook-guardian-git-dir"),
-            ("GIT_INDEX_FILE", "/nonexistent/hook-guardian-index"),
+            ("GIT_DIR", "/nonexistent/command-guardian-git-dir"),
+            ("GIT_INDEX_FILE", "/nonexistent/command-guardian-index"),
         ],
     );
     assert_eq!(r.code, 0, "stdout: {} stderr: {}", r.stdout, r.stderr);
@@ -306,7 +306,7 @@ fn req_007_trailing_slash_dereferences_through_the_engine() {
     // /tmp の中のリンクは、リンクそれ自体なら ephemeral、末尾スラッシュ付きは
     // リンク先（/etc）を分類して block にする。
     let link_dir = tempfile::Builder::new()
-        .prefix("hook-guardian-link-")
+        .prefix("command-guardian-link-")
         .tempdir_in("/tmp")
         .unwrap();
     let link = link_dir.path().join("link");
@@ -616,7 +616,7 @@ fn req_026_a_deep_command_still_matches_a_custom_rule() {
     // （REQ-026・REQ-039）。子が死んでいたときは本文が空に落ち、設定した block の
     // ルールが消えていた。
     let home = temp_home();
-    let config = home.path().join(".config/hook-guardian/config.toml");
+    let config = home.path().join(".config/command-guardian/config.toml");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(
         &config,

@@ -8,14 +8,14 @@ members = [
 resolver = "2"
 
 [package]
-name = "hook-guardian"
+name = "command-guardian"
 version = "0.1.0"
 edition = "2021"
 description = "危険な Bash コマンドをパスの意味論で判定するフック"
 license = "MIT"
 
 [[bin]]
-name = "hook-guardian"
+name = "command-guardian"
 path = "src/main.rs"
 
 [dependencies]

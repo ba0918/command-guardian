@@ -12,7 +12,7 @@ struct Run {
 }
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_hook-guardian")
+    env!("CARGO_BIN_EXE_command-guardian")
 }
 
 fn temp_dir(prefix: &str) -> tempfile::TempDir {
@@ -24,7 +24,7 @@ fn temp_dir(prefix: &str) -> tempfile::TempDir {
 
 /// `[mode] enforce = false` の利用者設定を置く。
 fn write_shadow_config(xdg: &Path) {
-    let path = xdg.join("hook-guardian/config.toml");
+    let path = xdg.join("command-guardian/config.toml");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, "[mode]\nenforce = false\n").unwrap();
 }
@@ -97,9 +97,9 @@ fn run_bin(
 // @kotowari[REQ-018, EX-018]
 #[test]
 fn req_018_shadow_returns_nothing_and_logs() {
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let state = temp_dir("hook-guardian-shadow-state-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let state = temp_dir("command-guardian-shadow-state-");
     write_shadow_config(xdg.path());
     let r = run_hook(
         &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
@@ -109,7 +109,7 @@ fn req_018_shadow_returns_nothing_and_logs() {
     );
     assert_eq!(r.code, 0, "stderr: {}", r.stderr);
     assert!(r.stdout.trim().is_empty(), "{}", r.stdout);
-    let log = std::fs::read_to_string(state.path().join("hook-guardian/shadow.log")).unwrap();
+    let log = std::fs::read_to_string(state.path().join("command-guardian/shadow.log")).unwrap();
     assert!(log.contains("block"), "{log}");
     assert!(log.contains("/etc/nginx"), "{log}");
     assert!(log.contains("rm -rf /etc/nginx"), "{log}");
@@ -119,9 +119,9 @@ fn req_018_shadow_returns_nothing_and_logs() {
 // @kotowari[REQ-019, EX-026]
 #[test]
 fn req_019_shadow_log_is_one_line_with_owner_only_permissions() {
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let state = temp_dir("hook-guardian-shadow-state-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let state = temp_dir("command-guardian-shadow-state-");
     write_shadow_config(xdg.path());
     run_hook(
         &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
@@ -129,7 +129,7 @@ fn req_019_shadow_log_is_one_line_with_owner_only_permissions() {
         xdg.path(),
         Some(state.path()),
     );
-    let path = state.path().join("hook-guardian/shadow.log");
+    let path = state.path().join("command-guardian/shadow.log");
     let log = std::fs::read_to_string(&path).unwrap();
     let line = log.trim_end();
     assert!(!line.contains('\n'), "{log}");
@@ -147,7 +147,7 @@ fn req_019_shadow_log_is_one_line_with_owner_only_permissions() {
 // @kotowari[REQ-019]
 #[test]
 fn req_019_state_home_falls_back_to_home_local_state() {
-    let home = temp_dir("hook-guardian-shadow-home-");
+    let home = temp_dir("command-guardian-shadow-home-");
     let xdg = home.path().join(".config");
     write_shadow_config(&xdg);
     run_hook(
@@ -158,16 +158,16 @@ fn req_019_state_home_falls_back_to_home_local_state() {
     );
     assert!(home
         .path()
-        .join(".local/state/hook-guardian/shadow.log")
+        .join(".local/state/command-guardian/shadow.log")
         .is_file());
 }
 
 // @kotowari[REQ-018]
 #[test]
 fn req_018_enforce_true_does_not_write_a_log() {
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let state = temp_dir("hook-guardian-shadow-state-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let state = temp_dir("command-guardian-shadow-state-");
     let r = run_hook(
         &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
         home.path(),
@@ -176,15 +176,15 @@ fn req_018_enforce_true_does_not_write_a_log() {
     );
     assert_eq!(r.code, 0);
     assert!(r.stdout.contains("deny"), "{}", r.stdout);
-    assert!(!state.path().join("hook-guardian").exists());
+    assert!(!state.path().join("command-guardian").exists());
 }
 
 // @kotowari[REQ-018, EX-034]
 #[test]
 fn req_018_check_still_prints_the_verdict_in_shadow() {
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let state = temp_dir("hook-guardian-shadow-state-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let state = temp_dir("command-guardian-shadow-state-");
     write_shadow_config(xdg.path());
     let r = run_check(
         "rm -rf /etc/nginx",
@@ -194,16 +194,16 @@ fn req_018_check_still_prints_the_verdict_in_shadow() {
     );
     assert_eq!(r.code, 2, "stdout: {} stderr: {}", r.stdout, r.stderr);
     assert!(r.stdout.contains("block"), "{}", r.stdout);
-    assert!(!state.path().join("hook-guardian").exists());
+    assert!(!state.path().join("command-guardian").exists());
 }
 
 // @kotowari[REQ-019]
 #[test]
 fn req_019_empty_state_home_falls_back_to_home_local_state() {
     // XDG_STATE_HOME が空文字列のときは ~/.local/state に書き、cwd 相対には書かない。
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let scratch = temp_dir("hook-guardian-shadow-cwd-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let scratch = temp_dir("command-guardian-shadow-cwd-");
     write_shadow_config(xdg.path());
     let input = bash_input("rm -rf /etc/nginx", "/tmp/scratch");
     let mut child = Command::new(bin())
@@ -228,18 +228,18 @@ fn req_019_empty_state_home_falls_back_to_home_local_state() {
     assert_eq!(out.status.code(), Some(0));
     assert!(home
         .path()
-        .join(".local/state/hook-guardian/shadow.log")
+        .join(".local/state/command-guardian/shadow.log")
         .is_file());
-    assert!(!scratch.path().join("hook-guardian/shadow.log").exists());
+    assert!(!scratch.path().join("command-guardian/shadow.log").exists());
 }
 
 // @kotowari[REQ-019]
 #[test]
 fn req_019_multiline_command_stays_one_record() {
     // コマンド本文の改行とタブをエスケープし、1 判定 1 行 5 フィールドを守る。
-    let home = temp_dir("hook-guardian-shadow-home-");
-    let xdg = temp_dir("hook-guardian-shadow-xdg-");
-    let state = temp_dir("hook-guardian-shadow-state-");
+    let home = temp_dir("command-guardian-shadow-home-");
+    let xdg = temp_dir("command-guardian-shadow-xdg-");
+    let state = temp_dir("command-guardian-shadow-state-");
     write_shadow_config(xdg.path());
     run_hook(
         &bash_input("echo a\tb\nrm -rf /tmp/scratch/x", "/tmp/scratch"),
@@ -247,7 +247,7 @@ fn req_019_multiline_command_stays_one_record() {
         xdg.path(),
         Some(state.path()),
     );
-    let path = state.path().join("hook-guardian/shadow.log");
+    let path = state.path().join("command-guardian/shadow.log");
     let log = std::fs::read_to_string(&path).unwrap();
     let line = log.trim_end();
     assert!(!line.contains('\n'), "{log}");

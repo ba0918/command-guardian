@@ -81,10 +81,10 @@ pub struct Loaded {
 /// 利用者設定のパスを決める（REQ-013）。空の `XDG_CONFIG_HOME` は「無い」として扱う。
 pub fn user_config_path(xdg_config_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
     if let Some(x) = xdg_config_home.filter(|p| !p.as_os_str().is_empty()) {
-        return Some(x.join("hook-guardian/config.toml"));
+        return Some(x.join("command-guardian/config.toml"));
     }
     home.filter(|h| !h.as_os_str().is_empty())
-        .map(|h| h.join(".config/hook-guardian/config.toml"))
+        .map(|h| h.join(".config/command-guardian/config.toml"))
 }
 
 /// 3 層の設定を読み込む。
@@ -163,10 +163,10 @@ pub fn load(
     }
 }
 
-/// 上へ探して最初の `.hook-guardian.toml`。
+/// 上へ探して最初の `.command-guardian.toml`。
 pub fn find_project_config(cwd: &Path) -> Option<PathBuf> {
     for dir in cwd.ancestors() {
-        let candidate = dir.join(".hook-guardian.toml");
+        let candidate = dir.join(".command-guardian.toml");
         if candidate.is_file() {
             return Some(candidate);
         }

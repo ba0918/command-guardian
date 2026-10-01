@@ -10,7 +10,7 @@ Claude Code と Codex のフックとして呼ばれたときの入出力の契�
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A24, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
 - verification: unit
 
-Claude Code のフックとして呼ばれたとき、hook-guardian は、"hookSpecificOutput" の封筒に "hookEventName" を "PreToolUse" として置き、`allow` のときは何も返さず、`ask` のときは "permissionDecision" に "ask" と "permissionDecisionReason" を返し、`block` のときは "deny" と理由を返す。"permission_mode" が "dontAsk" か "bypassPermissions" のときは、`ask` を何も返さないに落とす。
+Claude Code のフックとして呼ばれたとき、command-guardian は、"hookSpecificOutput" の封筒に "hookEventName" を "PreToolUse" として置き、`allow` のときは何も返さず、`ask` のときは "permissionDecision" に "ask" と "permissionDecisionReason" を返し、`block` のときは "deny" と理由を返す。"permission_mode" が "dontAsk" か "bypassPermissions" のときは、`ask` を何も返さないに落とす。
 
 ### REQ-023: Codex の写像
 
@@ -18,7 +18,7 @@ Claude Code のフックとして呼ばれたとき、hook-guardian は、"hookS
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A24, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
 - verification: unit
 
-Codex のフックとして呼ばれたとき、hook-guardian は、"hookSpecificOutput" の封筒に "hookEventName" を "PreToolUse" として置き、`block` のときだけ "permissionDecision" に "deny" と "permissionDecisionReason" を返し、`allow`、`ask`、内部エラーのときは何も返さない。Codex には `ask` の出口がないため、確認は Codex 本来の承認フローに委ねる。
+Codex のフックとして呼ばれたとき、command-guardian は、"hookSpecificOutput" の封筒に "hookEventName" を "PreToolUse" として置き、`block` のときだけ "permissionDecision" に "deny" と "permissionDecisionReason" を返し、`allow`、`ask`、内部エラーのときは何も返さない。Codex には `ask` の出口がないため、確認は Codex 本来の承認フローに委ねる。
 
 ### REQ-024: 判定しない入力
 
@@ -26,7 +26,7 @@ Codex のフックとして呼ばれたとき、hook-guardian は、"hookSpecifi
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A40
 - verification: unit
 
-hook-guardian は、フックの入力のうち、Bash のコマンドを含むものだけを判定する。コマンドを含まない入力では、何も返さずに終わる。
+command-guardian は、フックの入力のうち、Bash のコマンドを含むものだけを判定する。コマンドを含まない入力では、何も返さずに終わる。
 
 ## Examples
 

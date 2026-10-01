@@ -1,4 +1,4 @@
-//! hook-guardian の policy。設定の読み込み、判定の合成、文面を作る。
+//! command-guardian の policy。設定の読み込み、判定の合成、文面を作る。
 
 pub mod config;
 pub mod engine;

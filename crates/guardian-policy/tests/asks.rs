@@ -30,7 +30,7 @@ fn req_009_a_readable_block_is_not_overwritten_by_a_parse_ask() {
 fn req_009_a_rule_block_names_the_rule_in_the_reason() {
     // 見張りの規則で block になるとき、構文解析の ask が理由を上書きしない。
     let dir = tempfile::Builder::new()
-        .prefix("hook-guardian-asks-")
+        .prefix("command-guardian-asks-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .unwrap();
     let root = dir.path().canonicalize().unwrap();

@@ -13,7 +13,7 @@ struct Run {
 }
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_hook-guardian")
+    env!("CARGO_BIN_EXE_command-guardian")
 }
 
 /// HOME と XDG_CONFIG_HOME を分けて渡してフックを起動する。
@@ -74,7 +74,7 @@ fn git(root: &Path) -> Command {
 
 /// 未追跡のファイルを 1 つ持つ git の作業ツリー。
 fn git_repo_with_untracked() -> tempfile::TempDir {
-    let dir = temp_dir("hook-guardian-hook-git-");
+    let dir = temp_dir("command-guardian-hook-git-");
     let root = dir.path();
     std::fs::write(root.join("tracked.txt"), "x").unwrap();
     for args in [
@@ -121,7 +121,7 @@ fn envelope(stdout: &str) -> serde_json::Value {
 // @kotowari[REQ-016, EX-025]
 #[test]
 fn req_016_check_and_hook_accept_two_commands() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
 
     let check = Command::new(bin())
         .args(["check", "true", "--cwd", "/tmp"])
@@ -144,7 +144,7 @@ fn req_016_check_and_hook_accept_two_commands() {
 // @kotowari[REQ-022]
 #[test]
 fn req_022_claude_ask_returns_permission_decision() {
-    let xdg = temp_dir("hook-guardian-hook-xdg-");
+    let xdg = temp_dir("command-guardian-hook-xdg-");
     let repo = git_repo_with_untracked();
     // フィクスチャは実ユーザのホームの下にあるため、HOME は実環境のままにする。
     let real_home = std::env::var_os("HOME")
@@ -170,7 +170,7 @@ fn req_022_claude_ask_returns_permission_decision() {
 // @kotowari[REQ-022, EX-020]
 #[test]
 fn req_022_claude_block_returns_deny() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     let r = run_hook(
         &["hook", "--agent", "claude"],
         &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
@@ -191,7 +191,7 @@ fn req_022_claude_block_returns_deny() {
 // @kotowari[REQ-022]
 #[test]
 fn req_022_claude_allow_returns_nothing() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     let r = run_hook(
         &["hook", "--agent", "claude"],
         &bash_input("rm -rf /tmp/scratch/x", "/tmp/scratch"),
@@ -205,7 +205,7 @@ fn req_022_claude_allow_returns_nothing() {
 // @kotowari[REQ-022]
 #[test]
 fn req_022_claude_dont_ask_modes_drop_the_ask() {
-    let xdg = temp_dir("hook-guardian-hook-xdg-");
+    let xdg = temp_dir("command-guardian-hook-xdg-");
     let repo = git_repo_with_untracked();
     let real_home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
@@ -225,7 +225,7 @@ fn req_022_claude_dont_ask_modes_drop_the_ask() {
 // @kotowari[REQ-023, EX-021]
 #[test]
 fn req_023_codex_ask_returns_nothing() {
-    let xdg = temp_dir("hook-guardian-hook-xdg-");
+    let xdg = temp_dir("command-guardian-hook-xdg-");
     let repo = git_repo_with_untracked();
     let real_home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
@@ -243,7 +243,7 @@ fn req_023_codex_ask_returns_nothing() {
 // @kotowari[REQ-023]
 #[test]
 fn req_023_codex_block_returns_deny() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     let r = run_hook(
         &["hook", "--agent", "codex"],
         &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
@@ -264,7 +264,7 @@ fn req_023_codex_block_returns_deny() {
 // @kotowari[REQ-023]
 #[test]
 fn req_023_codex_allow_returns_nothing() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     let r = run_hook(
         &["hook", "--agent", "codex"],
         &bash_input("rm -rf /tmp/scratch/x", "/tmp/scratch"),
@@ -278,7 +278,7 @@ fn req_023_codex_allow_returns_nothing() {
 // @kotowari[REQ-024, EX-022]
 #[test]
 fn req_024_non_bash_input_returns_nothing() {
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     for agent in ["claude", "codex"] {
         let r = run_hook(
             &["hook", "--agent", agent],
@@ -295,7 +295,7 @@ fn req_024_non_bash_input_returns_nothing() {
 #[test]
 fn req_010_hook_does_not_fail_on_a_bare_wrapper_option() {
     // 値付きオプションが末尾のラッパーでも、フックは判定を出さずに 0 で終わる。
-    let home = temp_dir("hook-guardian-hook-home-");
+    let home = temp_dir("command-guardian-hook-home-");
     let r = run_hook(
         &["hook", "--agent", "claude"],
         &bash_input("doas -a", "/tmp/scratch"),
@@ -326,9 +326,9 @@ fn req_006_empty_tmpdir_still_denies_protected_paths() {
 #[test]
 fn req_015_hook_warns_when_the_user_config_is_broken() {
     // 壊れた利用者設定では check と同じくフックも警告を stderr に出す。
-    let home = temp_dir("hook-guardian-hook-home-");
-    let xdg = temp_dir("hook-guardian-hook-xdg-");
-    let config = xdg.path().join("hook-guardian/config.toml");
+    let home = temp_dir("command-guardian-hook-home-");
+    let xdg = temp_dir("command-guardian-hook-xdg-");
+    let config = xdg.path().join("command-guardian/config.toml");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(&config, "これは TOML ではない [ paths\n").unwrap();
     let r = run_hook(

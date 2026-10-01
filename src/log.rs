@@ -17,7 +17,7 @@ pub fn shadow_log_path(xdg_state_home: Option<&Path>, home: Option<&Path>) -> Op
             .filter(|h| !h.as_os_str().is_empty())?
             .join(".local/state"),
     };
-    Some(base.join("hook-guardian/shadow.log"))
+    Some(base.join("command-guardian/shadow.log"))
 }
 
 /// 影実行の 1 判定を追記する。

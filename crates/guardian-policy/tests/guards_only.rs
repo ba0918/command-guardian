@@ -169,7 +169,7 @@ examples = { deny = ["GIT_CONFIG_COUNT=1 git push"], allow = ["git push"] }
 // @kotowari[REQ-033, EX-037]
 #[test]
 fn req_033_matched_rule_joins_composition_with_reason() {
-    let dir = fixture_dir("hook-guardian-only-");
+    let dir = fixture_dir("command-guardian-only-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -197,7 +197,7 @@ deny = [["push"]]
 // @kotowari[REQ-033]
 #[test]
 fn req_033_multiple_rules_compose_with_the_worst_verdict() {
-    let dir = fixture_dir("hook-guardian-only-");
+    let dir = fixture_dir("command-guardian-only-");
     let root = dir.path().canonicalize().unwrap();
     let user = root.join("config.toml");
     write(
@@ -226,10 +226,10 @@ deny-flags = ["--force"]
 // @kotowari[REQ-033]
 #[test]
 fn req_033_project_config_guard_rules_apply() {
-    let dir = fixture_dir("hook-guardian-only-");
+    let dir = fixture_dir("command-guardian-only-");
     let root = dir.path().canonicalize().unwrap();
     write(
-        &root.join(".hook-guardian.toml"),
+        &root.join(".command-guardian.toml"),
         r#"
 [[commands.guard]]
 program = "git"

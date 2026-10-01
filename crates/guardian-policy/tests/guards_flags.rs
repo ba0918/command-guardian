@@ -128,7 +128,7 @@ deny-env = ["GIT_CONFIG_COUNT"]
     assert!(!matches(&rs, "GIT_CONFIG_COUNT=1 git status"));
 
     // フック自身の環境は見ない。
-    let key = "HOOK_GUARDIAN_PROBE_ENV";
+    let key = "COMMAND_GUARDIAN_PROBE_ENV";
     std::env::set_var(key, "1");
     let rs = rules(&format!(
         r#"

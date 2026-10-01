@@ -19,7 +19,7 @@ use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
 /// 子として起動されたことを示す環境変数。値は使い捨ての nonce。
-const WORKER_ENV: &str = "HOOK_GUARDIAN_PARSER_WORKER";
+const WORKER_ENV: &str = "COMMAND_GUARDIAN_PARSER_WORKER";
 
 /// 子の解析スレッドのスタック。上限つきにする。深すぎる入力は子ごと落ちるが、
 /// 親はそれを入力に帰せる死として block にする（REQ-039・A23）。

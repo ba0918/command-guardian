@@ -21,7 +21,7 @@
 ## 検証・リリース
 
 - [ ] **S17**: メッセージと遅延の体感レビュー（人間）
-- [ ] **S19・配備**: リリース（Linux x86_64 の単体バイナリ、GitHub Releases + mise）と、dotfiles のフック差し替え（`block_dangerous_command.py` → `hook-guardian`）。git remote が無いため未実施
+- [ ] **S19・配備**: リリース（Linux x86_64 の単体バイナリ、GitHub Releases + mise）と、dotfiles のフック差し替え（`block_dangerous_command.py` → `command-guardian`）。git remote が無いため未実施
 - [ ] 実測 355 コマンドのコーパスでの再判定（コーパスはリポジトリに無い）
 
 ## 将来の方向（決まったら小さな決定から）

@@ -10,7 +10,7 @@
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A1, docs/decision/records/2026-09-30-hook-guardian-scope.md#A11, docs/decision/records/2026-09-30-hook-guardian-scope.md#A12, docs/decision/records/2026-09-30-hook-guardian-scope.md#A38
 - verification: unit
 
-コマンドを判定するとき、hook-guardian は、コマンド列、パイプ、引用、ヒアドキュメント、コマンド置換、sudo と doas のラッパー、シェルの "bash -c" と "eval" の内側を読み、3 種の破壊的効果と対象パスを取り出す。削除の効果は、"rm"、"rmdir"、"unlink"、"find" の "-delete" と "-exec rm"、"xargs" の "rm"、"shred" から取り出す。切り詰めの効果は、リダイレクトの ">"、"dd" の "of="、"truncate" から取り出す。フォーマットの効果は、"mkfs"、"wipefs"、"dd" のブロックデバイスへの書き込みから取り出す。M1 では、"git clean"、mv と cp の上書き、"sed -i"、"rsync --delete" の効果は取り出さない。
+コマンドを判定するとき、command-guardian は、コマンド列、パイプ、引用、ヒアドキュメント、コマンド置換、sudo と doas のラッパー、シェルの "bash -c" と "eval" の内側を読み、3 種の破壊的効果と対象パスを取り出す。削除の効果は、"rm"、"rmdir"、"unlink"、"find" の "-delete" と "-exec rm"、"xargs" の "rm"、"shred" から取り出す。切り詰めの効果は、リダイレクトの ">"、"dd" の "of="、"truncate" から取り出す。フォーマットの効果は、"mkfs"、"wipefs"、"dd" のブロックデバイスへの書き込みから取り出す。M1 では、"git clean"、mv と cp の上書き、"sed -i"、"rsync --delete" の効果は取り出さない。
 
 ### REQ-002: パスの解決
 
@@ -18,7 +18,7 @@
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A7, docs/decision/records/2026-09-30-hook-guardian-scope.md#A28, docs/decision/records/2026-09-30-hook-guardian-scope.md#A29, docs/decision/records/2026-09-30-hook-guardian-scope.md#A36
 - verification: unit
 
-判定のとき、hook-guardian は、コマンド自身が値の確定するパスを使う場合、そのパスを解決してから分類する。解決できるのは、絶対パス、相対パス、"~" の付いたパス、環境変数 "HOME"、"TMPDIR"、"PWD"、リテラルの代入、リテラルの "cd"、"mktemp" が作ったパスである。解決できないパスは未解決として扱う。glob を含む対象は、glob が広がり得る最も外側のディレクトリを base として分類し、base が保護領域に一致するときは、保護と同じ判定にする。
+判定のとき、command-guardian は、コマンド自身が値の確定するパスを使う場合、そのパスを解決してから分類する。解決できるのは、絶対パス、相対パス、"~" の付いたパス、環境変数 "HOME"、"TMPDIR"、"PWD"、リテラルの代入、リテラルの "cd"、"mktemp" が作ったパスである。解決できないパスは未解決として扱う。glob を含む対象は、glob が広がり得る最も外側のディレクトリを base として分類し、base が保護領域に一致するときは、保護と同じ判定にする。
 
 ### REQ-003: 一時領域の分類
 
@@ -50,7 +50,7 @@
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A3, docs/decision/records/2026-09-30-hook-guardian-scope.md#A7, docs/decision/records/2026-09-30-hook-guardian-scope.md#A9, docs/decision/records/2026-09-30-hook-guardian-scope.md#A17, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18, docs/decision/records/2026-09-30-hook-guardian-scope.md#A28, docs/decision/records/2026-09-30-hook-guardian-scope.md#A39
 - verification: unit
 
-hook-guardian は、対象パスの分類に応じて判定を決める。`ephemeral` と `vcs` は `allow`、`protected` は `block`、`unknown` は `ask` にする。パスを解決できない場合は、分類は `unknown` のままで、判定だけを `block` にする。3 層設定の "paths.allowed_roots"（既定は一時領域のルート）の配下も `ephemeral` と同じく `allow` にし、許可ルートそれ自体はこの規則に含めない（それ自体は通常の分類で判定する）。"git.enabled" が false のときは、git による分類を行わない。
+command-guardian は、対象パスの分類に応じて判定を決める。`ephemeral` と `vcs` は `allow`、`protected` は `block`、`unknown` は `ask` にする。パスを解決できない場合は、分類は `unknown` のままで、判定だけを `block` にする。3 層設定の "paths.allowed_roots"（既定は一時領域のルート）の配下も `ephemeral` と同じく `allow` にし、許可ルートそれ自体はこの規則に含めない（それ自体は通常の分類で判定する）。"git.enabled" が false のときは、git による分類を行わない。
 
 ### REQ-007: シンボリックリンクの扱い
 
@@ -58,7 +58,7 @@ hook-guardian は、対象パスの分類に応じて判定を決める。`ephem
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A21
 - verification: unit
 
-削除の対象がシンボリックリンクのとき、hook-guardian は、リンクそれ自体を分類して判定する。末尾に "/" を付けた削除だけ、リンク先を解決して分類する。ハードリンクは、1 つのリンクを消すだけとして扱う。
+削除の対象がシンボリックリンクのとき、command-guardian は、リンクそれ自体を分類して判定する。末尾に "/" を付けた削除だけ、リンク先を解決して分類する。ハードリンクは、1 つのリンクを消すだけとして扱う。
 
 ### REQ-008: 対象集合が未知の効果の判定
 
@@ -66,7 +66,7 @@ hook-guardian は、対象パスの分類に応じて判定を決める。`ephem
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A25
 - verification: unit
 
-効果の対象がコマンド本文に書かれていないとき（"find" の削除、"xargs"、"for" のループ）、hook-guardian は、供給元（"find" の起点、パイプの元、ループの供給元）の子の分類で判定する。供給元も確定できないときは `unknown` として `ask` にする。"-name" や "-path" の絞り込みは判定に使わない。
+効果の対象がコマンド本文に書かれていないとき（"find" の削除、"xargs"、"for" のループ）、command-guardian は、供給元（"find" の起点、パイプの元、ループの供給元）の子の分類で判定する。供給元も確定できないときは `unknown` として `ask` にする。"-name" や "-path" の絞り込みは判定に使わない。
 
 ### REQ-009: 判定の合成
 
@@ -74,7 +74,7 @@ hook-guardian は、対象パスの分類に応じて判定を決める。`ephem
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A13
 - verification: unit
 
-1 つのコマンドから複数の効果と対象が出るとき、hook-guardian は、最も重い判定を返す。`block` が 1 つでもあれば `block`、`block` が無く `ask` があれば `ask`、どちらも無ければ `allow` にする。
+1 つのコマンドから複数の効果と対象が出るとき、command-guardian は、最も重い判定を返す。`block` が 1 つでもあれば `block`、`block` が無く `ask` があれば `ask`、どちらも無ければ `allow` にする。
 
 ### REQ-010: 内部エラーで止めない
 
@@ -82,7 +82,7 @@ hook-guardian は、対象パスの分類に応じて判定を決める。`ephem
 - source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A14, docs/decision/records/2026-10-01-parser.md#A22, docs/decision/records/2026-10-01-parser.md#A23
 - verification: unit
 
-hook-guardian は、判定の内部エラー、git の失敗、入力の解析の失敗によって `block` しない。判定できないときは `ask` にする。この `ask` は、上限の内側で読めないものを指す。上限の超過と、隔離した子プロセスの死のうち入力に帰せるものは `block` になり、自分に帰せるものは `ask` のままになる（REQ-039 が扱う）。
+command-guardian は、判定の内部エラー、git の失敗、入力の解析の失敗によって `block` しない。判定できないときは `ask` にする。この `ask` は、上限の内側で読めないものを指す。上限の超過と、隔離した子プロセスの死のうち入力に帰せるものは `block` になり、自分に帰せるものは `ask` のままになる（REQ-039 が扱う）。
 
 ## Examples
 
