@@ -4,7 +4,7 @@
 //! 呼び、判定の間の子とのやり取りが `take()` で 1 回ずつ消費する。`begin()` を
 //! 呼ばない直接の解析は判定の外なので数えない。
 
-use crate::{LIMIT_EXCHANGES, LIMIT_JUDGMENT_TIME};
+use guardian_parser::{LIMIT_EXCHANGES, LIMIT_JUDGMENT_TIME};
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 

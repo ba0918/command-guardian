@@ -8,14 +8,14 @@
 //! 帰せない死）は Failure::Internal（ask）。1 回の判定で行うやり取りの回数と
 //! 時間には予算を設ける（REQ-039）。
 
-use crate::budget;
-use crate::wire::{self, Response};
-use crate::{Failure, Outcome};
+use super::budget;
+use super::wire::{self, Response};
+use guardian_parser::{Failure, Outcome};
 use std::io::{Read, Write};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
 /// 子として起動されたことを示す環境変数。値は使い捨ての nonce。
@@ -64,8 +64,6 @@ const REQUEST_HEADER: usize = 21;
 /// 応答の枠の頭（nonce 16 + 長さ 4）。
 const RESPONSE_HEADER: usize = 20;
 
-static STARTED: Once = Once::new();
-
 /// 使い回す子。プロセスごとに 1 つ持ち、やり取りは直列化する。
 struct Worker {
     child: Child,
@@ -73,7 +71,26 @@ struct Worker {
     nonce: [u8; 16],
 }
 
-static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
+pub struct ParserRuntime {
+    worker: Option<Worker>,
+    executable: PathBuf,
+}
+
+impl ParserRuntime {
+    pub fn new(executable: PathBuf) -> Self {
+        Self {
+            worker: None,
+            executable,
+        }
+    }
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
 
 /// 子として起動されていれば親の要求を、親がソケットを閉じるまで処理する。
 /// 子でなければ何もしない。実行ファイルの main と、解析の入口（parse /
@@ -84,12 +101,12 @@ pub fn run_if_child() {
     if std::env::var_os(WORKER_ENV).is_none() {
         return;
     }
-    STARTED.call_once(|| {
+    {
         // run は親がソケットを閉じるまで返らない。ここへ来るのは panic を
         // 捕まえたときだけ。
         let _ = std::panic::catch_unwind(run);
         std::process::exit(1);
-    });
+    }
 }
 
 /// 子プロセスとして親の要求を順に処理する。
@@ -114,11 +131,11 @@ fn run() -> ! {
         }
         let response = match request.mode {
             wire::MODE_PARSE => {
-                let (failures, script) = crate::parse_in_child(&request.input);
+                let (failures, script) = super::parse_in_child(&request.input);
                 Response::Parsed { failures, script }
             }
             wire::MODE_STRIP_QUOTES => {
-                Response::Stripped(crate::strip_quotes_in_child(&request.input))
+                Response::Stripped(super::strip_quotes_in_child(&request.input))
             }
             _ => std::process::exit(1),
         };
@@ -167,26 +184,28 @@ fn write_response(socket: &mut UnixStream, nonce: &[u8; 16], body: &[u8]) -> std
 }
 
 /// 親側: 解析を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
-pub(crate) fn request_parse(input: &str) -> Result<Outcome, Failure> {
-    match exchange(wire::MODE_PARSE, input) {
-        Ok(Response::Parsed { failures, script }) => Ok(Outcome {
-            script: script.unwrap_or_default(),
-            failures,
-        }),
-        Ok(Response::Stripped(_)) => Err(Failure::Internal),
-        Err(ExchangeError::Limit) => Err(Failure::Limit),
-        Err(ExchangeError::Internal) => Err(Failure::Internal),
+impl ParserRuntime {
+    pub(crate) fn request_parse(&mut self, input: &str) -> Result<Outcome, Failure> {
+        match self.exchange(wire::MODE_PARSE, input) {
+            Ok(Response::Parsed { failures, script }) => Ok(Outcome {
+                script: script.unwrap_or_default(),
+                failures,
+            }),
+            Ok(Response::Stripped(_)) => Err(Failure::Internal),
+            Err(ExchangeError::Limit) => Err(Failure::Limit),
+            Err(ExchangeError::Internal) => Err(Failure::Internal),
+        }
     }
-}
 
-/// 親側: 引用を外した本文を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
-pub(crate) fn request_strip_quotes(input: &str) -> Result<String, Failure> {
-    match exchange(wire::MODE_STRIP_QUOTES, input) {
-        Ok(Response::Stripped(Ok(text))) => Ok(text),
-        Ok(Response::Stripped(Err(failure))) => Err(failure),
-        Ok(Response::Parsed { .. }) => Err(Failure::Internal),
-        Err(ExchangeError::Limit) => Err(Failure::Limit),
-        Err(ExchangeError::Internal) => Err(Failure::Internal),
+    /// 親側: 引用を外した本文を子に依頼する。失敗は原因で分ける（REQ-039・A23）。
+    pub(crate) fn request_strip_quotes(&mut self, input: &str) -> Result<String, Failure> {
+        match self.exchange(wire::MODE_STRIP_QUOTES, input) {
+            Ok(Response::Stripped(Ok(text))) => Ok(text),
+            Ok(Response::Stripped(Err(failure))) => Err(failure),
+            Ok(Response::Parsed { .. }) => Err(Failure::Internal),
+            Err(ExchangeError::Limit) => Err(Failure::Limit),
+            Err(ExchangeError::Internal) => Err(Failure::Internal),
+        }
     }
 }
 
@@ -200,38 +219,34 @@ pub(crate) enum ExchangeError {
     Internal,
 }
 
-fn exchange(mode: u8, input: &str) -> Result<Response, ExchangeError> {
-    // 判定の予算を先に確かめる（REQ-039）。構文解析の回数は構文解析だけが
-    // 消費し、引用の除去は時間の上限だけを見る。
-    let allowed = if mode == wire::MODE_PARSE {
-        budget::take()
-    } else {
-        budget::within_time()
-    };
-    if !allowed {
-        return Err(ExchangeError::Limit);
-    }
-    let mut guard = WORKER
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if guard.is_none() {
-        *guard = spawn_worker();
-    }
-    let Some(worker) = guard.as_mut() else {
-        // 子を起こせないのは自分に帰せる失敗（A23）。
-        return Err(ExchangeError::Internal);
-    };
-    let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input)
-        .map_err(|interrupted| classify(interrupted, &mut worker.child));
-    match result {
-        Ok(response) => Ok(response),
-        Err(error) => {
-            // 子が死んだか時間切れ。次の要求のために始末する。
-            if let Some(mut dead) = guard.take() {
-                let _ = dead.child.kill();
-                let _ = dead.child.wait();
+impl ParserRuntime {
+    fn exchange(&mut self, mode: u8, input: &str) -> Result<Response, ExchangeError> {
+        // 判定の予算を先に確かめる（REQ-039）。構文解析の回数は構文解析だけが
+        // 消費し、引用の除去は時間の上限だけを見る。
+        let allowed = if mode == wire::MODE_PARSE {
+            budget::take()
+        } else {
+            budget::within_time()
+        };
+        if !allowed {
+            return Err(ExchangeError::Limit);
+        }
+        if self.worker.is_none() {
+            self.worker = spawn_worker(&self.executable);
+        }
+        let Some(worker) = self.worker.as_mut() else {
+            // 子を起こせないのは自分に帰せる失敗（A23）。
+            return Err(ExchangeError::Internal);
+        };
+        let result = exchange_with(&mut worker.socket, &worker.nonce, mode, input)
+            .map_err(|interrupted| classify(interrupted, &mut worker.child));
+        match result {
+            Ok(response) => Ok(response),
+            Err(error) => {
+                // 子が死んだか時間切れ。次の要求のために始末する。
+                self.worker.take();
+                Err(error)
             }
-            Err(error)
         }
     }
 }
@@ -283,8 +298,7 @@ fn status_error(status: ExitStatus) -> ExchangeError {
 }
 
 /// 子を 1 つ起こし、解析を始められる印まで待つ。
-fn spawn_worker() -> Option<Worker> {
-    let exe = std::env::current_exe().ok()?;
+fn spawn_worker(exe: &std::path::Path) -> Option<Worker> {
     let nonce = make_nonce();
     let (mut parent_end, child_end) = UnixStream::pair().ok()?;
     let mut child = Command::new(exe)

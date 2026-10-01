@@ -1,8 +1,9 @@
 //! S13: only・合成・例の検証（REQ-032, REQ-033, REQ-034）。
 
 use guardian_core::Verdict;
-use guardian_policy::guard::{invocations, parse_guard_rules_document, GuardRule};
-use guardian_policy::{Engine, EngineEnv};
+mod app_support;
+use app_support::{invocations, parse_guard_rules_document, Engine, EngineEnv};
+use guardian_policy::guard::GuardRule;
 use std::path::{Path, PathBuf};
 
 fn rules(text: &str) -> (Vec<GuardRule>, Vec<String>) {

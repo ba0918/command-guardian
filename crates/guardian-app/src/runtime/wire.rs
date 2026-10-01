@@ -2,8 +2,8 @@
 //!
 //! 枠の外側（nonce・種別・長さ）は worker が扱い、ここは本体だけを扱う。
 
-use crate::ast::*;
-use crate::Failure;
+use guardian_core::Failure;
+use guardian_parser::ast::*;
 
 /// 要求の種別。
 pub(crate) const MODE_PARSE: u8 = 0;

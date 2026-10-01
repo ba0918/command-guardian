@@ -1,18 +1,9 @@
 //! S7: 非 allow の文面（REQ-011）。
 
-use guardian_analysis::extract_effects;
-use guardian_core::{Ask, Class, Env, Op, ProtectedKind, Target, Why};
+use guardian_core::{Ask, Class, Op, ProtectedKind, Target, Why};
 use guardian_parser::Failure;
 use guardian_policy::message::{ask_message, ask_reason, non_allow_message};
 use std::path::PathBuf;
-
-fn env() -> Env {
-    Env {
-        home: Some(PathBuf::from("/home/you")),
-        tmpdir: Some(PathBuf::from("/tmp")),
-        cwd: Some(PathBuf::from("/home/you/work/repo")),
-    }
-}
 
 fn lines(text: &str) -> Vec<&str> {
     text.lines().collect()
@@ -21,12 +12,12 @@ fn lines(text: &str) -> Vec<&str> {
 // @kotowari[REQ-011, EX-012]
 #[test]
 fn req_011_protected_message_has_op_path_class_loss_and_alternative() {
-    let effects = extract_effects("rm -rf /etc/nginx", &env());
-    assert_eq!(effects.len(), 1);
-    let e = &effects[0];
     let text = non_allow_message(
-        e.op,
-        &e.target,
+        Op::Delete,
+        &Target::Path {
+            path: PathBuf::from("/etc/nginx"),
+            dereference: false,
+        },
         Class::Protected,
         &Why::Protected(ProtectedKind::SystemArea),
     );

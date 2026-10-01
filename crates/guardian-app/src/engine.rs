@@ -1,11 +1,10 @@
 //! 判定の入口。設定を読み、効果ごとに分類と判定を出し、合成する。
 
-use crate::config::{self, Config};
-use crate::guard;
-use crate::message;
+use crate::config_loader as config;
 use guardian_analysis::analyze;
 use guardian_core::{Ask, Class, Env, Op, ProtectedKind, Target, Verdict, Why};
 use guardian_judge::{GitRunner, Judge, JudgeEnv};
+use guardian_policy::{config::Config, guard, message};
 use regex::Regex;
 use std::path::{Path, PathBuf};
 
@@ -56,6 +55,7 @@ struct CompiledRule {
 }
 
 pub struct Engine {
+    runtime: std::cell::RefCell<crate::runtime::ParserRuntime>,
     config: Config,
     env: EngineEnv,
     judge: Judge,
@@ -65,24 +65,34 @@ pub struct Engine {
 
 impl Engine {
     /// 設定を読み込んで作る。
-    pub fn load(user_config: Option<&Path>, env: EngineEnv) -> Engine {
+    pub fn load(
+        user_config: Option<&Path>,
+        env: EngineEnv,
+        mut runtime: crate::runtime::ParserRuntime,
+    ) -> Engine {
         let loaded = config::load(
             user_config,
             &env.cwd,
             env.home.as_deref(),
             env.tmpdir.as_deref(),
+            &mut |input| runtime.parse(input),
         );
-        Engine::build(loaded.config, env, loaded.warnings, None)
+        Engine::build(loaded.config, env, loaded.warnings, None, runtime)
     }
 
     /// 設定をそのまま渡して作る。
-    pub fn new(config: Config, env: EngineEnv) -> Engine {
-        Engine::build(config, env, Vec::new(), None)
+    pub fn new(config: Config, env: EngineEnv, runtime: crate::runtime::ParserRuntime) -> Engine {
+        Engine::build(config, env, Vec::new(), None, runtime)
     }
 
     /// git の起動を差し替えて作る（テスト用）。
-    pub fn with_git(config: Config, env: EngineEnv, git: Box<dyn GitRunner>) -> Engine {
-        Engine::build(config, env, Vec::new(), Some(git))
+    pub fn with_git(
+        config: Config,
+        env: EngineEnv,
+        git: Box<dyn GitRunner>,
+        runtime: crate::runtime::ParserRuntime,
+    ) -> Engine {
+        Engine::build(config, env, Vec::new(), Some(git), runtime)
     }
 
     fn build(
@@ -90,6 +100,7 @@ impl Engine {
         env: EngineEnv,
         warnings: Vec<String>,
         git: Option<Box<dyn GitRunner>>,
+        runtime: crate::runtime::ParserRuntime,
     ) -> Engine {
         let judge_env = JudgeEnv {
             home: env.home.clone(),
@@ -117,6 +128,7 @@ impl Engine {
             }
         }
         Engine {
+            runtime: std::cell::RefCell::new(runtime),
             config,
             env,
             judge,
@@ -136,7 +148,10 @@ impl Engine {
             tmpdir: self.env.tmpdir.clone(),
             cwd: Some(self.env.cwd.clone()),
         };
-        let analysis = analyze(command, &core_env);
+        crate::runtime::begin_judgment();
+        let mut runtime = self.runtime.borrow_mut();
+        let outcome = runtime.parse(command);
+        let analysis = analyze(outcome, &core_env, &mut |input| runtime.parse(input));
         // 構文解析の ask。引用の除去の失敗も同じ列に足す（REQ-039・A23）。
         let mut asks = analysis.parse_errors;
         let mut effects = Vec::new();
@@ -151,7 +166,7 @@ impl Engine {
         // カスタムのルール。引用とヒアドキュメントを外した本文に照合する。
         let mut rules = Vec::new();
         if !self.custom_rules.is_empty() {
-            match guardian_parser::strip_quotes(command) {
+            match runtime.strip_quotes(command) {
                 Ok(body) => {
                     for rule in &self.custom_rules {
                         if rule.regex.is_match(&body) {
@@ -176,7 +191,8 @@ impl Engine {
 
         // 見張りの規則。ラッパーとシェルの内側も展開して照合する（REQ-027〜REQ-034）。
         if !self.config.guard.is_empty() {
-            let invocations = guard::invocations(command);
+            let mut parse = |input: &str| runtime.parse(input);
+            let invocations = guard::invocations(command, &mut parse);
             for failure in &invocations.failures {
                 let ask = Ask::Parse(failure.clone());
                 if !asks.contains(&ask) {
@@ -196,7 +212,7 @@ impl Engine {
 
         // 見張りの規則の照合でも構文解析をする。この判定で予算を使い切って
         // いたら、上限の超過として block にする（REQ-039）。
-        if guardian_parser::judgment_over_budget() && !asks.iter().any(Ask::is_limit) {
+        if crate::runtime::judgment_over_budget() && !asks.iter().any(Ask::is_limit) {
             asks.push(Ask::Parse(guardian_parser::Failure::Limit));
         }
         let mut verdict = Verdict::Allow;

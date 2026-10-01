@@ -3,14 +3,15 @@
 mod hook;
 mod log;
 
+use guardian_app::{Engine, EngineEnv, Report};
 use guardian_core::Verdict;
-use guardian_policy::{message, Engine, EngineEnv, Report};
+use guardian_policy::message;
 use std::path::PathBuf;
 
 fn main() {
     // 入力由来の解析の子プロセスとして起動されたときは、何よりも先に解析を務める。
     // 子は stdin を要求のソケットとして使うため、フックの入力より先にここへ来る。
-    guardian_parser::run_if_child();
+    guardian_app::runtime::run_if_child();
     let args: Vec<String> = std::env::args().skip(1).collect();
     std::process::exit(run(&args));
 }
@@ -125,6 +126,7 @@ fn build_engine(cwd: PathBuf) -> Result<Engine, i32> {
     Ok(Engine::load(
         user_config.as_deref(),
         EngineEnv { home, tmpdir, cwd },
+        guardian_app::runtime::ParserRuntime::new(std::env::current_exe().map_err(|_| 3)?),
     ))
 }
 
@@ -136,7 +138,7 @@ fn env_path(name: &str) -> Option<PathBuf> {
 }
 
 fn user_config_path() -> Option<PathBuf> {
-    guardian_policy::config::user_config_path(
+    guardian_app::config_loader::user_config_path(
         env_path("XDG_CONFIG_HOME").as_deref(),
         env_path("HOME").as_deref(),
     )

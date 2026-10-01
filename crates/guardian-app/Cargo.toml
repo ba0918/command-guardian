@@ -1,13 +1,14 @@
 [package]
-name = "guardian-judge"
+name = "guardian-app"
 version = "0.1.0"
 edition = "2021"
-description = "fs と git によるパスの分類"
+publish = false
 
 [dependencies]
 guardian-core = { path = "../guardian-core" }
-
-[dev-dependencies]
 guardian-parser = { path = "../guardian-parser" }
 guardian-analysis = { path = "../guardian-analysis" }
-tempfile = { workspace = true }
+guardian-judge = { path = "../guardian-judge" }
+guardian-policy = { path = "../guardian-policy" }
+regex = { workspace = true }
+toml = { workspace = true }

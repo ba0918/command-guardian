@@ -1,6 +1,7 @@
 //! 影実行のログ（REQ-019）。判定を 1 行ずつ追記し、所有者だけが読める権限にする。
 
-use guardian_policy::{message, Report};
+use guardian_app::Report;
+use guardian_policy::message;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
@@ -68,7 +69,7 @@ fn reason_text(report: &Report) -> String {
 
 /// 対象パス。最も重い効果の対象、効果が無ければ "-"。
 fn target_text(report: &Report) -> String {
-    let mut worst: Option<&guardian_policy::EffectReport> = None;
+    let mut worst: Option<&guardian_app::EffectReport> = None;
     for e in &report.effects {
         worst = Some(match worst {
             None => e,

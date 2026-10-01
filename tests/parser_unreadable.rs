@@ -1,6 +1,10 @@
 //! S8: 読めない構文は ask のコーパス（REQ-038）。
 
-use guardian_parser::{parse, Failure, Outcome, LIMIT_DEPTH};
+use guardian_parser::{Failure, Outcome, LIMIT_DEPTH};
+fn parse(input: &str) -> Outcome {
+    guardian_app::runtime::ParserRuntime::new(env!("CARGO_BIN_EXE_command-guardian").into())
+        .parse(input)
+}
 
 /// 深い入力が止まったことを確かめる。構文木の走査（TooDeep）か、隔離した子の
 /// 異常終了（Limit）のどちらでも、判定は block になる（REQ-039）。

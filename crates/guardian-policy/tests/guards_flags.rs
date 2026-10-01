@@ -1,6 +1,8 @@
 //! S12: フラグ・オプションの値・環境変数（REQ-030, REQ-031）。
 
-use guardian_policy::guard::{invocations, parse_guard_rules_document, GuardRule};
+mod common;
+use common::{invocations, parse_guard_rules_document};
+use guardian_policy::guard::GuardRule;
 
 fn rules(text: &str) -> Vec<GuardRule> {
     parse_guard_rules_document(text).unwrap().0

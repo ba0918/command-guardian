@@ -1,7 +1,8 @@
 //! S9: ルールの意味論（REQ-026）。
 
 use guardian_core::{Op, Verdict};
-use guardian_policy::{Engine, EngineEnv};
+mod app_support;
+use app_support::{Engine, EngineEnv};
 use std::path::{Path, PathBuf};
 
 fn env(cwd: &Path) -> EngineEnv {

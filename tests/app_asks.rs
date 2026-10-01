@@ -1,7 +1,8 @@
 //! S7: 構文解析由来の ask の合成と文面（REQ-009・REQ-011・REQ-038）。
 
 use guardian_core::Verdict;
-use guardian_policy::{Engine, EngineEnv};
+mod app_support;
+use app_support::{Engine, EngineEnv};
 use std::path::PathBuf;
 
 fn engine() -> Engine {

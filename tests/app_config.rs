@@ -1,7 +1,9 @@
 //! S8: 設定のファイルと層・信頼・壊れたとき（REQ-005, REQ-006, REQ-013, REQ-014, REQ-015）。
 
 use guardian_core::Verdict;
-use guardian_policy::{Config, Engine, EngineEnv};
+mod app_support;
+use app_support::{Engine, EngineEnv};
+use guardian_policy::Config;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};

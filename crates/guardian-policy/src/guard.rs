@@ -100,7 +100,11 @@ pub struct Invocation {
 /// options-with-value = ["-c", "--config-env"]
 /// deny-option-values = { "-c" = ["/alias[.].*/"], "--config-env" = ["/alias[.].*/"] }
 /// ```
-pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<GuardRule> {
+pub fn parse_guards(
+    root: &toml::Value,
+    warnings: &mut Vec<String>,
+    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+) -> Vec<GuardRule> {
     let Some(value) = root.get("commands").and_then(|c| c.get("guard")) else {
         return Vec::new();
     };
@@ -120,18 +124,22 @@ pub fn parse_guards(root: &toml::Value, warnings: &mut Vec<String>) -> Vec<Guard
             Err(e) => warnings.push(format!("見張りの規則を無効にします（{name}）: {e}")),
         }
     }
-    validate_examples(&mut rules, warnings);
+    validate_examples(&mut rules, warnings, parse);
     rules
 }
 
 /// `examples.deny` が一致し、`examples.allow` が一致しないことを確かめる（REQ-034）。
-fn validate_examples(rules: &mut Vec<GuardRule>, warnings: &mut Vec<String>) {
+fn validate_examples(
+    rules: &mut Vec<GuardRule>,
+    warnings: &mut Vec<String>,
+    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+) {
     rules.retain(|rule| {
         if rule.examples_deny.is_empty() && rule.examples_allow.is_empty() {
             return true;
         }
         for example in &rule.examples_deny {
-            match example_matches(rule, example) {
+            match example_matches(rule, example, parse) {
                 Ok(true) => {}
                 Ok(false) => {
                     warnings.push(format!(
@@ -150,7 +158,7 @@ fn validate_examples(rules: &mut Vec<GuardRule>, warnings: &mut Vec<String>) {
             }
         }
         for example in &rule.examples_allow {
-            match example_matches(rule, example) {
+            match example_matches(rule, example, parse) {
                 Ok(false) => {}
                 Ok(true) => {
                     warnings.push(format!(
@@ -172,8 +180,12 @@ fn validate_examples(rules: &mut Vec<GuardRule>, warnings: &mut Vec<String>) {
     });
 }
 
-fn example_matches(rule: &GuardRule, example: &str) -> Result<bool, String> {
-    let invs = invocations(example);
+fn example_matches(
+    rule: &GuardRule,
+    example: &str,
+    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+) -> Result<bool, String> {
+    let invs = invocations(example, parse);
     match invs.as_slice() {
         [inv] => Ok(rule.matches(inv)),
         _ => Err("例を 1 つの起動として読めない".to_string()),
@@ -183,10 +195,11 @@ fn example_matches(rule: &GuardRule, example: &str) -> Result<bool, String> {
 /// テスト用に TOML の文書から読む。
 pub fn parse_guard_rules_document(
     text: &str,
+    parse: &mut dyn FnMut(&str) -> parser::Outcome,
 ) -> Result<(Vec<GuardRule>, Vec<String>), toml::de::Error> {
     let value: toml::Value = toml::from_str(text)?;
     let mut warnings = Vec::new();
-    let rules = parse_guards(&value, &mut warnings);
+    let rules = parse_guards(&value, &mut warnings, parse);
     Ok((rules, warnings))
 }
 
@@ -455,6 +468,21 @@ pub struct InvocationAnalysis {
     pub invocations: Vec<Invocation>,
     pub failures: Vec<parser::Failure>,
 }
+struct Walker<'a> {
+    out: InvocationAnalysis,
+    parse: &'a mut dyn FnMut(&str) -> parser::Outcome,
+}
+impl std::ops::Deref for Walker<'_> {
+    type Target = InvocationAnalysis;
+    fn deref(&self) -> &Self::Target {
+        &self.out
+    }
+}
+impl std::ops::DerefMut for Walker<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.out
+    }
+}
 
 impl std::ops::Deref for InvocationAnalysis {
     type Target = [Invocation];
@@ -474,17 +502,23 @@ impl InvocationAnalysis {
     }
 }
 
-pub fn invocations(command: &str) -> InvocationAnalysis {
-    let outcome = parser::parse(command);
-    let mut out = InvocationAnalysis {
-        invocations: Vec::new(),
-        failures: outcome.failures,
+pub fn invocations(
+    command: &str,
+    parse: &mut dyn FnMut(&str) -> parser::Outcome,
+) -> InvocationAnalysis {
+    let outcome = parse(command);
+    let mut out = Walker {
+        out: InvocationAnalysis {
+            invocations: Vec::new(),
+            failures: outcome.failures,
+        },
+        parse,
     };
     walk_script(&outcome.script, &mut out, 0);
-    out
+    out.out
 }
 
-fn walk_script(script: &Script, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_script(script: &Script, out: &mut Walker, depth: usize) {
     if depth > parser::LIMIT_DEPTH {
         out.failures.push(parser::Failure::TooDeep);
         return;
@@ -497,13 +531,13 @@ fn walk_script(script: &Script, out: &mut InvocationAnalysis, depth: usize) {
     }
 }
 
-fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_pipeline(pipeline: &parser::Pipeline, out: &mut Walker, depth: usize) {
     for command in &pipeline.commands {
         walk_command(command, out, depth);
     }
 }
 
-fn walk_command(command: &Command, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_command(command: &Command, out: &mut Walker, depth: usize) {
     match command {
         Command::Simple(simple) => walk_simple(simple, out, depth),
         Command::Compound {
@@ -527,7 +561,7 @@ fn walk_command(command: &Command, out: &mut InvocationAnalysis, depth: usize) {
     }
 }
 
-fn walk_redirects(redirects: &[Redirect], out: &mut InvocationAnalysis, depth: usize) {
+fn walk_redirects(redirects: &[Redirect], out: &mut Walker, depth: usize) {
     for redirect in redirects {
         match &redirect.target {
             parser::RedirectTarget::Word(word) => walk_word_subst(word, out, depth),
@@ -540,7 +574,7 @@ fn walk_redirects(redirects: &[Redirect], out: &mut InvocationAnalysis, depth: u
     }
 }
 
-fn walk_compound(compound: &Compound, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_compound(compound: &Compound, out: &mut Walker, depth: usize) {
     match compound {
         Compound::If {
             condition,
@@ -603,7 +637,7 @@ fn walk_compound(compound: &Compound, out: &mut InvocationAnalysis, depth: usize
     }
 }
 
-fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_simple(simple: &SimpleCommand, out: &mut Walker, depth: usize) {
     for word in &simple.words {
         walk_word_subst(word, out, depth);
     }
@@ -664,13 +698,13 @@ fn walk_simple(simple: &SimpleCommand, out: &mut InvocationAnalysis, depth: usiz
     });
 }
 
-fn walk_inner(inner: &str, out: &mut InvocationAnalysis, depth: usize) {
-    let outcome = parser::parse(inner);
+fn walk_inner(inner: &str, out: &mut Walker, depth: usize) {
+    let outcome = (out.parse)(inner);
     out.failures.extend(outcome.failures);
     walk_script(&outcome.script, out, depth + 1);
 }
 
-fn walk_word_subst(word: &Word, out: &mut InvocationAnalysis, depth: usize) {
+fn walk_word_subst(word: &Word, out: &mut Walker, depth: usize) {
     for part in &word.parts {
         if let Part::Substitution(substitution) = part {
             if let Some(body) = &substitution.body {

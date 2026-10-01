@@ -1,6 +1,13 @@
 //! judge のテストで共有する git リポジトリのフィクスチャ。
 
 #![allow(dead_code)]
+pub fn extract_effects(command: &str, env: &guardian_core::Env) -> Vec<guardian_core::Effect> {
+    guardian_analysis::extract_effects(
+        guardian_parser::parse(command),
+        env,
+        &mut guardian_parser::parse,
+    )
+}
 
 use guardian_core::{Env, Verdict};
 use guardian_judge::{Judge, JudgeEnv};

@@ -17,14 +17,10 @@
 //!   （REQ-038）。
 
 pub mod ast;
-mod budget;
 mod depth;
 mod normalize;
-mod wire;
-mod worker;
 
 pub use ast::*;
-pub use worker::run_if_child;
 
 use brush_parser::{ParserOptions, Token};
 use normalize::{options, parse_program, parse_tokens, tokenize, unquoted_word, Normalizer};
@@ -64,36 +60,18 @@ impl Outcome {
 
 /// コマンド文字列を構文解析し、正規化した構文木と読めなかった理由を返す。
 pub fn parse(input: &str) -> Outcome {
-    worker::run_if_child();
-    // サイズは構文解析の前に測る（REQ-039）。子を起こす前の近道。
-    if input.len() > LIMIT_BYTES {
-        return Outcome::failure(Failure::TooLarge);
+    let outcome = parse_inner(input, parse_program);
+    if depth::exceeds(&outcome.script) {
+        Outcome::failure(Failure::TooDeep)
+    } else {
+        outcome
     }
-    // 子の死は原因で分ける（REQ-039・A23）。入力に帰せる死（スタック
-    // オーバーフロー、時間の上限の超過）と上限の超過は Limit（block）、
-    // 自分に帰せる失敗（起動・プロトコルの失敗、panic、帰せない死）は
-    // Internal（ask）に落とす。
-    match worker::request_parse(input) {
-        Ok(outcome) => outcome,
-        Err(failure) => Outcome::failure(failure),
-    }
-}
-
-/// 1 回の判定の予算を数え直す（REQ-039）。判定の入口が呼ぶ。
-pub fn begin_judgment() {
-    budget::begin();
-}
-
-/// この判定で予算を使い切ったか（REQ-039）。判定の終わりに確かめる。
-pub fn judgment_over_budget() -> bool {
-    budget::exceeded()
 }
 
 /// 引用を外したコマンド本文。失敗は原因を返す（REQ-039・A23）。設定の照合
 /// （見張りの例の分割とカスタムルールの本文の引用の除去）で使う（REQ-036）。
 pub fn strip_quotes(input: &str) -> Result<String, Failure> {
-    worker::run_if_child();
-    worker::request_strip_quotes(input)
+    strip_quotes_inner(input)
 }
 
 /// 差し込み可能な生の構文解析。panic はスレッドの境界で Failure に変える（REQ-038）。
@@ -248,8 +226,9 @@ pub(crate) fn strip_quotes_inner(input: &str) -> Result<String, Failure> {
 /// スレッド）で行う（REQ-039）。設定の照合が消えないよう、解析の死より深い
 /// 入力まで本文を返す。スレッドを起こせないときと panic は Failure::Panic に
 /// する。
-pub(crate) fn strip_quotes_in_child(input: &str) -> Result<String, Failure> {
-    match in_bounded_thread(worker::STRIP_STACK_BYTES, move || strip_quotes_inner(input)) {
+#[cfg(test)]
+fn strip_quotes_in_child(input: &str) -> Result<String, Failure> {
+    match in_bounded_thread(32 * 1024 * 1024, move || strip_quotes_inner(input)) {
         Some(result) => result,
         None => Err(Failure::Panic),
     }
@@ -262,18 +241,15 @@ pub(crate) fn catch<T>(f: impl FnOnce() -> T) -> Result<T, ()> {
 
 /// 子プロセス側の解析。上限つきのスタックのスレッドで行い、panic は
 /// Failure::Panic、深さの上限超えは Failure::TooDeep にする（REQ-039）。
-pub(crate) fn parse_in_child(input: &str) -> (Vec<Failure>, Option<Script>) {
+#[cfg(test)]
+fn parse_in_child(input: &str) -> (Vec<Failure>, Option<Script>) {
     parse_in_child_with(input, parse_program)
 }
 
 /// 解析の関数を差し込める形。スレッドを起こせないときと panic は Panic。
-pub(crate) fn parse_in_child_with(
-    input: &str,
-    parser: ProgramParser,
-) -> (Vec<Failure>, Option<Script>) {
-    match in_bounded_thread(worker::CHILD_STACK_BYTES, move || {
-        parse_inner(input, parser)
-    }) {
+#[cfg(test)]
+fn parse_in_child_with(input: &str, parser: ProgramParser) -> (Vec<Failure>, Option<Script>) {
+    match in_bounded_thread(8 * 1024 * 1024, move || parse_inner(input, parser)) {
         Some(outcome) => finish(outcome),
         None => (vec![Failure::Panic], None),
     }
@@ -281,6 +257,7 @@ pub(crate) fn parse_in_child_with(
 
 /// 深さは、成功した正規化の構文木の走査で測る（REQ-039）。超えたら構文木は
 /// 返さない（親が深い木を読まないようにするため）。
+#[cfg(test)]
 fn finish(outcome: Outcome) -> (Vec<Failure>, Option<Script>) {
     if depth::exceeds(&outcome.script) {
         (vec![Failure::TooDeep], None)
@@ -290,6 +267,7 @@ fn finish(outcome: Outcome) -> (Vec<Failure>, Option<Script>) {
 }
 
 /// 処理をスタックの上限つきのスレッドで行う。スレッドを作れないときは None。
+#[cfg(test)]
 fn in_bounded_thread<T: Send>(stack: usize, f: impl FnOnce() -> T + Send) -> Option<T> {
     std::thread::scope(|scope| {
         let handle = std::thread::Builder::new()
@@ -304,6 +282,16 @@ fn in_bounded_thread<T: Send>(stack: usize, f: impl FnOnce() -> T + Send) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn parse(input: &str) -> Outcome {
+        let (failures, script) = parse_in_child(input);
+        Outcome {
+            failures,
+            script: script.unwrap_or_default(),
+        }
+    }
+    fn strip_quotes(input: &str) -> Result<String, Failure> {
+        strip_quotes_in_child(input)
+    }
 
     /// panic する解析関数を差し込む口（S1 の境界の確認に使う）。
     fn parse_with(input: &str, parser: ProgramParser) -> Outcome {
@@ -389,22 +377,6 @@ mod tests {
         }
         let outcome = parse(&input);
         assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
-    }
-
-    // @kotowari[REQ-039]
-    #[test]
-    fn req_039_parse_exchanges_over_the_budget_fail() {
-        // 1 回の判定の構文解析は 1000 回まで。1001 回目は Limit になる。
-        begin_judgment();
-        for _ in 0..LIMIT_EXCHANGES {
-            let outcome = parse("true");
-            assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
-        }
-        // 引用の除去は字句解析であり、構文解析の回数の予算を消費しない。
-        assert_eq!(strip_quotes("true").unwrap(), "true");
-        let outcome = parse("true");
-        assert_eq!(outcome.failures, vec![Failure::Limit]);
-        assert!(outcome.script.is_empty());
     }
 
     // @kotowari[REQ-038]

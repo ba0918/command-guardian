@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/guardian-app",
     "crates/guardian-analysis",
     "crates/guardian-core",
     "crates/guardian-judge",
@@ -20,6 +21,7 @@ name = "command-guardian"
 path = "src/main.rs"
 
 [dependencies]
+guardian-app = { path = "crates/guardian-app" }
 guardian-core = { path = "crates/guardian-core" }
 guardian-judge = { path = "crates/guardian-judge" }
 guardian-parser = { path = "crates/guardian-parser" }
@@ -27,6 +29,7 @@ guardian-policy = { path = "crates/guardian-policy" }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+toml = { workspace = true }
 tempfile = { workspace = true }
 
 [workspace.dependencies]

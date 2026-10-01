@@ -47,27 +47,35 @@ enum Value {
 }
 
 #[derive(Clone)]
-struct Context {
+struct Context<'a> {
     home: Option<PathBuf>,
     tmpdir: Option<PathBuf>,
     cwd: Option<PathBuf>,
     vars: HashMap<String, Value>,
+    parser: SharedParser<'a>,
 }
+type SharedParser<'a> =
+    std::rc::Rc<std::cell::RefCell<&'a mut dyn FnMut(&str) -> guardian_parser::Outcome>>;
 
-impl Context {
-    fn new(env: &Env) -> Context {
+impl<'a> Context<'a> {
+    fn new(env: &Env, parser: &'a mut dyn FnMut(&str) -> guardian_parser::Outcome) -> Context<'a> {
         Context {
             home: env.home.clone(),
             tmpdir: env.tmpdir.clone(),
             cwd: env.cwd.clone(),
             vars: HashMap::new(),
+            parser: std::rc::Rc::new(std::cell::RefCell::new(parser)),
         }
     }
 }
 
 /// コマンド文字列から効果を取り出す。
-pub fn extract_effects(command: &str, env: &Env) -> Vec<Effect> {
-    analyze(command, env).effects
+pub fn extract_effects(
+    outcome: guardian_parser::Outcome,
+    env: &Env,
+    parser: &mut dyn FnMut(&str) -> guardian_parser::Outcome,
+) -> Vec<Effect> {
+    analyze(outcome, env, parser).effects
 }
 
 /// 判定の材料。効果と、判定できない理由。
@@ -78,12 +86,12 @@ pub struct Analysis {
 }
 
 /// コマンド文字列を解析して効果を取り出す。判定できない理由も返す。
-pub fn analyze(command: &str, env: &Env) -> Analysis {
-    // 判定の予算（構文解析の回数と時間）を数え直す（REQ-039）。この判定の間の
-    // 構文解析がここから数える。
-    guardian_parser::begin_judgment();
-    let outcome = guardian_parser::parse(command);
-    let mut ctx = Context::new(env);
+pub fn analyze(
+    outcome: guardian_parser::Outcome,
+    env: &Env,
+    parser: &mut dyn FnMut(&str) -> guardian_parser::Outcome,
+) -> Analysis {
+    let mut ctx = Context::new(env, parser);
     let mut effects = Vec::new();
     let mut asks: Vec<Ask> = outcome.failures.into_iter().map(Ask::Parse).collect();
     extract_script(&outcome.script, &mut ctx, &mut effects, &mut asks, 0);
@@ -530,7 +538,7 @@ fn extract_inner(
     asks: &mut Vec<Ask>,
     depth: usize,
 ) {
-    let outcome = guardian_parser::parse(inner);
+    let outcome = (ctx.parser.borrow_mut())(inner);
     for failure in outcome.failures {
         asks.push(Ask::Parse(failure));
     }

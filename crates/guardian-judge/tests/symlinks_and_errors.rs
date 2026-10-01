@@ -1,6 +1,15 @@
 //! S6: symlink・合成・内部エラー（REQ-007, REQ-009, REQ-010）。
 
-use guardian_analysis::{analyze, extract_effects};
+fn analyze(command: &str, env: &Env) -> guardian_analysis::Analysis {
+    guardian_analysis::analyze(
+        guardian_parser::parse(command),
+        env,
+        &mut guardian_parser::parse,
+    )
+}
+fn extract_effects(command: &str, env: &Env) -> Vec<guardian_core::Effect> {
+    analyze(command, env).effects
+}
 use guardian_core::{Class, Env, Target, Verdict, Why};
 use guardian_judge::{Classification, Judge, JudgeEnv};
 use std::path::PathBuf;

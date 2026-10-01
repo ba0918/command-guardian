@@ -1,6 +1,8 @@
 //! S10: 見張りの規則の形と語の照合（REQ-027, REQ-028）。
 
-use guardian_policy::guard::{invocations, parse_guard_rules_document, GuardRule};
+mod common;
+use common::{invocations, parse_guard_rules_document};
+use guardian_policy::guard::GuardRule;
 
 fn rules(text: &str) -> (Vec<GuardRule>, Vec<String>) {
     parse_guard_rules_document(text).unwrap()
@@ -32,7 +34,6 @@ fn literal_eval(body: &str) -> String {
 // @kotowari[REQ-038, REQ-033]
 #[test]
 fn req_038_guard_collection_keeps_syntax_failures_from_literal_bodies() {
-    guardian_parser::begin_judgment();
     let result = invocations("eval 'if true; then git push'");
     assert_eq!(result.failures, vec![guardian_parser::Failure::Syntax]);
 }
@@ -60,7 +61,6 @@ fn req_033_guards_inside_sixteen_and_seventeen_literal_evals_are_kept() {
     for depth in 1..=17 {
         command = literal_eval(&command);
         if depth >= 16 {
-            guardian_parser::begin_judgment();
             assert!(
                 matches(&rs, &command),
                 "guard lost at {depth} literal evals"
