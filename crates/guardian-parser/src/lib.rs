@@ -262,10 +262,17 @@ fn depth_over_limit(input: &str) -> bool {
     const SINGLE: char = 's';
     const BACKTICK: char = 'b';
 
+    /// 開いている入れ子の種類。`)` は `(` だけを、`}` は `{` だけを閉じる。
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Ctx {
+        Paren,
+        Brace,
+    }
+
     let chars: Vec<char> = input.chars().collect();
     let mut states = vec![NORMAL];
+    let mut stack: Vec<Ctx> = Vec::new();
     let mut sub_marks: Vec<usize> = Vec::new();
-    let mut depth = 0usize;
     let mut keywords = 0usize;
     let mut peak = 0usize;
     let mut at_word_start = true;
@@ -298,16 +305,19 @@ fn depth_over_limit(input: &str) -> bool {
                     continue;
                 }
                 if c == '$' && chars.get(index + 1) == Some(&'(') {
-                    depth += 1;
-                    sub_marks.push(depth);
+                    stack.push(Ctx::Paren);
+                    sub_marks.push(stack.len());
                     states.push(NORMAL);
+                    if bump(stack.len(), keywords, &mut peak) {
+                        return true;
+                    }
                     index += 2;
                     continue;
                 }
                 if is_word_char(c) {
                     let word = word_at(&chars, &mut index);
                     count_keyword(&word, &mut keywords);
-                    if bump(depth, keywords, &mut peak) {
+                    if bump(stack.len(), keywords, &mut peak) {
                         return true;
                     }
                     continue;
@@ -321,9 +331,12 @@ fn depth_over_limit(input: &str) -> bool {
                     index += 1;
                 }
                 '$' if chars.get(index + 1) == Some(&'(') => {
-                    depth += 1;
-                    sub_marks.push(depth);
+                    stack.push(Ctx::Paren);
+                    sub_marks.push(stack.len());
                     states.push(NORMAL);
+                    if bump(stack.len(), keywords, &mut peak) {
+                        return true;
+                    }
                     index += 2;
                 }
                 '`' => {
@@ -357,32 +370,45 @@ fn depth_over_limit(input: &str) -> bool {
                         index += 1;
                     }
                 }
-                '(' | '{' => {
-                    depth += 1;
-                    if bump(depth, keywords, &mut peak) {
+                '(' => {
+                    stack.push(Ctx::Paren);
+                    if bump(stack.len(), keywords, &mut peak) {
+                        return true;
+                    }
+                    index += 1;
+                    at_word_start = true;
+                }
+                '{' => {
+                    stack.push(Ctx::Brace);
+                    if bump(stack.len(), keywords, &mut peak) {
                         return true;
                     }
                     index += 1;
                     at_word_start = true;
                 }
                 ')' => {
-                    if sub_marks.last() == Some(&depth) {
-                        sub_marks.pop();
-                        states.pop();
+                    // `)` は `(` を閉じる。`${...}` の中の `)` は閉じない。
+                    if stack.last() == Some(&Ctx::Paren) {
+                        if sub_marks.last() == Some(&stack.len()) {
+                            sub_marks.pop();
+                            states.pop();
+                        }
+                        stack.pop();
                     }
-                    depth = depth.saturating_sub(1);
                     index += 1;
                     at_word_start = true;
                 }
                 '}' => {
-                    depth = depth.saturating_sub(1);
+                    if stack.last() == Some(&Ctx::Brace) {
+                        stack.pop();
+                    }
                     index += 1;
                     at_word_start = true;
                 }
                 _ if is_word_char(c) => {
                     let word = word_at(&chars, &mut index);
                     count_keyword(&word, &mut keywords);
-                    if bump(depth, keywords, &mut peak) {
+                    if bump(stack.len(), keywords, &mut peak) {
                         return true;
                     }
                     at_word_start = false;

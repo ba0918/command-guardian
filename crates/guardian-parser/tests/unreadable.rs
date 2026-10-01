@@ -1,6 +1,6 @@
 //! S8: 読めない構文は ask のコーパス（REQ-038）。
 
-use guardian_parser::parse;
+use guardian_parser::{parse, Failure};
 
 /// 読めない入力のコーパス。
 const UNREADABLE: &[&str] = &[
@@ -58,4 +58,16 @@ fn req_038_readable_inputs_are_not_reported() {
             outcome.failures
         );
     }
+}
+
+// @kotowari[REQ-039]
+#[test]
+fn req_039_parentheses_in_parameter_operands_do_not_hide_depth() {
+    // `${x:-)}` の中の ")" は本物の "(" を閉じない。深さを少なく数えない。
+    let mut input = "( ${x:-)}; ".repeat(2000);
+    input.push_str(": ");
+    input.push_str(&")".repeat(2000));
+    let outcome = parse(&input);
+    assert_eq!(outcome.failures, vec![Failure::TooDeep]);
+    assert!(outcome.script.is_empty());
 }
