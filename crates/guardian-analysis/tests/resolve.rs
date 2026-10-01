@@ -363,3 +363,15 @@ fn req_002_pipeline_eval_state_does_not_escape_to_the_parent_or_other_stages() {
         vec![delete(p("/etc/x"))]
     );
 }
+
+// @kotowari[REQ-002]
+#[test]
+fn req_002_mktemp_unambiguous_dry_run_abbreviations_are_not_created_paths() {
+    for option in ["--dr", "--dry", "--dry-r", "--dry-ru"] {
+        let effects = effects(&format!("rm \"$(mktemp {option} /etc/guardian.XXXXXX)\""));
+        assert!(
+            matches!(effects[0].target, Target::Unresolved(_)),
+            "{effects:?}"
+        );
+    }
+}

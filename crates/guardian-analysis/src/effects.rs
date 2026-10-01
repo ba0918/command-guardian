@@ -1292,7 +1292,7 @@ fn is_mktemp_script(script: &Script) -> bool {
             .iter()
             .take_while(|word| word.text != "--")
             .any(|word| {
-                word.text == "--dry-run"
+                (word.text.starts_with("--dr") && "--dry-run".starts_with(&word.text))
                     || (word.text.starts_with('-')
                         && !word.text.starts_with("--")
                         && word.text[1..].contains('u'))
