@@ -345,6 +345,7 @@ version = "0.1.0"
 dependencies = [
  "guardian-core",
  "guardian-judge",
+ "guardian-parser",
  "guardian-policy",
  "serde_json",
  "tempfile",

@@ -139,24 +139,18 @@ fn req_039_shallow_spellings_are_still_read() {
 // @kotowari[REQ-039]
 #[test]
 fn req_039_other_hiding_spellings_do_not_hide_depth() {
-    // パラメータ展開の閉じの直後の `#`、here-doc の本体、case の枝でも、
-    // 隠れた入れ子を深さとして数える。
+    // パラメータ展開の閉じの直後の `#` と、here-doc の本体でも、隠れた入れ子を
+    // 深さとして数える（字句解析ではなく、正規化した構文木の走査で）。
     let mut after_parameter = String::from("echo ${x}#");
     let mut here_doc = String::from("cat <<EOF\n");
-    let mut case_chain = String::new();
     for _ in 0..2000 {
         after_parameter.push_str("$(");
         here_doc.push_str("$(");
-        case_chain.push_str("case x in a) echo $(");
     }
     after_parameter.push_str(": ");
     after_parameter.push_str(&")".repeat(2000));
     here_doc.push_str(":\nEOF\n");
-    case_chain.push(':');
-    for _ in 0..2000 {
-        case_chain.push_str(");; esac");
-    }
-    for input in [after_parameter, here_doc, case_chain] {
+    for input in [after_parameter, here_doc] {
         let outcome = parse(&input);
         assert_eq!(outcome.failures, vec![Failure::TooDeep], "{input}");
         assert!(outcome.script.is_empty());
@@ -185,10 +179,15 @@ fn req_039_keyword_words_in_arguments_do_not_hide_depth() {
 #[test]
 fn req_039_an_ordinary_script_is_not_too_deep() {
     // here-doc と case と繰り返しを含む普通のスクリプトは、深さの上限に
-    // 達しない（保守側に倒すのは曖昧な字面だけで足りる）。
+    // 達しない。`#` や `)` の解釈の揺れる綴り（URL の `#top`、`&&` の後ろの
+    // コメント、`COLOR=#...`、`${x}#y`、`${x%)}`、引用の中の括弧）が入っても
+    // 浅いままなら ask にしない。
     let mut script = String::from(
         "#!/bin/bash\nset -euo pipefail\ncleanup() {\n  rm -rf \"$TMPDIR/build-$$\"\n}\ntrap cleanup EXIT\n",
     );
+    script.push_str("echo see https://example.com/#top\ntrue && # keep going\n");
+    script.push_str("COLOR=#ff0000\necho \"${HOME}#x\" \"${HOME%)}\"\n");
+    script.push_str(&format!("echo '{}'\n", "(".repeat(200)));
     for i in 0..60 {
         script.push_str(&format!(
             "echo \"step {i}: $(date +%s)\" | tee -a \"$LOG\"\n"

@@ -79,9 +79,6 @@ impl Normalizer {
     }
 
     fn item(&mut self, item: &raw::CompoundListItem, depth: usize) -> Result<Item, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let first = self.pipeline(&item.0.first, depth)?;
         let mut rest = Vec::new();
         for and_or in &item.0.additional {
@@ -106,9 +103,6 @@ impl Normalizer {
     }
 
     fn pipeline(&mut self, pipeline: &raw::Pipeline, depth: usize) -> Result<Pipeline, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let mut commands = Vec::new();
         for command in &pipeline.seq {
             commands.push(self.command(command, depth)?);
@@ -117,9 +111,6 @@ impl Normalizer {
     }
 
     fn command(&mut self, command: &raw::Command, depth: usize) -> Result<Command, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         match command {
             raw::Command::Simple(simple) => Ok(Command::Simple(self.simple(simple, depth)?)),
             raw::Command::Compound(compound, redirects) => {
@@ -154,9 +145,6 @@ impl Normalizer {
         simple: &raw::SimpleCommand,
         depth: usize,
     ) -> Result<SimpleCommand, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let mut out = SimpleCommand::default();
         if let Some(prefix) = &simple.prefix {
             for item in &prefix.0 {
@@ -217,9 +205,6 @@ impl Normalizer {
         compound: &raw::CompoundCommand,
         depth: usize,
     ) -> Result<Compound, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let inner = depth + 1;
         match compound {
             raw::CompoundCommand::Arithmetic(arithmetic) => Ok(Compound::Arithmetic(
@@ -431,9 +416,6 @@ impl Normalizer {
         if !expand {
             return Ok(Word::from_parts(vec![Part::Quoted(doc.value.clone())]));
         }
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let pieces = match catch(|| word::parse_heredoc(&doc.value, &self.options)) {
             Ok(Ok(pieces)) => pieces,
             Ok(Err(_)) => return Err(Failure::UnknownNode(doc.value.clone())),
@@ -447,9 +429,6 @@ impl Normalizer {
     }
 
     fn word(&mut self, word: &raw::Word, depth: usize) -> Result<Word, Failure> {
-        if depth > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let pieces = match catch(|| word::parse(&word.value, &self.options)) {
             Ok(Ok(pieces)) => pieces,
             Ok(Err(_)) => return Err(Failure::UnknownNode(word.value.clone())),
@@ -563,9 +542,6 @@ impl Normalizer {
         piece: &word::WordPiece,
         depth: usize,
     ) -> Result<Substitution, Failure> {
-        if depth + 1 > LIMIT_DEPTH {
-            return Err(Failure::TooDeep);
-        }
         let body_text = substitution_source(piece);
         if self.budget < body_text.len() {
             return Err(Failure::TooLarge);
@@ -675,6 +651,10 @@ impl Normalizer {
     }
 
     /// 生の断片。綴りは Opaque のまま保ち、中の置換だけを読む（REQ-037）。
+    ///
+    /// パラメータ展開と算術のオペランドの再帰読みは、正規化した構文木では
+    /// 平坦な断片になるため、事後の走査では段数を測れない。ここで再帰読みの
+    /// 段数を測り、上限を超えたら TooDeep にする（REQ-039）。
     fn fragment_parts(
         &mut self,
         raw: &str,

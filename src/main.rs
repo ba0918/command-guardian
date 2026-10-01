@@ -8,6 +8,9 @@ use guardian_policy::{message, Engine, EngineEnv, Report};
 use std::path::PathBuf;
 
 fn main() {
+    // 入力由来の解析の子プロセスとして起動されたときは、何よりも先に解析を務める。
+    // 子は stdin を要求のソケットとして使うため、フックの入力より先にここへ来る。
+    guardian_parser::run_if_child();
     let args: Vec<String> = std::env::args().skip(1).collect();
     std::process::exit(run(&args));
 }
