@@ -119,6 +119,25 @@ impl<'a> Context<'a> {
         }
         true
     }
+
+    fn merge_state(&mut self, other: &Context) {
+        let names: std::collections::HashSet<_> =
+            self.vars.keys().chain(other.vars.keys()).cloned().collect();
+        let vars = names
+            .into_iter()
+            .map(|name| {
+                let value = match (lookup_var(&name, self), lookup_var(&name, other)) {
+                    (Some(left), Some(right)) if left == right => left,
+                    _ => Value::Unresolved(format!("${name}")),
+                };
+                (name, value)
+            })
+            .collect();
+        self.vars = vars;
+        if self.cwd != other.cwd {
+            self.cwd = None;
+        }
+    }
 }
 
 /// コマンド文字列から効果を取り出す。
@@ -301,13 +320,25 @@ fn extract_compound(
             elses,
         } => {
             extract_script(condition, ctx, out, asks, depth);
-            extract_script(then, ctx, out, asks, depth);
+            let mut remaining = ctx.clone();
+            let mut joined = ctx.clone();
+            extract_script(then, &mut joined, out, asks, depth);
+            let mut has_else = false;
             for clause in elses {
                 if let Some(condition) = &clause.condition {
-                    extract_script(condition, ctx, out, asks, depth);
+                    extract_script(condition, &mut remaining, out, asks, depth);
+                } else {
+                    has_else = true;
                 }
-                extract_script(&clause.body, ctx, out, asks, depth);
+                let mut branch = remaining.clone();
+                extract_script(&clause.body, &mut branch, out, asks, depth);
+                joined.merge_state(&branch);
             }
+            if !has_else {
+                joined.merge_state(&remaining);
+            }
+            ctx.vars = joined.vars;
+            ctx.cwd = joined.cwd;
         }
         Compound::While {
             condition, body, ..
