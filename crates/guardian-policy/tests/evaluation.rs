@@ -49,6 +49,32 @@ fn req_006_classification_and_roots_are_decided_from_values() {
     );
 }
 
+// @kotowari[REQ-003, REQ-005, REQ-006]
+#[test]
+fn req_003_nested_tmpdir_root_is_not_allowed_by_an_outer_temporary_root() {
+    for root in ["/tmp/session-temp", "/var/tmp/session-temp"] {
+        let policy = Policy::new(Config::builtin(Some(std::path::Path::new(root))), vec![]);
+        assert!(policy
+            .apply_roots(&ObservedPath {
+                path: root.into(),
+                children: false,
+            })
+            .is_none());
+        for observed in [
+            ObservedPath {
+                path: root.into(),
+                children: true,
+            },
+            ObservedPath {
+                path: std::path::Path::new(root).join("child"),
+                children: false,
+            },
+        ] {
+            assert_eq!(policy.apply_roots(&observed).unwrap().2, Verdict::Allow);
+        }
+    }
+}
+
 // @kotowari[REQ-009, REQ-026, REQ-033, REQ-038, REQ-039]
 #[test]
 fn req_009_allow_rules_never_overwrite_heavier_diagnostics_or_rules() {

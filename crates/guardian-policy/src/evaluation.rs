@@ -101,6 +101,9 @@ impl Policy {
                 ));
             }
         }
+        if !observed.children && self.config.allowed_roots.iter().any(|root| path == root) {
+            return None;
+        }
         for root in &self.config.allowed_roots {
             if !root.as_os_str().is_empty()
                 && (path != root || observed.children)
