@@ -194,3 +194,20 @@ fn req_002_other_user_tilde_paths_are_unresolved() {
         vec![delete(Target::Unresolved("~+/x".to_string()))]
     );
 }
+
+// @kotowari[REQ-001, REQ-002]
+#[test]
+fn req_002_subshell_and_function_definition_do_not_change_parent_bindings() {
+    for command in [
+        "S=/etc/x; (S=/tmp/x); rm \"$S\"",
+        "S=/etc/x; f() { S=/tmp/x; }; rm \"$S\"",
+    ] {
+        assert_eq!(effects(command), vec![delete(p("/etc/x"))], "{command}");
+    }
+    assert_eq!(
+        effects("(cd /tmp); rm x"),
+        vec![delete(p("/home/you/work/repo/x"))]
+    );
+    assert_eq!(effects("{ cd /tmp; }; rm x"), vec![delete(p("/tmp/x"))]);
+    assert_eq!(effects("(rm /etc/x)"), vec![delete(p("/etc/x"))]);
+}

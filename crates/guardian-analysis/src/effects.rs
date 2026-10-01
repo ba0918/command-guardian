@@ -258,9 +258,10 @@ fn extract_command(
             Vec::new()
         }
         Command::Function(function) => {
-            extract_redirects(&function.redirects, ctx, out, asks, depth);
-            scan_word_substitutions(&function.name, ctx, out, asks, depth);
-            extract_compound(&function.body, ctx, out, asks, depth);
+            let mut child = ctx.clone();
+            extract_redirects(&function.redirects, &mut child, out, asks, depth);
+            scan_word_substitutions(&function.name, &child, out, asks, depth);
+            extract_compound(&function.body, &mut child, out, asks, depth);
             Vec::new()
         }
         Command::Test(test) => {
@@ -330,8 +331,12 @@ fn extract_compound(
                 }
             }
         }
-        Compound::BraceGroup(script) | Compound::Subshell(script) => {
+        Compound::BraceGroup(script) => {
             extract_script(script, ctx, out, asks, depth);
+        }
+        Compound::Subshell(script) => {
+            let mut child = ctx.clone();
+            extract_script(script, &mut child, out, asks, depth);
         }
         Compound::Arithmetic(word) => {
             scan_word_substitutions(word, ctx, out, asks, depth);
