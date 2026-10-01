@@ -108,6 +108,21 @@ mod tests {
     use super::*;
     // @kotowari[REQ-039]
     #[test]
+    fn req_039_quote_stripping_rejects_oversized_input_before_using_the_host() {
+        let input = "a".repeat(guardian_parser::LIMIT_BYTES + 1);
+        let mut runtime = ParserRuntime::new(std::path::PathBuf::new());
+        assert_eq!(
+            runtime.judgment().strip_quotes(&input),
+            Err(Failure::TooLarge)
+        );
+        assert_eq!(
+            runtime.validation().strip_quotes(&input),
+            Err(Failure::TooLarge)
+        );
+    }
+
+    // @kotowari[REQ-039]
+    #[test]
     fn req_039_a_panicking_parser_becomes_a_failure() {
         fn boom(_: &str) -> Outcome {
             panic!("panic in the injected parser")

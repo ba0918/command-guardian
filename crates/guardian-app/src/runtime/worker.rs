@@ -207,6 +207,9 @@ impl ParserRuntime {
         input: &str,
         budget: Option<&mut budget::Budget>,
     ) -> Result<String, Failure> {
+        if input.len() > guardian_parser::LIMIT_BYTES {
+            return Err(Failure::TooLarge);
+        }
         match self.exchange(wire::MODE_STRIP_QUOTES, input, budget) {
             Ok(Response::Stripped(Ok(text))) => Ok(text),
             Ok(Response::Stripped(Err(failure))) => Err(failure),
