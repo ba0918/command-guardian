@@ -919,9 +919,14 @@ fn update_cwd(
         Some(index) => {
             // 値付きオプション（`-P` など）は読み飛ばさない。最初の非オプションの語。
             let word = &args[index];
-            match resolve_word(word, ctx, out, asks, depth) {
-                Resolved::Path(path) => ctx.cwd = Some(path),
-                _ => ctx.cwd = None,
+            if word.text == "-" {
+                // `cd -` は OLDPWD へ移る。解決できるパスではない。
+                ctx.cwd = None;
+            } else {
+                match resolve_word(word, ctx, out, asks, depth) {
+                    Resolved::Path(path) => ctx.cwd = Some(path),
+                    _ => ctx.cwd = None,
+                }
             }
         }
     }

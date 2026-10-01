@@ -87,6 +87,17 @@ fn req_002_literal_cd_moves_relative_paths() {
 
 // @kotowari[REQ-002]
 #[test]
+fn req_002_cd_dash_is_not_a_directory_named_dash() {
+    // `cd -` は OLDPWD で、REQ-002 が解決できるとするパスではない。
+    // cwd 相対の "-" にせず、続く相対パスは未解決として扱う。
+    assert_eq!(
+        effects("cd -; rm -rf x"),
+        vec![delete(Target::Unresolved("x".to_string()))]
+    );
+}
+
+// @kotowari[REQ-002]
+#[test]
 fn req_002_mktemp_paths_resolve() {
     assert_eq!(
         effects("d=$(mktemp -d); rm -rf \"$d\""),
