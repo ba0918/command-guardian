@@ -48,6 +48,29 @@ fn req_001_rm_delete() {
     );
 }
 
+// @kotowari[REQ-001, REQ-008, REQ-009]
+#[test]
+fn req_001_find_and_xargs_rm_keep_fixed_targets_as_well_as_source_children() {
+    for command in [
+        "find /tmp/scratch -exec rm -rf /etc/x {} +",
+        "find /tmp/scratch -type f | xargs rm -rf /etc/x",
+    ] {
+        let effects = effects(command);
+        assert_eq!(effects.len(), 2, "{command}: {effects:?}");
+        assert!(effects.contains(&Effect {
+            op: Op::Delete,
+            target: path("/etc/x"),
+        }));
+        assert!(effects.contains(&Effect {
+            op: Op::Delete,
+            target: Target::Children {
+                base: PathBuf::from("/tmp/scratch"),
+                dereference: false,
+            },
+        }));
+    }
+}
+
 // @kotowari[REQ-001]
 #[test]
 fn req_001_rmdir_unlink_shred_delete() {

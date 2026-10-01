@@ -594,7 +594,7 @@ fn extract_simple(
         }
         "find" => find_effects(args, ctx, out),
         "xargs" => {
-            xargs_effects(args, &children_sources, out);
+            xargs_effects(args, &children_sources, ctx, out);
             Vec::new()
         }
         "eval" => {
@@ -891,6 +891,12 @@ fn find_effects(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>) -> Vec<
             if let Some(next) = args.get(index + 1) {
                 if basename(&next.text) == "rm" {
                     has_delete = true;
+                    let tail = &args[index + 2..];
+                    let end = tail
+                        .iter()
+                        .position(|word| word.text == ";" || word.text == "+")
+                        .unwrap_or(tail.len());
+                    rm_fixed_effects(&tail[..end], Some("{}"), ctx, out);
                 }
             }
         }
@@ -966,17 +972,49 @@ const XARGS_VALUED: &[&str] = &[
     "--max-procs",
 ];
 
-fn xargs_effects(args: &[Word], children_sources: &[(PathBuf, bool)], out: &mut Vec<Effect>) {
+fn rm_fixed_effects(
+    args: &[Word],
+    placeholder: Option<&str>,
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+) {
+    let (targets, _) = option_targets(args, &[]);
+    for word in targets {
+        if placeholder.is_some_and(|placeholder| word.text == placeholder) {
+            continue;
+        }
+        out.push(Effect {
+            op: Op::Delete,
+            target: resolve_word(word, ctx).into_target(word, ctx),
+        });
+    }
+}
+
+fn xargs_effects(
+    args: &[Word],
+    children_sources: &[(PathBuf, bool)],
+    ctx: &Context,
+    out: &mut Vec<Effect>,
+) {
     let mut index = 0;
-    let mut utility: Option<&Word> = None;
+    let mut utility_index = None;
+    let mut placeholder = None;
     while index < args.len() {
         let text = &args[index].text;
         if text == "--" {
-            utility = args.get(index + 1);
+            utility_index = Some(index + 1);
             break;
         }
         if text.starts_with('-') && text != "-" {
             let head = text.split('=').next().unwrap_or(text);
+            if matches!(head, "-I" | "-i" | "--replace") {
+                placeholder = text
+                    .split_once('=')
+                    .map(|(_, value)| value)
+                    .or_else(|| args.get(index + 1).map(|word| word.text.as_str()));
+            } else if let Some(value) = text.strip_prefix("-I").filter(|value| !value.is_empty()) {
+                placeholder = Some(value);
+            }
             if XARGS_VALUED.contains(&head) && !text.contains('=') {
                 index += 2;
             } else {
@@ -984,14 +1022,17 @@ fn xargs_effects(args: &[Word], children_sources: &[(PathBuf, bool)], out: &mut 
             }
             continue;
         }
-        utility = Some(&args[index]);
+        utility_index = Some(index);
         break;
     }
-    let Some(utility) = utility else { return };
+    let Some(index) = utility_index else { return };
+    let Some(utility) = args.get(index) else {
+        return;
+    };
     if basename(&utility.text) != "rm" {
         return;
     }
-    // 引数中の対象は供給元から来る。供給元の子の集合ごとに効果を出す。
+    rm_fixed_effects(&args[index + 1..], placeholder, ctx, out);
     if children_sources.is_empty() {
         out.push(Effect {
             op: Op::Delete,
