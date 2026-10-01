@@ -331,6 +331,7 @@ dependencies = [
  "guardian-analysis",
  "guardian-core",
  "guardian-parser",
+ "guardian-policy",
  "tempfile",
 ]
 

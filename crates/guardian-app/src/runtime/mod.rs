@@ -63,7 +63,10 @@ impl ValidationSession<'_> {
 }
 
 fn parse_in_child(input: &str) -> (Vec<Failure>, Option<Script>) {
-    match in_bounded_thread(worker::CHILD_STACK_BYTES, || guardian_parser::parse(input)) {
+    parse_in_child_with(input, guardian_parser::parse)
+}
+fn parse_in_child_with(input: &str, parse: fn(&str) -> Outcome) -> (Vec<Failure>, Option<Script>) {
+    match in_bounded_thread(worker::CHILD_STACK_BYTES, || parse(input)) {
         Some(outcome) => (outcome.failures, Some(outcome.script)),
         None => (vec![Failure::Panic], None),
     }
@@ -85,4 +88,19 @@ fn in_bounded_thread<T: Send>(stack: usize, f: impl FnOnce() -> T + Send) -> Opt
             .ok()?;
         handle.join().ok()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // @kotowari[REQ-039]
+    #[test]
+    fn req_039_a_panicking_parser_becomes_a_failure() {
+        fn boom(_: &str) -> Outcome {
+            panic!("panic in the injected parser")
+        }
+        let (failures, script) = parse_in_child_with("true", boom);
+        assert_eq!(failures, vec![Failure::Panic]);
+        assert!(script.is_none());
+    }
 }

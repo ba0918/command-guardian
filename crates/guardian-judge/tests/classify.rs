@@ -1,7 +1,6 @@
 //! S3: 一時領域と保護領域の分類と判定（REQ-003, REQ-005, REQ-006）。
 //!
-//! 分類から判定への対応は policy の責務だが、この段では仕様の対応表
-//! (REQ-006) をテスト側の写像で固定し、分類そのものを確かめる。
+//! 分類から判定への対応には実際の純粋policyを使う。
 
 fn extract_effects(command: &str, env: &Env) -> Vec<Effect> {
     guardian_analysis::extract_effects(
@@ -32,23 +31,24 @@ fn classify(path: &str) -> Classification {
 }
 
 fn verdict(class: Class) -> Verdict {
-    match class {
-        Class::Ephemeral | Class::Vcs => Verdict::Allow,
-        Class::Protected => Verdict::Block,
-        Class::Unknown => Verdict::Ask,
-    }
+    guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![])
+        .classification_verdict(class, &guardian_core::Why::Unmanaged)
 }
 
 fn verdict_for(target: &Target) -> Verdict {
+    if let Some(value) =
+        guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![])
+            .value_target(target)
+    {
+        return value.2;
+    }
     match target {
-        Target::Unresolved(_) => Verdict::Block,
-        Target::Mktemp => Verdict::Allow,
-        Target::UnknownSource => Verdict::Ask,
         Target::Path { path, dereference } => {
             verdict(judge().classify_path(path, *dereference).class)
         }
         Target::GlobBase(base) => verdict(judge().classify_path(base, false).class),
         Target::Children { base, .. } => verdict(judge().classify_children(base).class),
+        _ => unreachable!(),
     }
 }
 

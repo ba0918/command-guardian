@@ -23,12 +23,12 @@ path = "src/main.rs"
 [dependencies]
 guardian-app = { path = "crates/guardian-app" }
 guardian-core = { path = "crates/guardian-core" }
-guardian-judge = { path = "crates/guardian-judge" }
-guardian-parser = { path = "crates/guardian-parser" }
 guardian-policy = { path = "crates/guardian-policy" }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+guardian-judge = { path = "crates/guardian-judge" }
+guardian-parser = { path = "crates/guardian-parser" }
 guardian-analysis = { path = "crates/guardian-analysis" }
 toml = { workspace = true }
 tempfile = { workspace = true }

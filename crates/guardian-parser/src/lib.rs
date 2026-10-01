@@ -2,12 +2,8 @@
 //! （brush-parser、版を固定）を背後に隠し、正規化した構文木だけを公開する
 //! （REQ-036）。
 //!
-//! - 入力由来の解析は隔離した子プロセス（同じ実行ファイル、スタックの上限つき）で
-//!   行う。引用の除去も同じ隔離の内側（スタックの上限つきのスレッド）で行う。
-//!   子の死は原因で分け（REQ-039・A23）、入力に帰せる死（スタック
-//!   オーバーフロー、時間の上限の超過）と上限の超過は Failure::Limit（block）、
-//!   自分に帰せる死（panic、起動とプロトコルの失敗、帰せない死）は
-//!   Failure::Panic・Failure::Internal（ask）に落とし、判定は必ず返る。
+//! - 純粋な構文解析と引用除去を提供する。本番の入力はguardian-appが同じ
+//!   実行ファイルの子で隔離し、スタック・回数・待ち時間・回収を管理する。
 //! - サイズは構文解析の前に測る。置換の再帰読みは累計で測る（REQ-039）。
 //! - 深さは、正規化した構文木が保つ入れ子（複合構文と置換の再帰）を成功後の走査で
 //!   測る。構文木では平坦な断片になる再帰読み（パラメータ展開と算術式）と `[[ ]]`
@@ -30,12 +26,6 @@ pub const LIMIT_BYTES: usize = 1024 * 1024;
 
 /// 構文の入れ子と置換の再帰の上限（REQ-039）。
 pub const LIMIT_DEPTH: usize = 128;
-
-/// 1 回の判定で行う構文解析の回数の上限（REQ-039）。固定値。
-pub const LIMIT_EXCHANGES: usize = 1000;
-
-/// 1 回の判定の時間の上限（REQ-039）。固定値。
-pub const LIMIT_JUDGMENT_TIME: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// 読み直しの試行の上限。壊れた入力を読み続けないための歯止め。
 const MAX_RECOVERY_ATTEMPTS: usize = 64;
@@ -60,7 +50,7 @@ impl Outcome {
 
 /// コマンド文字列を構文解析し、正規化した構文木と読めなかった理由を返す。
 pub fn parse(input: &str) -> Outcome {
-    let outcome = parse_inner(input, parse_program);
+    let outcome = parse_inner(input);
     if depth::exceeds(&outcome.script) {
         Outcome::failure(Failure::TooDeep)
     } else {
@@ -74,18 +64,14 @@ pub fn strip_quotes(input: &str) -> Result<String, Failure> {
     strip_quotes_inner(input)
 }
 
-/// 差し込み可能な生の構文解析。panic はスレッドの境界で Failure に変える（REQ-038）。
-pub(crate) type ProgramParser =
-    fn(&str, &ParserOptions) -> Result<brush_parser::ast::Program, Failure>;
-
-fn parse_inner(input: &str, parser: ProgramParser) -> Outcome {
+fn parse_inner(input: &str) -> Outcome {
     // サイズは構文解析の前に測る（REQ-039）。
     if input.len() > LIMIT_BYTES {
         return Outcome::failure(Failure::TooLarge);
     }
     let options = options();
     let mut normalizer = Normalizer::new(LIMIT_BYTES - input.len());
-    match parser(input, &options) {
+    match parse_program(input, &options) {
         Ok(program) => {
             let script = normalizer.program(&program, 0);
             Outcome {
@@ -222,85 +208,14 @@ pub(crate) fn strip_quotes_inner(input: &str) -> Result<String, Failure> {
     Ok(out.join(" "))
 }
 
-/// 子プロセス側の引用の除去。解析と同じ隔離の内側（スタックの上限つきの
-/// スレッド）で行う（REQ-039）。設定の照合が消えないよう、解析の死より深い
-/// 入力まで本文を返す。スレッドを起こせないときと panic は Failure::Panic に
-/// する。
-#[cfg(test)]
-fn strip_quotes_in_child(input: &str) -> Result<String, Failure> {
-    match in_bounded_thread(32 * 1024 * 1024, move || strip_quotes_inner(input)) {
-        Some(result) => result,
-        None => Err(Failure::Panic),
-    }
-}
-
 /// panic を捕まえて Err に変える境界（REQ-038）。
 pub(crate) fn catch<T>(f: impl FnOnce() -> T) -> Result<T, ()> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).map_err(|_| ())
 }
 
-/// 子プロセス側の解析。上限つきのスタックのスレッドで行い、panic は
-/// Failure::Panic、深さの上限超えは Failure::TooDeep にする（REQ-039）。
-#[cfg(test)]
-fn parse_in_child(input: &str) -> (Vec<Failure>, Option<Script>) {
-    parse_in_child_with(input, parse_program)
-}
-
-/// 解析の関数を差し込める形。スレッドを起こせないときと panic は Panic。
-#[cfg(test)]
-fn parse_in_child_with(input: &str, parser: ProgramParser) -> (Vec<Failure>, Option<Script>) {
-    match in_bounded_thread(8 * 1024 * 1024, move || parse_inner(input, parser)) {
-        Some(outcome) => finish(outcome),
-        None => (vec![Failure::Panic], None),
-    }
-}
-
-/// 深さは、成功した正規化の構文木の走査で測る（REQ-039）。超えたら構文木は
-/// 返さない（親が深い木を読まないようにするため）。
-#[cfg(test)]
-fn finish(outcome: Outcome) -> (Vec<Failure>, Option<Script>) {
-    if depth::exceeds(&outcome.script) {
-        (vec![Failure::TooDeep], None)
-    } else {
-        (outcome.failures, Some(outcome.script))
-    }
-}
-
-/// 処理をスタックの上限つきのスレッドで行う。スレッドを作れないときは None。
-#[cfg(test)]
-fn in_bounded_thread<T: Send>(stack: usize, f: impl FnOnce() -> T + Send) -> Option<T> {
-    std::thread::scope(|scope| {
-        let handle = std::thread::Builder::new()
-            .name("guardian-parser".to_string())
-            .stack_size(stack)
-            .spawn_scoped(scope, f)
-            .ok()?;
-        handle.join().ok()
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn parse(input: &str) -> Outcome {
-        let (failures, script) = parse_in_child(input);
-        Outcome {
-            failures,
-            script: script.unwrap_or_default(),
-        }
-    }
-    fn strip_quotes(input: &str) -> Result<String, Failure> {
-        strip_quotes_in_child(input)
-    }
-
-    /// panic する解析関数を差し込む口（S1 の境界の確認に使う）。
-    fn parse_with(input: &str, parser: ProgramParser) -> Outcome {
-        let (failures, script) = parse_in_child_with(input, parser);
-        Outcome {
-            script: script.unwrap_or_default(),
-            failures,
-        }
-    }
 
     // @kotowari[REQ-036]
     #[test]
@@ -312,71 +227,9 @@ mod tests {
 
     // @kotowari[REQ-039]
     #[test]
-    fn req_039_a_panicking_parser_becomes_a_failure() {
-        fn boom(_: &str, _: &ParserOptions) -> Result<brush_parser::ast::Program, Failure> {
-            panic!("panic in the injected parser")
-        }
-        let outcome = parse_with("rm -rf /tmp/x", boom);
-        assert_eq!(outcome.failures, vec![Failure::Panic]);
-        assert!(outcome.script.is_empty());
-    }
-
-    // @kotowari[REQ-039]
-    #[test]
     fn req_039_input_over_one_mebibyte_is_too_large() {
         let input = "a".repeat(LIMIT_BYTES + 1);
         assert_eq!(parse(&input).failures, vec![Failure::TooLarge]);
-    }
-
-    // @kotowari[REQ-039]
-    #[test]
-    fn req_039_cumulative_substitution_reads_are_measured() {
-        // 1 段ごとに約 2 万バイトの本体を持つ 100 段の入れ子。累計で 1 MiB を超える。
-        let payload = "echo y; ".repeat(2_500);
-        let mut input = String::from("echo ");
-        for _ in 0..100 {
-            input.push_str("$(");
-        }
-        input.push_str(&payload);
-        for _ in 0..100 {
-            input.push(')');
-        }
-        assert!(input.len() < LIMIT_BYTES);
-        let outcome = parse(&input);
-        assert!(
-            outcome.failures.contains(&Failure::TooLarge),
-            "{:?}",
-            outcome.failures
-        );
-    }
-
-    // @kotowari[REQ-039]
-    #[test]
-    fn req_039_depth_over_the_limit_is_too_deep() {
-        let input = format!(
-            "{}{}{}",
-            "{ ".repeat(LIMIT_DEPTH + 1),
-            "true",
-            " ; }".repeat(LIMIT_DEPTH + 1)
-        );
-        let outcome = parse(&input);
-        assert_eq!(outcome.failures, vec![Failure::TooDeep]);
-        assert!(outcome.script.is_empty());
-    }
-
-    // @kotowari[REQ-039]
-    #[test]
-    fn req_039_depth_at_the_limit_is_read() {
-        let mut input = String::from("echo ");
-        for _ in 0..LIMIT_DEPTH {
-            input.push_str("$(");
-        }
-        input.push_str("true");
-        for _ in 0..LIMIT_DEPTH {
-            input.push(')');
-        }
-        let outcome = parse(&input);
-        assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
     }
 
     // @kotowari[REQ-038]
@@ -410,19 +263,5 @@ mod tests {
         assert!(strip_quotes("cat <<EOF\nbody\nEOF")
             .unwrap()
             .starts_with("cat << EOF"));
-    }
-
-    // @kotowari[REQ-036]
-    #[test]
-    fn req_036_strip_quotes_survives_a_deep_input() {
-        // 引用の除去も解析と同じ隔離の内側（スタックの上限つきのスレッド）で
-        // 行う（REQ-039）。深い入力でも本文が返り、設定の照合が空にならない。
-        let deep = format!(
-            "echo $(true)#{}: {} ; git push origin main",
-            "$(".repeat(2000),
-            ")".repeat(2000)
-        );
-        let text = strip_quotes(&deep).expect("深い入力でも引用を外せる");
-        assert!(text.contains("git push origin main"), "{text}");
     }
 }

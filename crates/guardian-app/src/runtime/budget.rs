@@ -1,6 +1,7 @@
 //! 一判定だけが所有する回数と経過時間。
-use guardian_parser::{LIMIT_EXCHANGES, LIMIT_JUDGMENT_TIME};
 use std::time::{Duration, Instant};
+const LIMIT_EXCHANGES: usize = 1000;
+const LIMIT_JUDGMENT_TIME: Duration = Duration::from_secs(5);
 
 pub(super) struct Budget {
     exchanges: usize,

@@ -6,7 +6,7 @@ use guardian_judge::{Classification, Judge};
 use std::path::Path;
 
 mod common;
-use common::{core_env, fixture, judge_for, verdict_of};
+use common::{core_env, fixture, judge_for};
 
 fn effects(root: &Path, command: &str) -> Vec<Effect> {
     extract_effects(command, &core_env(root))
@@ -34,11 +34,25 @@ fn classify(root: &Path, target: &Target) -> Classification {
 }
 
 fn worst_verdict(root: &Path, command: &str) -> Verdict {
-    let mut verdict = Verdict::Allow;
-    for e in effects(root, command) {
-        verdict = verdict.worst(verdict_of(classify(root, &e.target).class));
-    }
-    verdict
+    let policy = guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![]);
+    let reports = effects(root, command)
+        .into_iter()
+        .map(|e| {
+            let (class, why, verdict) = policy.value_target(&e.target).unwrap_or_else(|| {
+                let c = classify(root, &e.target);
+                let verdict = policy.classification_verdict(c.class, &c.why);
+                (c.class, c.why, verdict)
+            });
+            guardian_policy::EffectReport {
+                op: e.op,
+                target: e.target,
+                class,
+                why,
+                verdict,
+            }
+        })
+        .collect();
+    policy.report(reports, vec![], vec![]).verdict
 }
 
 // @kotowari[REQ-008, EX-006]

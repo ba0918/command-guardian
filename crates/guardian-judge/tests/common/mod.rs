@@ -9,7 +9,7 @@ pub fn extract_effects(command: &str, env: &guardian_core::Env) -> Vec<guardian_
     )
 }
 
-use guardian_core::{Env, Verdict};
+use guardian_core::Env;
 use guardian_judge::{Judge, JudgeEnv};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -88,13 +88,5 @@ pub fn core_env(root: &Path) -> Env {
         home: std::env::var_os("HOME").map(PathBuf::from),
         tmpdir: Some(PathBuf::from("/tmp")),
         cwd: Some(root.to_path_buf()),
-    }
-}
-
-pub fn verdict_of(class: guardian_core::Class) -> Verdict {
-    match class {
-        guardian_core::Class::Ephemeral | guardian_core::Class::Vcs => Verdict::Allow,
-        guardian_core::Class::Protected => Verdict::Block,
-        guardian_core::Class::Unknown => Verdict::Ask,
     }
 }

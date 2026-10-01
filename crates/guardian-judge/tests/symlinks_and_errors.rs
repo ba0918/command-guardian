@@ -48,11 +48,26 @@ fn classify(target: &Target) -> Classification {
 }
 
 fn verdict(class: Class) -> Verdict {
-    match class {
-        Class::Ephemeral | Class::Vcs => Verdict::Allow,
-        Class::Protected => Verdict::Block,
-        Class::Unknown => Verdict::Ask,
-    }
+    guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![])
+        .classification_verdict(class, &Why::Unmanaged)
+}
+fn composed_verdict(effects: Vec<guardian_core::Effect>) -> Verdict {
+    let policy = guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![]);
+    let reports = effects
+        .into_iter()
+        .map(|e| {
+            let c = classify(&e.target);
+            let verdict = policy.classification_verdict(c.class, &c.why);
+            guardian_policy::EffectReport {
+                op: e.op,
+                target: e.target,
+                class: c.class,
+                why: c.why,
+                verdict,
+            }
+        })
+        .collect();
+    policy.report(reports, vec![], vec![]).verdict
 }
 
 // @kotowari[REQ-007, EX-008]
@@ -105,18 +120,10 @@ fn req_007_hardlink_is_one_link() {
 fn req_009_worst_verdict_wins() {
     let effects = extract_effects("rm -rf /tmp/scratch/x /etc/foo", &core_env());
     assert_eq!(effects.len(), 2);
-    let mut worst = Verdict::Allow;
-    for e in &effects {
-        worst = worst.worst(verdict(classify(&e.target).class));
-    }
-    assert_eq!(worst, Verdict::Block);
+    assert_eq!(composed_verdict(effects), Verdict::Block);
 
     let effects = extract_effects("rm -rf /tmp/scratch/x /tmp/scratch/y", &core_env());
-    let mut worst = Verdict::Allow;
-    for e in &effects {
-        worst = worst.worst(verdict(classify(&e.target).class));
-    }
-    assert_eq!(worst, Verdict::Allow);
+    assert_eq!(composed_verdict(effects), Verdict::Allow);
 }
 
 // @kotowari[REQ-010]

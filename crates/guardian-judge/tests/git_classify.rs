@@ -99,11 +99,8 @@ fn req_020_git_is_not_invoked_outside_a_worktree() {
     assert!(git.calls.lock().unwrap().is_empty());
     assert_eq!(
         Verdict::Ask,
-        match c.class {
-            Class::Ephemeral | Class::Vcs => Verdict::Allow,
-            Class::Protected => Verdict::Block,
-            Class::Unknown => Verdict::Ask,
-        }
+        guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![])
+            .classification_verdict(c.class, &c.why)
     );
 }
 
@@ -148,11 +145,8 @@ fn req_010_git_failure_falls_to_ask() {
     assert_eq!(c.class, Class::Unknown);
     assert_eq!(c.why, Why::GitFailed);
     assert_ne!(
-        match c.class {
-            Class::Ephemeral | Class::Vcs => Verdict::Allow,
-            Class::Protected => Verdict::Block,
-            Class::Unknown => Verdict::Ask,
-        },
+        guardian_policy::Policy::new(guardian_policy::Config::builtin(None), vec![])
+            .classification_verdict(c.class, &c.why),
         Verdict::Block
     );
 }
