@@ -1,130 +1,18 @@
 version: 1
 entries:
-- id: opencode-protocol-implementation
-  base: 5b6e2b8de22368430a4726d06dbdc4ded4dd9d5b
+- id: opencode-native-teardown-implementation
+  base: 60b105cd2f9b28d321dda4325e08a3d6481eebcf
   role: implementer
   files:
-  - path: src/hook.rs
-    before: sha256:6a088d01dc25b526d08568166d266d310ef616326f1f2a16c09df896a158c79c
-    after: sha256:a435de13e72f6d1883995653be081752dcbe0ed7419149540a2dfb143c8ff112
-  - path: src/hook/opencode.rs
-    before: null
-    after: sha256:92da82470ac157954395af611512b51c5010b8f82f2132b75bc6a134ca31c0e3
-  - path: tests/opencode_hook.rs
-    before: null
-    after: sha256:ab0ce2e5e09a7be02ded2b45dd0a340927073b04113480fc5c73283b68c32c9b
-  ir:
-  - path: docs/ir/cli.md
-    sha256: sha256:a9c0c22d80aa795dba8acf34bb413a05c5e6b5c6d8e03c3ba2250e96f9f3ecee
-  - path: docs/ir/opencode.md
-    sha256: sha256:68690909633bb2d99a7e7eb3ccf30e2d86007ecc495f6368035b0874a01465c8
-  conclusion: existing
-  reason: 承認済みのOpenCode専用hookと影実行の区別を既存Engineで実現する。JSON表現はD1内の具体化で、旧hook契約とcheckを変えない。
-  requirements: [REQ-016, REQ-018, REQ-045, REQ-048, REQ-055]
-  decisions:
-  - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A2
-  handoff: null
-  gaps: []
-- id: opencode-plugin-implementation
-  base: 5b6e2b8de22368430a4726d06dbdc4ded4dd9d5b
-  role: implementer
-  files:
-  - path: .gitignore
-    before: sha256:bca5511b4255d71ed9671ddf15081e8a7245138cbc7a5699fdde5920ab74db75
-    after: sha256:b7a6db778b7c820a497461acaa220aca46b64511975f60fbf78a583e8b5c90d0
-  - path: plugins/opencode/bun.lock
-    before: null
-    after: sha256:ee3cae53b9efbfbdbc541b0caa52961d72c1a4834a6b76527c6774ca3adfbd29
-  - path: plugins/opencode/index.ts
-    before: null
-    after: sha256:a294f0a5082ed50056292002e1edd323bf099aa20cbd1f038d30d1124a1fd157
-  - path: plugins/opencode/package.json
-    before: null
-    after: sha256:92d7d2c888b9f715075bdf063435649c6325e185f0bbd4a666e549b83fcfa554
-  - path: plugins/opencode/src/approval.ts
-    before: null
-    after: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
-  - path: plugins/opencode/src/gate.ts
-    before: null
-    after: sha256:7cff3be711d45cf2353e18ad469120aeb7c65f1e5171e7b47da23813ac02528b
-  - path: plugins/opencode/src/guardian.ts
-    before: null
-    after: sha256:5c5b0edf23534b7ec6395ce68e8043ef3609daf7f6927d4d5cca8f77b87c089e
-  - path: plugins/opencode/src/index.ts
-    before: null
-    after: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
-  - path: plugins/opencode/tests/integration/bridge/index.ts
-    before: null
-    after: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
-  - path: plugins/opencode/tests/integration/bridge/package.json
-    before: null
-    after: sha256:e402e47c3a5392b07a39af1e3f6c3bccebbfbf19f6ea3bd382dc9b8e560496f7
   - path: plugins/opencode/tests/integration/host.test.ts
-    before: null
-    after: sha256:3a390fa7505fffcc50d2eaf5462c6ed0a594013a7042cb8b3ac5229a35a15b3d
-  - path: plugins/opencode/tests/unit/approval.test.ts
-    before: null
-    after: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
-  - path: plugins/opencode/tests/unit/gate.test.ts
-    before: null
-    after: sha256:e6e55f2114636b2838911416239685bb1cec0ada7df2c6fd993a7b8a1dcdb2e3
-  - path: plugins/opencode/tests/unit/guardian.test.ts
-    before: null
-    after: sha256:3bb2faaa7e575fa34d65c6b2aef694a7a487915f57103b94d2646d87bf5e7207
-  - path: plugins/opencode/tsconfig.json
-    before: null
-    after: sha256:8abe5992767495943ff67610b3e901030002be10fe2556187961d751a16796f6
+    before: sha256:3a390fa7505fffcc50d2eaf5462c6ed0a594013a7042cb8b3ac5229a35a15b3d
+    after: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
   ir:
-  - path: docs/ir/opencode.md
-    sha256: sha256:68690909633bb2d99a7e7eb3ccf30e2d86007ecc495f6368035b0874a01465c8
-  conclusion: existing
-  reason: 承認済みのshell対象・影実行優先・native権限合成・実行ごとの承認・取消と分離を公開2.0.21 APIで実装する。ホストが受理する空commandも保持してRustのunavailable応答をnative承認へ渡し、実機で承認前の未完了・once後の元executor完了・reject時の失敗を検証した。expected入力とhost入力は同じ変換を使い、空文字列を理由に入力確立を拒否しない。接続設定と状態部品はD1内で記録した。実機RPCのsignal取消を検証し、idle session interruptをactive sessionの証拠とは扱わない。全15ファイルと関連IRを同じbranch-wide baseで照合し直した。
-  requirements: [REQ-047, REQ-048, REQ-049, REQ-050, REQ-051, REQ-052, REQ-053, REQ-054, REQ-055]
-  decisions:
-  - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A3
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A4
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A5
-  handoff: null
-  gaps: []
-- id: opencode-delivery-implementation
-  base: 5b6e2b8de22368430a4726d06dbdc4ded4dd9d5b
-  role: implementer
-  files:
-  - path: .github/workflows/ci.yml
-    before: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
-    after: sha256:bb910de370653a9ff6a943228e9c2329f0be2b8ac31d6738fab2f5633ad2262b
-  - path: CHANGELOG.md
-    before: sha256:5d905e86eaddd1896f7d22d28fb269cb9eb322df405dcbb5cf92477968fe754d
-    after: sha256:2903c7f2f25cc39056e3e519909fa0049e3084f3166e62f046b6826367c42e9d
-  - path: PROJECT.md
-    before: sha256:079579d2c9c571990fdd8a81f37dd2e7a8faddb50dd8c75688c4220d119a23da
-    after: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
-  - path: README.md
-    before: sha256:15af5b954c2e5b13a1a357e191a3b329f573a413ed755a8b010ef664e9d71143
-    after: sha256:dac310b58452ecb5b52127c12bb12ab597f23a479c1d585a6e62fdbbc2da7eaf
-  - path: docs/opencode.md
-    before: null
-    after: sha256:d8e07778ac225157317050807fe42d602f94c0874bcac9db2af0dd4cf78e647f
-  - path: plugins/opencode/licenses/opencode-LICENSE.txt
-    before: null
-    after: sha256:1b9a45847866f283b86cbca738e2500dd8fce1c72986f532337b0608e13ed7a3
-  - path: scripts/package-release.sh
-    before: null
-    after: sha256:1a8315271d9f736c3d0e272c6a000db0cfa12ad57f94714f714f0528dc3b4da1
-  ir:
-  - path: docs/ir/cli.md
-    sha256: sha256:a9c0c22d80aa795dba8acf34bb413a05c5e6b5c6d8e03c3ba2250e96f9f3ecee
   - path: docs/ir/opencode-delivery.md
     sha256: sha256:2282c00e8ac1b8e501ddef21c4496d2bfba9fde52cd96368043ac63981d8b48b
   conclusion: existing
-  reason: 承認済みの同版同梱・手動登録・対応条件・モデルなし隔離検証を配布scriptとCI・手順へ反映する。versionはCargo.tomlから生成し、既存binary配置を保持する。独立reviewと公開は実施していない。
-  requirements: [REQ-045, REQ-056, REQ-057, REQ-058]
-  decisions:
-  - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A6
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A7
+  reason: REQ-058の必須の隔離連携試験が新規checkoutでも実行できるよう、診断保存先を試験自身で作成し、診断保存に失敗してもfixtureをfinallyで除去する。既存の9試験で修正前のENOENTと修正後の成功を観測し、GNU・muslとcheckout外の展開済み成果物でも成功した。判定・承認の期待値、ホストexecutor、診断の秘匿処理と承認済み要求は変更しない。
+  requirements: [REQ-058]
+  decisions: []
   handoff: null
   gaps: []
