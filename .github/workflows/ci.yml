@@ -48,6 +48,31 @@ jobs:
       - run: cargo build --release --locked --target "$TARGET"
         env:
           TARGET: ${{ matrix.target }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile --cwd plugins/opencode
+      - run: bun run --cwd plugins/opencode typecheck
+      - run: bun run --cwd plugins/opencode test:unit
+      - name: Verify native OpenCode integration and archive
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          export OPENCODE_TEST_BIN="$PWD/plugins/opencode/node_modules/@opencode/cli-linux-x64/bin/opencode"
+          test "$("$OPENCODE_TEST_BIN" --version)" = "opencode v2.0.21"
+          export GUARDIAN_TEST_BIN="$PWD/target/$TARGET/release/command-guardian"
+          bun run --cwd plugins/opencode test:integration
+          scripts/package-release.sh "$GUARDIAN_TEST_BIN" "$TARGET" "$RUNNER_TEMP/package"
+          mkdir "$RUNNER_TEMP/extracted" "$RUNNER_TEMP/bridge"
+          tar -xzf "$RUNNER_TEMP/package/"*.tar.gz -C "$RUNNER_TEMP/extracted"
+          cp "$OPENCODE_TEST_BIN" "$RUNNER_TEMP/opencode-test"
+          export OPENCODE_TEST_BIN="$RUNNER_TEMP/opencode-test"
+          bun build plugins/opencode/tests/integration/bridge/index.ts --target=node --format=esm --reject-unresolved --env=disable --outfile="$RUNNER_TEMP/bridge/server.js"
+          echo '{"type":"module"}' > "$RUNNER_TEMP/bridge/package.json"
+          export GUARDIAN_TEST_BIN="$RUNNER_TEMP/extracted/command-guardian"
+          export GUARDIAN_PLUGIN_DIR="$RUNNER_TEMP/extracted/opencode"
+          export GUARDIAN_TEST_BRIDGE_DIR="$RUNNER_TEMP/bridge"
+          bun run --cwd plugins/opencode test:integration
 
   changes:
     runs-on: ubuntu-24.04
@@ -121,6 +146,10 @@ jobs:
       - if: steps.decide.outputs.release == 'true'
         uses: Swatinem/rust-cache@v2
       - name: Build and package
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Build release archive
         if: steps.decide.outputs.release == 'true'
         env:
           VERSION: ${{ steps.decide.outputs.version }}
@@ -128,11 +157,8 @@ jobs:
           cargo build --release --locked --target "$PUBLISHED_TARGET"
           binary="target/$PUBLISHED_TARGET/release/command-guardian"
           "$binary" --help
-          mkdir dist
-          cp "$binary" LICENSE dist/
-          archive="command-guardian-v$VERSION-$PUBLISHED_TARGET.tar.gz"
-          tar -czf "$archive" -C dist command-guardian LICENSE
-          sha256sum "$archive" > "$archive.sha256"
+          bun install --frozen-lockfile --cwd plugins/opencode
+          scripts/package-release.sh "$binary" "$PUBLISHED_TARGET" .
       - name: Create tag and release
         if: steps.decide.outputs.release == 'true'
         env:
