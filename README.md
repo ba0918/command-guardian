@@ -126,6 +126,8 @@ Disabling an effect means the checker no longer extracts it. It is not just a wa
 
 ## Agent hooks
 
+OpenCode V2 2.0.21 uses the bundled TypeScript plugin and `hook --agent opencode`. See [manual registration, authenticated connection, and supported conditions](docs/opencode.md). Existing Claude and Codex hooks below are unchanged.
+
 Invoke the binary from a pre-execution hook and send one JSON request on standard input:
 
 ```sh

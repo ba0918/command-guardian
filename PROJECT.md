@@ -46,6 +46,22 @@ cargo run --locked -- check 'rm -rf /etc/x' --cwd /tmp --format json
 
 ## Conventions specific to this project
 
+### OpenCode V2の検証
+
+Bun 1.4.2とpackage内の固定依存を使う。試験実行ファイルは公式npmの "@opencode/cli-linux-x64@2.0.21" をlockfileのintegrity付きで取得する。試験冒頭でも版を確認する。個人のサービスを探索せず、モデルを呼ばない。
+
+```sh
+bun install --frozen-lockfile --cwd plugins/opencode
+bun run --cwd plugins/opencode typecheck
+bun run --cwd plugins/opencode test:unit
+cargo build --locked
+GUARDIAN_TEST_BIN="$PWD/target/debug/command-guardian" \
+  OPENCODE_TEST_BIN="$PWD/plugins/opencode/node_modules/@opencode/cli-linux-x64/bin/opencode" \
+  bun run --cwd plugins/opencode test:integration
+```
+
+GNU/muslのrelease binaryでもGUARDIAN_TEST_BINを差し替えて実行する。CIは同じscriptでアーカイブを作り、checkout外へ展開したpluginとbinaryでも試験する。配布用manifestの版はCargo.tomlから組立て時に生成する。
+
 ### 変更とIRの照合
 
 kotowari 0.3.0以降の、"changes" コマンドを持つ版を使う。

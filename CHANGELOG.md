@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add an OpenCode V2 2.0.21 shell-tool plugin and `hook --agent opencode` protocol. Native approval remains required for guardian `ask`, including after saved permissions; confirmed shadow mode retains native permissions without guardian enforcement.
+- Include the plugin and runtime dependencies in the binary release archive. Registration and authenticated connection are manual; V1 and later V2 releases are not verified.
+
 ## [0.1.1] - 2026-10-02
 
 - Stop treating literal redirects to `/dev/null`, including quoted paths and stderr redirects, as destructive truncation. Other targets and destructive commands remain checked.
