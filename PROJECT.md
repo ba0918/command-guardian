@@ -84,6 +84,15 @@ CIとフックは開発運用の設定であり、製品IRへ要求を追加し�
 CHANGELOGを "## [VERSION] - YYYY-MM-DD" に昇格し、対応する比較リンクを添えてmainへ統合すると、全検査成功後に未公開のvVERSIONを自動公開する。Unreleasedの間は公開しない。
 GitHub ReleasesにはLinux x86_64 muslバイナリとLICENSEのtar.gz、SHA256を置く。タグは検査したcommitへ付け、公開済みタグは移動・再利用しない。
 
+### 紹介ページ
+
+"site/" の紹介ページは、mainへのpushごとに ".github/workflows/pages.yml" がGitHub Pagesへ公開する。
+版はCargo.toml、更新履歴はCHANGELOG.md、表と導入文はREADME.mdとREADME-ja.mdの見出しから取り、判定例はその場でビルドした実バイナリの出力を載せる。
+READMEの該当見出しを変えるとページのビルドが失敗するため、"site/build.py" の見出しも合わせる。
+判定例の結果が期待と変わってもビルドは警告だけで続き、ページには実際の出力が載る。
+ローカルでは "cargo build --release --locked" の後に "python3 site/build.py" で "_site/" に生成する。
+ページは製品の外部契約ではなく、製品IRへ要求を追加しない。
+
 ### 製品の実装と試験
 
 - 本番の入力由来の解析は app の session を通す。main の先頭で同一バイナリの子を dispatch する。親での直接解析 fallback は置かない。
