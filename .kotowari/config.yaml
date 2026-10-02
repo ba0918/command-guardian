@@ -24,6 +24,10 @@ changes:
     - "plugins/opencode/package.json"
     - "plugins/opencode/tsconfig.json"
     - "plugins/opencode/bun.lock"
+    - "plugins/opencode/licenses/**/*"
+    - "README.md"
+    - "CHANGELOG.md"
+    - "docs/opencode.md"
   exclude:
     - "Cargo.lock"
   records:
