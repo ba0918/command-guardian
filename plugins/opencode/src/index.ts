@@ -1,7 +1,6 @@
 import { Plugin } from "@opencode/plugin";
 import { Error as ToolError } from "@opencode/plugin/promise/tool";
 import type { ToolContext } from "@opencode/plugin/promise/tool";
-import { OpenCode } from "@opencode/client";
 import { Permission } from "@opencode/schema/permission";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { stat } from "node:fs/promises";
@@ -9,14 +8,12 @@ import { isAbsolute } from "node:path";
 import { Approval, type ApprovalEvent } from "./approval.js";
 import { authorize, type Invocation } from "./gate.js";
 import { executionInput, judge } from "./guardian.js";
+import { connect } from "./connection.js";
 
 export default Plugin.define({
   id: "command-guardian",
   async setup(ctx) {
-    const url=ctx.options.serverUrl;
-    const passwordEnv=ctx.options.passwordEnv;
-    const password=typeof passwordEnv==="string"?process.env[passwordEnv]:undefined;
-    const connection=typeof url==="string"&&typeof password==="string"&&password.length>0?OpenCode.make({baseUrl:url,headers:{authorization:`Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`}}):undefined;
+    const connection=await connect(ctx.options);
     let active=true;
     const local=new AsyncLocalStorage<{readonly context:ToolContext;readonly expected:Invocation|undefined}>();
     const fail=()=>{if(!active)throw new Error("Guardian plugin unloaded.");};
@@ -41,7 +38,7 @@ export default Plugin.define({
       reject:async(id,session)=>{await ctx.permission.reply({sessionID:session,requestID:id,decision:"reject"});},
     }):undefined;
     const approve=(context:ToolContext)=>(input:Invocation,reason:string)=>{
-      if(!approval)throw new Error("Guardian approval connection is not configured. Set serverUrl and passwordEnv for this server.");
+      if(!approval)throw new Error("Guardian could not connect to its own managed service. For an explicit server, set serverUrl and passwordEnv.");
       return approval.request(context.sessionID,input,reason,context.signal);
     };
     const check=async(input:Invocation,context:ToolContext)=>{

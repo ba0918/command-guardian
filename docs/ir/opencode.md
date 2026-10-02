@@ -53,10 +53,10 @@ guardian が `ask` と判定した実行では、その実行の承認要求を 
 ### REQ-052: 承認経路を利用できない場合
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A10, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15
+- source: docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15
 - verification: unit
 
-プラグインは自身をホストする同一 OpenCode HTTP サーバーへの明示的な接続・認証設定を使い、承認要求を作る。接続先を推測しない。接続・認証の失敗により承認要求そのものを出せない場合は対象コマンドを実行せず、失敗の理由を返す。これは guardian が危険と判定した `block` と区別し、警告だけで実行を継続しない。
+プラグインは自身をホストする同一 OpenCode HTTP サーバーで承認要求を作る。接続オプションが未指定なら管理サービスの登録情報を一度だけ読み、通信前に登録PIDが自身の実行プロセスと一致し、URLと非空の認証情報が文字列であり、URLがloopback HTTPであることを確認する。検証済みのURLと認証情報を固定したSDK接続でサーバー情報を取得し、応答PIDが自身と一致し版が"2.0.21"の場合だけ採用する。自動接続ではHTTPリダイレクトを拒否し、別サービスを起動しない。接続オプションを一つでも指定した場合は明示設定を使い、不完全な設定や認証失敗から自動探索へ切り替えない。接続・認証の失敗や自身のサーバーを確認できない場合は対象コマンドを実行せず、失敗の理由を返す。これは guardian が危険と判定した `block` と区別し、警告だけで実行を継続しない。
 
 ### REQ-053: 承認待ちの寿命
 
@@ -83,6 +83,41 @@ guardian が `ask` と判定した実行では、その実行の承認要求を 
 Bash 以外の shell では安全に判定できたと見なさず、対象外である理由を示して OpenCode の承認フローに渡す。影実行と確定済みの場合は REQ-048 を優先する。Bash を明示設定し、他の hook が実行コマンド・cwd・shell を変更しないという対応条件は REQ-057 に従う。
 
 ## Examples
+
+```gherkin
+@id=EX-106 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+Scenario: 接続設定なしで自身の管理サービスを使う
+  Given プラグインが認証付きloopbackの管理サービス内で動いている
+  And 接続オプションが未指定である
+  When shellツールを実行する
+  Then 通信前に登録を検証し固定した接続先の応答PIDと版をSDKで照合して接続する
+  And allowとblockと承認待ちが明示設定時と同じように働く
+
+@id=EX-107 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+Scenario: 別サーバーや不整合な登録へ承認を送らない
+  Given 登録PIDが自身と異なるか接続先の応答PIDまたは版が一致しない
+  When 自動接続先を確定する
+  Then その接続を採用しない
+
+@id=EX-108 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+Scenario: 未認証やリモートの登録情報を採用しない
+  Given 登録情報が未認証かloopback HTTP以外である
+  When 自動接続先を確定する
+  Then その宛先へ認証付き通信を行わず接続を採用しない
+
+@id=EX-110 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+Scenario: 検証済みの自動接続先を固定する
+  Given 自身の認証付きloopback HTTPの登録情報を通信前に検証した
+  When 登録情報が差し替えられるかサーバーがHTTPリダイレクトを返す
+  Then 登録差替えやリダイレクトにより別の宛先へ接続しない
+
+@id=EX-109 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+Scenario: 不完全な明示設定や認証失敗を自動接続で隠さない
+  Given 自身の管理サービスへ自動接続できる環境である
+  And 明示した接続オプションが不完全か認証に失敗する
+  When shellツールを実行する
+  Then 自動接続へ切り替えず対象コマンドを実行しない
+```
 
 ```gherkin
 @id=EX-078 @about=REQ-047 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A2,docs/decision/records/2026-10-02-opencode-v2-hook.md#A7

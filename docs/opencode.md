@@ -8,6 +8,22 @@ Use Linux x86_64 or WSL with OpenCode V2 2.0.21, explicitly configured Bash, and
 
 This is accident prevention, not a security sandbox. `allow` is not proof of safety. Changes to files during approval and changes by other hooks are outside the input-consistency guarantee.
 
+## Automatic connection to the background service
+
+This feature is unreleased and is not present in 0.1.2. After upgrading to a release that includes it, normal `opencode2` startup needs no connection options. Keep Bash explicitly selected and register the matching plugin, for example from a mise-managed release bundle:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "shell": "/bin/bash",
+  "plugins": ["/absolute/path/to/mise/installs/github-ba0918-command-guardian/latest/opencode"]
+}
+```
+
+The mise `latest` link selects the binary's matching plugin without a second Git package update. Restart the OpenCode server after an upgrade to load the new plugin. Register only one copy of guardian; remove an older Git package entry before switching to the bundle.
+
+The plugin reads the existing service registration once and validates its PID, URL, and credentials before sending any HTTP request. It accepts only an authenticated loopback HTTP endpoint, then uses the OpenCode SDK to confirm that the server reports its own PID and version 2.0.21. The validated URL and credentials stay fixed, and automatic connections reject HTTP redirects. It does not start a service, write credentials, or set password environment variables. A standalone, remote, or explicitly started server still needs the connection options below. Explicit options take precedence; incomplete options never fall back to discovery. If its own service cannot be confirmed, execution does not proceed.
+
 ## Install with mise and a GitHub package
 
 The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag:
@@ -21,7 +37,7 @@ For another release, replace `0.1.2` in both commands and the configuration belo
 
 The isolated installation check uses the pinned host's public `plugin add` command with an immutable local Git commit and `::path:plugins/opencode`. It installs the source package and its dependencies. Native approval tests then load that installed package in the real host. Downloading this plugin from the published GitHub tag has not been tested. Releases before 0.1.2 do not contain the plugin.
 
-After adding the package, complete the connection settings below. Update the guardian binary and the plugin's tag together.
+For 0.1.2 or an explicit server, complete the connection settings below after adding the package. Update the guardian binary and the plugin's tag together.
 
 ## Alternative: install the matching bundle
 
@@ -42,7 +58,7 @@ cargo build --release --locked --target x86_64-unknown-linux-musl
 scripts/package-release.sh target/x86_64-unknown-linux-musl/release/command-guardian x86_64-unknown-linux-musl target/package
 ```
 
-## Register and connect manually
+## Register and connect to an explicit server
 
 Edit the OpenCode V2 global configuration yourself, preserving existing settings. Its usual location is `$XDG_CONFIG_HOME/opencode/opencode.json`, or `~/.config/opencode/opencode.json` when XDG_CONFIG_HOME is unset. Replace the package string added by `plugin add` with the object below to supply connection options; keep your other plugin entries. Use the same release tag as above and explicitly select Bash:
 

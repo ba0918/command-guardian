@@ -40,6 +40,7 @@ Position: Q1〜Q24の回答を仕様草稿へ反映済み。機械検査の文�
   - why: 普段使う複数のリポジトリで連携を有効にしつつ、個人環境への反映は利用者の操作にするため
   - decided_by: 利用者（Q8の推奨案Aを採用）
 - A10 現行 OpenCode V2 の HTTP API による確認要求作成を使う方式を採用し、プラグインをホストする同一サーバーへの明示的な接続・認証設定を受け入れる。接続先を推測せず、必要な設定を導入手順で示す。
+  - superseded_by: [管理サービスの自動接続](./2026-10-03-opencode-managed-service.md#A1)
   - why: 別プロジェクトの API 拡張を前提にせず、現行 V2 の API で連携を実現するため
   - decided_by: 利用者（Q9の推奨案Aを採用）
 - A11 OpenCode 連携も既存の guardian 設定を共有し、影実行の切り替えをプラグイン側に重複させない。mode.enforce が false なら guardian は判定をログに残すだけで、guardian 由来の確認・拒否は出さない。OpenCode 本来の権限判断は維持する。

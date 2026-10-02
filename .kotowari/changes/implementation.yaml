@@ -1,129 +1,58 @@
 version: 1
 entries:
-- id: release-0.1.2-outgoing-implementation
-  base: 17bc46e6b5bb912f0284747c27733dbabc3ab85d
+- id: opencode-managed-service-implementation
+  base: 256717021e5ceb0b93d8b0bc21e25e1133bafd01
   role: implementer
   files:
-  - path: .github/workflows/ci.yml
-    before: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
-    after: sha256:bb910de370653a9ff6a943228e9c2329f0be2b8ac31d6738fab2f5633ad2262b
-  - path: .gitignore
-    before: sha256:bca5511b4255d71ed9671ddf15081e8a7245138cbc7a5699fdde5920ab74db75
-    after: sha256:b7a6db778b7c820a497461acaa220aca46b64511975f60fbf78a583e8b5c90d0
   - path: CHANGELOG.md
-    before: sha256:5d905e86eaddd1896f7d22d28fb269cb9eb322df405dcbb5cf92477968fe754d
-    after: sha256:65e479b27c53762793e502767dd2e0ad023c1bc97dc4e9c7e5f27b83690ed899
-  - path: Cargo.toml
-    before: sha256:fa8f78e1cb39f23f5e8bf298d5222250bb92737a5b94459b0ea19737753074b7
-    after: sha256:26f0e432f8d1db201b3cfbaddd186e2ef2f48a1b6509a3731a2d03ad91f4ac8b
-  - path: PROJECT.md
-    before: sha256:079579d2c9c571990fdd8a81f37dd2e7a8faddb50dd8c75688c4220d119a23da
-    after: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
-  - path: README-ja.md
-    before: sha256:2b880bfa6fad31f8e5a8c858b37a6fc3e7cd156bfbd0b2937f0e0243ec7c169c
-    after: sha256:b6a4c7a4ec6fab1df87693a813d5aea4125d6bf64e32d6aa280cf0266889c14c
+    before: sha256:65e479b27c53762793e502767dd2e0ad023c1bc97dc4e9c7e5f27b83690ed899
+    after: sha256:f22dd4c17ba693f2338a719a398b15d89961d2cf13df011d047fcc19a4160af4
   - path: README.md
-    before: sha256:15af5b954c2e5b13a1a357e191a3b329f573a413ed755a8b010ef664e9d71143
-    after: sha256:6c518e209f209be32cfbefd343bc696e44a2ffdb5e54d73586f95a9e02850623
+    before: sha256:6c518e209f209be32cfbefd343bc696e44a2ffdb5e54d73586f95a9e02850623
+    after: sha256:3f2ea58ae9ac2943c896d9bc671851e5c86855d6e30bf2dc92d5e64baf25498a
+  - path: README-ja.md
+    before: sha256:b6a4c7a4ec6fab1df87693a813d5aea4125d6bf64e32d6aa280cf0266889c14c
+    after: sha256:ec1be145ef4f36e521d123b70ac1856d8fafb24f18915a15974703456cd4a1a8
   - path: docs/opencode.md
-    before: null
-    after: sha256:58e5a55c605751b5fffb7382971b57babcbe858c9ac9050636e9fb49e1702e06
-  - path: plugins/opencode/bun.lock
-    before: null
-    after: sha256:ee3cae53b9efbfbdbc541b0caa52961d72c1a4834a6b76527c6774ca3adfbd29
-  - path: plugins/opencode/index.ts
-    before: null
-    after: sha256:a294f0a5082ed50056292002e1edd323bf099aa20cbd1f038d30d1124a1fd157
-  - path: plugins/opencode/licenses/opencode-LICENSE.txt
-    before: null
-    after: sha256:1b9a45847866f283b86cbca738e2500dd8fce1c72986f532337b0608e13ed7a3
-  - path: plugins/opencode/package.json
-    before: null
-    after: sha256:92d7d2c888b9f715075bdf063435649c6325e185f0bbd4a666e549b83fcfa554
-  - path: plugins/opencode/src/approval.ts
-    before: null
-    after: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
-  - path: plugins/opencode/src/gate.ts
-    before: null
-    after: sha256:7cff3be711d45cf2353e18ad469120aeb7c65f1e5171e7b47da23813ac02528b
-  - path: plugins/opencode/src/guardian.ts
-    before: null
-    after: sha256:5c5b0edf23534b7ec6395ce68e8043ef3609daf7f6927d4d5cca8f77b87c089e
+    before: sha256:58e5a55c605751b5fffb7382971b57babcbe858c9ac9050636e9fb49e1702e06
+    after: sha256:b3598b3dad12a0bf9d96310115773413887e336452af79d860538f176d2ad17b
   - path: plugins/opencode/src/index.ts
+    before: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
+    after: sha256:997bead58252ffdf928596c8d610718edc2f1c3c2cbe8186c7ca2a650ec188d2
+  - path: plugins/opencode/src/connection.ts
     before: null
-    after: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
-  - path: plugins/opencode/tests/integration/bridge/index.ts
-    before: null
-    after: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
-  - path: plugins/opencode/tests/integration/bridge/package.json
-    before: null
-    after: sha256:e402e47c3a5392b07a39af1e3f6c3bccebbfbf19f6ea3bd382dc9b8e560496f7
+    after: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
   - path: plugins/opencode/tests/integration/host.test.ts
+    before: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
+    after: sha256:539cfd69a09a8109f95465305a9efe4066ef5ce92bba790b0b0512e364950770
+  - path: plugins/opencode/tests/unit/connection.test.ts
     before: null
-    after: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
-  - path: plugins/opencode/tests/unit/approval.test.ts
-    before: null
-    after: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
-  - path: plugins/opencode/tests/unit/gate.test.ts
-    before: null
-    after: sha256:e6e55f2114636b2838911416239685bb1cec0ada7df2c6fd993a7b8a1dcdb2e3
-  - path: plugins/opencode/tests/unit/guardian.test.ts
-    before: null
-    after: sha256:3bb2faaa7e575fa34d65c6b2aef694a7a487915f57103b94d2646d87bf5e7207
-  - path: plugins/opencode/tsconfig.json
-    before: null
-    after: sha256:8abe5992767495943ff67610b3e901030002be10fe2556187961d751a16796f6
-  - path: scripts/package-release.sh
-    before: null
-    after: sha256:1a8315271d9f736c3d0e272c6a000db0cfa12ad57f94714f714f0528dc3b4da1
-  - path: src/hook.rs
-    before: sha256:6a088d01dc25b526d08568166d266d310ef616326f1f2a16c09df896a158c79c
-    after: sha256:a435de13e72f6d1883995653be081752dcbe0ed7419149540a2dfb143c8ff112
-  - path: src/hook/opencode.rs
-    before: null
-    after: sha256:92da82470ac157954395af611512b51c5010b8f82f2132b75bc6a134ca31c0e3
-  - path: tests/opencode_hook.rs
-    before: null
-    after: sha256:ab0ce2e5e09a7be02ded2b45dd0a340927073b04113480fc5c73283b68c32c9b
+    after: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
   ir:
-  - path: docs/ir/CONTEXT.md
-    sha256: sha256:3d490a3bce557dddb267b2462d5182bba1860f6ea49bf4957c763f38ec88633c
-  - path: docs/ir/cli.md
-    sha256: sha256:a9c0c22d80aa795dba8acf34bb413a05c5e6b5c6d8e03c3ba2250e96f9f3ecee
-  - path: docs/ir/agents.md
-    sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
   - path: docs/ir/opencode.md
-    sha256: sha256:68690909633bb2d99a7e7eb3ccf30e2d86007ecc495f6368035b0874a01465c8
+    sha256: sha256:545a307cc4b2d6a6828afbb84f0006c94c44ead538b24ea804ab5205530398ec
   - path: docs/ir/opencode-delivery.md
-    sha256: sha256:2282c00e8ac1b8e501ddef21c4496d2bfba9fde52cd96368043ac63981d8b48b
-  - path: docs/ir/release.md
-    sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
-  conclusion: existing
+    sha256: sha256:6cf5704d4363ee5cf9a7049d334df353e39834a9a88e8b4b53c4bb3f7a8cfb88
+  conclusion: new
   reason: >-
-    origin/mainの送出元から0.1.2候補までの全変更を承認済み要求と照合した。
-    Rustの専用入口は既存Engineと設定と影ログを使い、Claude・Codex・checkの契約を維持する。
-    TypeScriptは通常・background・Code Modeのホスト由来shellを判定し、native denyを保持する。
-    askは保存済み許可と区別して実行ごとに作成し、IDとsessionの対応、拒否、中断、解除、検知済み通信失敗で未実行を保つ。
-    空文字列もホスト入力として保持して判定不能の承認へ渡し、診断保存先のない新規sourceでも試験自身が作成して後始末する。
-    JSON、認証、依存とbundleの具体化は既存D1とprotocolのA1からA7に記録済みの範囲に留まり、追加サービスとモデル呼出しを導入しない。
-    GNU・muslの全Rust試験とstrict型検査と19件のunit試験を実行した。
-    各targetの新規sourceで9件のnative試験を実行し、公開plugin addが完全なlocal Git commitとsubdirectoryから実際に導入したpackageでも9件を実行した。
-    checkout外の同版archiveと固定CLIとstandalone bridgeでも各targetで9件を実行した。
-    公開前のGitHubタグ取得、WSL固有、active model session中断、model E2Eは観測済みとしない。
-    配布は既存のroot binaryとLICENSEを保持し、Cargo.tomlの0.1.2とlockとmanifestと日付入りCHANGELOGと比較リンクを照合した。
-    READMEの抽出見出しを維持し、miseと同版GitHub plugin登録と同一server認証とarchive代替手順を案内する。
-    CI・ignore・PROJECTは既存の試験と配布工程への配線であり製品要求を追加しない。
-    先行の未送出仕様と計画も関連IRとdecisionの出典を確認し、承認済み要求の意味を変更しない。
-    この記録は実装者の判断であり独立reviewと公開後のmise導入を代替しない。
-  requirements: [REQ-016, REQ-018, REQ-025, REQ-044, REQ-045, REQ-047, REQ-048, REQ-049, REQ-050, REQ-051, REQ-052, REQ-053, REQ-054, REQ-055, REQ-056, REQ-057, REQ-058]
+    接続設定の配布時に必要だった手動の認証設定を、自身の管理サービスの登録確認で置き換える。
+    通信前に登録PID・URL・認証情報とloopback HTTPを確認し、検証済み接続先を固定する。
+    SDKのサーバー情報で自身のPIDと2.0.21を照合し、自動接続のリダイレクトを拒否する。
+    discoverによる検証前の認証送信を避けるA3の具体化は、利用者が承認した修正範囲内である。
+    明示設定を一つでも指定した場合は従来の接続だけを使い、自動接続へ切り替えない。
+    承認経路が確定しない場合の未実行と、既存のallow・block・native承認を維持する。
+    A2・A3の判断をREQ-052・REQ-057とEX-106からEX-110に反映した。
+    導入手順は0.1.2と未公開版を区別し、本体と同版のプラグインを登録する範囲に留める。
+    型検査、24件のunit試験、固定OpenCode 2.0.21と実バイナリによる12件の隔離連携試験は成功した。
+    個人サービスの操作、モデル呼出し、WSL固有の観測、版更新とリリースは行っていない。
+  requirements: [REQ-047, REQ-048, REQ-049, REQ-052, REQ-056, REQ-057, REQ-058]
   decisions:
-  - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A1
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A2
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A3
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A4
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A5
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A6
-  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A7
+  - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+  - docs/decision/records/2026-10-03-opencode-managed-service.md#A3
   handoff: null
-  gaps: []
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+    - docs/decision/records/2026-10-03-opencode-managed-service.md#A3

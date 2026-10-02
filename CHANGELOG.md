@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Automatically connect the OpenCode V2 plugin to its own authenticated local background service when connection options are omitted. Explicit servers still use `serverUrl` and `passwordEnv`; missing or mismatched service registration does not permit execution.
+
 ## [0.1.2] - 2026-10-03
 
 - Add an OpenCode V2 2.0.21 shell-tool plugin and `hook --agent opencode` protocol. Native approval remains required for guardian `ask`, including after saved permissions; confirmed shadow mode retains native permissions without guardian enforcement.

@@ -16,11 +16,11 @@ TypeScript で実装したプラグインを guardian のリリースに同梱�
 ### REQ-057: 対応条件と保証の限界
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-02-opencode-v2-hook.md#A10, docs/decision/records/2026-10-02-opencode-v2-hook.md#A17, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A17, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22
 - verification: review
 - how_to_verify: 導入手順でLinux x86_64・WSL、Bashの明示設定、入力を変更する他のhookがない条件、同一HTTPサーバーへの接続・認証設定、検証した版を確認する。V1や後続V2の未検証互換性、無応答の即時検知、競合時の確認表示の完全な後始末を保証していないことを確かめる。
 
-対応条件は Linux x86_64・WSL 上で Bash を明示設定し、他の hook が実行コマンド・cwd・shell を変更しない環境である。プラグインをホストする同一 HTTP サーバーへの明示的な接続・認証設定を導入手順に示す。対象は V2 のみとし、初回検証は "2.0.21" を基準にする。V1 互換を作らず、後続 V2 まで検証済みとせず、検証した版を明記する。任意の hook の変更後の最終入力の判定、無応答状態の即時検知、要求作成と中断の競合時の確認表示の完全な後始末は保証に含めない。
+対応条件は Linux x86_64・WSL 上で Bash を明示設定し、他の hook が実行コマンド・cwd・shell を変更しない環境である。自身の管理サービスへの自動接続と、それ以外の同一 HTTP サーバーへの明示的な接続・認証設定を導入手順に示す。対象は V2 のみとし、初回検証は "2.0.21" を基準にする。V1 互換を作らず、後続 V2 まで検証済みとせず、検証した版を明記する。任意の hook の変更後の最終入力の判定、無応答状態の即時検知、要求作成と中断の競合時の確認表示の完全な後始末は保証に含めない。
 
 ### REQ-058: 隔離した連携検証
 

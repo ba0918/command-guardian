@@ -1,12 +1,13 @@
 import { test, expect } from "bun:test";
 import { OpenCode } from "@opencode/client";
+import { Service } from "@opencode/client/service";
 import { Permission } from "@opencode/schema/permission";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
-async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;wrongAuth?:boolean}={}) {
+async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean}={}) {
   const binary=process.env.OPENCODE_TEST_BIN,guardian=process.env.GUARDIAN_TEST_BIN;
   if (!binary || !guardian) throw new Error("Explicit OPENCODE_TEST_BIN and GUARDIAN_TEST_BIN are required");
   const version=Bun.spawnSync([binary,"--version"]);
@@ -26,9 +27,15 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
   for (const [key,value] of Object.entries(process.env)) if(!key.startsWith("OPENCODE")&&!key.startsWith("GIT_")&&!key.startsWith("SAFE_CHAIN_MINIMUM"))environment[key]=value;
   Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
   let logs="";
-  const server=spawn(binary,["serve","--hostname","127.0.0.1","--port",String(port)],{cwd:project,env:environment,stdio:["ignore","pipe","pipe"]});
+  if(options.managedService){
+    const config=JSON.parse(environment.OPENCODE_CONFIG_CONTENT!);
+    if(!options.wrongAuth)delete config.plugins[0].options;
+    if(options.incompleteConnection)config.plugins[0].options={serverUrl:url};
+    environment.OPENCODE_CONFIG_CONTENT=JSON.stringify(config);
+  }
+  const server=spawn(binary,["serve","--hostname","127.0.0.1","--port",String(port),...(options.managedService?["--service"]:[])],{cwd:project,env:environment,stdio:["ignore","pipe","pipe"]});
   server.stdout.on("data",data=>{logs+=String(data);});server.stderr.on("data",data=>{logs+=String(data);});
-  const client=OpenCode.make({baseUrl:url,headers:{authorization:`Basic ${Buffer.from("opencode:guardian-test-password-not-real").toString("base64")}`}});
+  let client=OpenCode.make({baseUrl:url,headers:{authorization:`Basic ${Buffer.from("opencode:guardian-test-password-not-real").toString("base64")}`}});
   try {
     for(let i=0;i<100;i++) {
       if(server.exitCode!==null)throw new Error("Isolated server exited");
@@ -36,9 +43,14 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
       await new Promise(resolve=>setTimeout(resolve,50));
     }
     if(!logs.includes(`server listening on ${url}`))throw new Error("Own server readiness missing");
+    if(options.managedService){
+      const endpoint=await Service.discover({file:join(home,"state/opencode/service.json"),version:"2.0.21"});
+      if(!endpoint||endpoint.url!==url)throw new Error("Own managed service registration missing");
+      client=OpenCode.make({baseUrl:endpoint.url,headers:Service.headers({url:endpoint.url,...(endpoint.auth?{auth:endpoint.auth}:{})})});
+    }
     const info=await client.server.info();expect(info.version).toBe("2.0.21");
-    const session=await client.session.create({title:"model-free guardian fixture"});
-    return {root,project,sentinel,client,session,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
+    const session=await client.session.create({title:"model-free guardian fixture",location:{directory:project}});
+    return {root,project,sentinel,client,session,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
       server.kill("SIGTERM");await new Promise<void>(resolve=>server.once("exit",()=>resolve()));
       try {
         const diagnostics=await readFile(join(home,"data/opencode/log/opencode.log"),"utf8").catch(()=>"");
@@ -179,6 +191,48 @@ async function pending(f:Awaited<ReturnType<typeof host>>,count:number){
   }
   throw new Error("Native approval request count did not arrive");
 }
+
+// @kotowari[REQ-052, EX-106]
+test("managed_service_without_connection_options_preserves_allow_block_and_native_approval",async()=>{
+  const f=await host({managedService:true});
+  try{
+    const allowed=await f.execute("printf guardian-automatic-connection");
+    expect(JSON.stringify(allowed)).toContain("guardian-automatic-connection");
+    const blocked=await f.execute("> sentinel");
+    expect(JSON.stringify(blocked)).toContain("protected");
+    expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+    for(const decision of ["once","reject"] as const){
+      const run=f.execute("").then(value=>({value}),error=>({error:String(error)}));
+      const requests=await pending(f,1);
+      if(!requests[0])throw new Error("Missing automatic connection approval");
+      expect(requests[0].metadata?.shell).toBe("/bin/bash");
+      await f.client.permission.reply({sessionID:f.session.id,requestID:requests[0].id,decision});
+      const result=await run;
+      expect("error" in result).toBe(false);
+      if("value" in result)expect(typeof result.value.output==="object"&&result.value.output!==null&&"error" in result.value.output).toBe(decision==="reject");
+    }
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-052, EX-109]
+test("managed_service_does_not_replace_incomplete_explicit_connection_options",async()=>{
+  const f=await host({managedService:true,incompleteConnection:true});
+  try{
+    const result=await f.execute("printf ran > connection-failure");
+    expect(JSON.stringify(result)).toContain("connect");
+    await expect(readFile(join(f.project,"connection-failure"),"utf8")).rejects.toThrow();
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-052, EX-109]
+test("managed_service_does_not_replace_failed_explicit_authentication",async()=>{
+  const f=await host({managedService:true,wrongAuth:true});
+  try{
+    const result=await f.execute("printf ran > connection-failure");
+    expect(JSON.stringify(result)).toContain("connection");
+    await expect(readFile(join(f.project,"connection-failure"),"utf8")).rejects.toThrow();
+  }finally{await f.close();}
+},20000);
 
 // @kotowari[REQ-050, REQ-054, EX-092, EX-102]
 test("req_054_native_parallel_requests_preserve_cwd_and_rejection_batch",async()=>{
