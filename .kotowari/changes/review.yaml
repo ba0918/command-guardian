@@ -1,29 +1,138 @@
 version: 1
 entries:
-  - id: opencode-native-teardown-astra-review
-    base: 60b105cd2f9b28d321dda4325e08a3d6481eebcf
-    role: reviewer
-    files:
-      - path: plugins/opencode/tests/integration/host.test.ts
-        before: sha256:3a390fa7505fffcc50d2eaf5462c6ed0a594013a7042cb8b3ac5229a35a15b3d
-        after: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
-    ir:
-      - path: docs/ir/opencode-delivery.md
-        sha256: sha256:2282c00e8ac1b8e501ddef21c4496d2bfba9fde52cd96368043ac63981d8b48b
-    conclusion: existing
-    reason: >-
-      REQ-058 requires isolated model-free integration verification. Independent
-      candidate runs from two Git-exported source trees without an artifacts
-      directory passed all nine existing native tests using GNU and musl binaries;
-      both extracted bundles passed the same suite. No fixture roots remained.
-      Source review confirms diagnostics directory creation precedes the write,
-      and finally attempts fixture removal even when diagnostics handling rejects.
-      This repairs the verification lifecycle within the approved S4/S5 scope.
-      The patch leaves host registration, authentication, isolation, redaction and
-      behavioral assertions intact, and introduces no new product meaning or
-      specification gap. Diagnostic error-path cleanup was reviewed statically,
-      not fault-injected. The diagnostic path is not treated as a public contract.
-    requirements: [REQ-058]
-    decisions: []
-    handoff: null
-    gaps: []
+- id: release-0.1.2-outgoing-independent-conformance
+  base: 17bc46e6b5bb912f0284747c27733dbabc3ab85d
+  role: reviewer
+  files:
+  - path: .github/workflows/ci.yml
+    before: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
+    after: sha256:bb910de370653a9ff6a943228e9c2329f0be2b8ac31d6738fab2f5633ad2262b
+  - path: .gitignore
+    before: sha256:bca5511b4255d71ed9671ddf15081e8a7245138cbc7a5699fdde5920ab74db75
+    after: sha256:b7a6db778b7c820a497461acaa220aca46b64511975f60fbf78a583e8b5c90d0
+  - path: CHANGELOG.md
+    before: sha256:5d905e86eaddd1896f7d22d28fb269cb9eb322df405dcbb5cf92477968fe754d
+    after: sha256:65e479b27c53762793e502767dd2e0ad023c1bc97dc4e9c7e5f27b83690ed899
+  - path: Cargo.toml
+    before: sha256:fa8f78e1cb39f23f5e8bf298d5222250bb92737a5b94459b0ea19737753074b7
+    after: sha256:26f0e432f8d1db201b3cfbaddd186e2ef2f48a1b6509a3731a2d03ad91f4ac8b
+  - path: PROJECT.md
+    before: sha256:079579d2c9c571990fdd8a81f37dd2e7a8faddb50dd8c75688c4220d119a23da
+    after: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
+  - path: README-ja.md
+    before: sha256:2b880bfa6fad31f8e5a8c858b37a6fc3e7cd156bfbd0b2937f0e0243ec7c169c
+    after: sha256:b6a4c7a4ec6fab1df87693a813d5aea4125d6bf64e32d6aa280cf0266889c14c
+  - path: README.md
+    before: sha256:15af5b954c2e5b13a1a357e191a3b329f573a413ed755a8b010ef664e9d71143
+    after: sha256:6c518e209f209be32cfbefd343bc696e44a2ffdb5e54d73586f95a9e02850623
+  - path: docs/opencode.md
+    before: null
+    after: sha256:58e5a55c605751b5fffb7382971b57babcbe858c9ac9050636e9fb49e1702e06
+  - path: plugins/opencode/bun.lock
+    before: null
+    after: sha256:ee3cae53b9efbfbdbc541b0caa52961d72c1a4834a6b76527c6774ca3adfbd29
+  - path: plugins/opencode/index.ts
+    before: null
+    after: sha256:a294f0a5082ed50056292002e1edd323bf099aa20cbd1f038d30d1124a1fd157
+  - path: plugins/opencode/licenses/opencode-LICENSE.txt
+    before: null
+    after: sha256:1b9a45847866f283b86cbca738e2500dd8fce1c72986f532337b0608e13ed7a3
+  - path: plugins/opencode/package.json
+    before: null
+    after: sha256:92d7d2c888b9f715075bdf063435649c6325e185f0bbd4a666e549b83fcfa554
+  - path: plugins/opencode/src/approval.ts
+    before: null
+    after: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
+  - path: plugins/opencode/src/gate.ts
+    before: null
+    after: sha256:7cff3be711d45cf2353e18ad469120aeb7c65f1e5171e7b47da23813ac02528b
+  - path: plugins/opencode/src/guardian.ts
+    before: null
+    after: sha256:5c5b0edf23534b7ec6395ce68e8043ef3609daf7f6927d4d5cca8f77b87c089e
+  - path: plugins/opencode/src/index.ts
+    before: null
+    after: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
+  - path: plugins/opencode/tests/integration/bridge/index.ts
+    before: null
+    after: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
+  - path: plugins/opencode/tests/integration/bridge/package.json
+    before: null
+    after: sha256:e402e47c3a5392b07a39af1e3f6c3bccebbfbf19f6ea3bd382dc9b8e560496f7
+  - path: plugins/opencode/tests/integration/host.test.ts
+    before: null
+    after: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
+  - path: plugins/opencode/tests/unit/approval.test.ts
+    before: null
+    after: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
+  - path: plugins/opencode/tests/unit/gate.test.ts
+    before: null
+    after: sha256:e6e55f2114636b2838911416239685bb1cec0ada7df2c6fd993a7b8a1dcdb2e3
+  - path: plugins/opencode/tests/unit/guardian.test.ts
+    before: null
+    after: sha256:3bb2faaa7e575fa34d65c6b2aef694a7a487915f57103b94d2646d87bf5e7207
+  - path: plugins/opencode/tsconfig.json
+    before: null
+    after: sha256:8abe5992767495943ff67610b3e901030002be10fe2556187961d751a16796f6
+  - path: scripts/package-release.sh
+    before: null
+    after: sha256:1a8315271d9f736c3d0e272c6a000db0cfa12ad57f94714f714f0528dc3b4da1
+  - path: src/hook.rs
+    before: sha256:6a088d01dc25b526d08568166d266d310ef616326f1f2a16c09df896a158c79c
+    after: sha256:a435de13e72f6d1883995653be081752dcbe0ed7419149540a2dfb143c8ff112
+  - path: src/hook/opencode.rs
+    before: null
+    after: sha256:92da82470ac157954395af611512b51c5010b8f82f2132b75bc6a134ca31c0e3
+  - path: tests/opencode_hook.rs
+    before: null
+    after: sha256:ab0ce2e5e09a7be02ded2b45dd0a340927073b04113480fc5c73283b68c32c9b
+  ir:
+  - path: docs/ir/CONTEXT.md
+    sha256: sha256:3d490a3bce557dddb267b2462d5182bba1860f6ea49bf4957c763f38ec88633c
+  - path: docs/ir/cli.md
+    sha256: sha256:a9c0c22d80aa795dba8acf34bb413a05c5e6b5c6d8e03c3ba2250e96f9f3ecee
+  - path: docs/ir/agents.md
+    sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
+  - path: docs/ir/opencode.md
+    sha256: sha256:68690909633bb2d99a7e7eb3ccf30e2d86007ecc495f6368035b0874a01465c8
+  - path: docs/ir/opencode-delivery.md
+    sha256: sha256:2282c00e8ac1b8e501ddef21c4496d2bfba9fde52cd96368043ac63981d8b48b
+  - path: docs/ir/release.md
+    sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
+  conclusion: existing
+  reason: >-
+    Independent static inspection of the full publication-base comparison found no remaining
+    conflict with the approved requirements or unsupported consequential choice.
+    Rust adds an agent-specific input/output boundary while retaining the shared Engine,
+    configuration and shadow logging, without replacing existing agent or check contracts.
+    The plugin snapshots host shell input, resolves cwd lexically and associates each call
+    with its session before judgment. Native deny remains effective; guardian ask uses a
+    fresh request identity rather than a saved approval. Rejection and cancellation remain
+    terminal, including unload and detected stream failure, so later replies cannot revive
+    canceled execution. Pinned upstream source supports the native shell, background,
+    Code Mode and signal-routing assumptions used by the adapter.
+    JSON framing, same-server authentication, dependency pins and distribution choices
+    stay within D1 and the concrete protocol decisions A1 through A7.
+    Release metadata agrees on Cargo version 0.1.2; the raw lock change only updates the
+    root package version. Archive construction retains the root binary and LICENSE and
+    includes the plugin manifest and third-party notice. The changelog, comparison link,
+    public Git installation commands and archive alternative match the declared delivery.
+    Documentation does not turn unpublished-tag, WSL or active-model trials into observed
+    results. CI and project guidance wire existing checks without adding product meaning.
+    All changed tests and fixtures were inspected against their governing requirements,
+    including isolation and fake authentication. Strict typing, shell syntax, whitespace,
+    kotowari check and implementation-phase coverage were independently checked successfully.
+    This judgment is limited to static conformance and those checks; it does not adopt the
+    implementer's runtime counts as independently observed evidence. Runtime verification
+    and publication remain subject to the required quality review and parent gates.
+  requirements: [REQ-016, REQ-018, REQ-025, REQ-044, REQ-045, REQ-047, REQ-048, REQ-049, REQ-050, REQ-051, REQ-052, REQ-053, REQ-054, REQ-055, REQ-056, REQ-057, REQ-058]
+  decisions:
+  - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A1
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A2
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A3
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A4
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A5
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A6
+  - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A7
+  handoff: null
+  gaps: []
