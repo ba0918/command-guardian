@@ -7,10 +7,10 @@
 ### REQ-016: 実行ファイルとコマンド
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35, docs/decision/records/2026-10-01-rename.md#A1, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
 - verification: unit
 
-M1 の成果物は、"command-guardian" という 1 つの実行ファイルであり、"hook" と "check" の 2 つのコマンドを持つ。"hook" は "--agent claude" か "--agent codex" を引数に取る。
+M1 の成果物は、"command-guardian" という 1 つの実行ファイルであり、"hook" と "check" の 2 つのコマンドを持つ。"hook" は "--agent claude"、"--agent codex"、"--agent opencode" を引数に取る。OpenCode の連携は opencode.md が扱う。
 
 ### REQ-017: check の契約
 
@@ -25,12 +25,12 @@ M1 の成果物は、"command-guardian" という 1 つの実行ファイルで�
 ### REQ-018: 影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
 - verification: unit
 
 "mode.enforce" が false のとき、command-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
 
-ログの保存場所がない、または保存できないときは、その記録を省略して標準エラーへ警告する。hookの標準出力は空で、終了コードは0にする。
+ログの保存場所がない、または保存できないときは、その記録を省略して標準エラーへ警告する。Claude Code と Codex の hook の標準出力は空で、終了コードは0にする。OpenCode の影実行の応答は REQ-048 が扱い、判定を返さず影実行と判定不能を区別する。
 
 ### REQ-019: 影実行のログ
 
@@ -70,11 +70,11 @@ command-guardian は、git のコマンドを、対象のパスが git の作業
 ### REQ-045: 入口に応じたヘルプの内容
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-02-cli-language-help.md#A3, docs/decision/records/2026-10-02-cli-language-help.md#A6, docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
+- source: docs/decision/records/2026-10-02-cli-language-help.md#A3, docs/decision/records/2026-10-02-cli-language-help.md#A6, docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
 - verification: review
 - how_to_verify: トップレベル、check、hook のヘルプを読み、用途、呼出し方、引数、オプション、使用例、終了コードが英語で説明され、各入口の契約と一致することを確かめる。check の cwd 省略時と format の既定の説明は実装と照合し、hook の終了コードを check の判定別終了コードと混同していないことを確かめる
 
-ヘルプは、各入口に応じた用途、呼出し方、引数、オプション、使用例、終了コードを英語で示す。トップレベルでは "check" と "hook" の入口を案内する。"check" では判定するコマンド文字列、作業ディレクトリを指定する "--cwd"（省略時は現在の作業ディレクトリ）、出力形式を指定する "--format text|json"（既定は "text"）、判定別の終了コード 0、1、2 と判定を出せない失敗の 3 を説明する。"hook" では標準入力でフックの入力を受けること、"--agent claude|codex"、プロトコル上の終了コードは常に 0 であることを説明する。各入口で "--help" と "-h" を案内する。
+ヘルプは、各入口に応じた用途、呼出し方、引数、オプション、使用例、終了コードを英語で示す。トップレベルでは "check" と "hook" の入口を案内する。"check" では判定するコマンド文字列、作業ディレクトリを指定する "--cwd"（省略時は現在の作業ディレクトリ）、出力形式を指定する "--format text|json"（既定は "text"）、判定別の終了コード 0、1、2 と判定を出せない失敗の 3 を説明する。"hook" では標準入力でフックの入力を受けること、"--agent claude|codex|opencode"、プロトコル上の終了コードは常に 0 であることを説明する。各入口で "--help" と "-h" を案内する。
 
 ## Examples
 
@@ -84,10 +84,10 @@ Scenario: check の終了コード
   When "command-guardian check 'rm -rf /tmp/scratch/x' --cwd /tmp/scratch" を実行する
   Then 判定は allow で、終了コードは 0 になる
 
-@id=EX-018 @about=REQ-018 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
+@id=EX-018 @about=REQ-018 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A22,docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
 Scenario: 影実行は止めずに記録する
   Given "mode.enforce" が false である
-  When 保護領域の削除を判定する
+  When Claude CodeまたはCodexのhookで保護領域の削除を判定する
   Then 何も返さず、判定と理由がログに書かれる
 
 @id=EX-019 @about=REQ-020 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A16
@@ -172,10 +172,10 @@ Scenario: check の省略時の使い方と判定別終了コードを確認で�
   Then コマンド文字列、"--cwd" と省略時の作業ディレクトリ、"--format text|json" と既定の "text"、ヘルプのオプション、使用例が英語で説明される
   And 終了コードは allow が 0、ask が 1、block が 2、判定を出せない失敗が 3 と説明される
 
-@id=EX-071 @about=REQ-045 @source=docs/decision/records/2026-10-02-cli-language-help.md#A3,docs/decision/records/2026-10-02-cli-language-help.md#A6,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
+@id=EX-071 @about=REQ-045 @source=docs/decision/records/2026-10-02-cli-language-help.md#A3,docs/decision/records/2026-10-02-cli-language-help.md#A6,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A35,docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
 Scenario: hook の終了コードを check と取り違えない
   When "command-guardian hook --help" を実行する
-  Then 標準入力、"--agent claude|codex"、ヘルプのオプション、使用例が英語で説明される
+  Then 標準入力、"--agent claude|codex|opencode"、ヘルプのオプション、使用例が英語で説明される
   And 判定にかかわらず終了コードは 0 と説明される
 
 @id=EX-076 @about=REQ-017 @source=docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
