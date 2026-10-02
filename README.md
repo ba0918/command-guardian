@@ -126,7 +126,7 @@ Disabling an effect means the checker no longer extracts it. It is not just a wa
 
 ## Agent hooks
 
-OpenCode V2 2.0.21 uses the bundled TypeScript plugin and `hook --agent opencode`. See [manual registration, authenticated connection, and supported conditions](docs/opencode.md). Existing Claude and Codex hooks below are unchanged.
+For OpenCode, see [OpenCode V2 plugin setup](#opencode-v2) below. The following hook instructions apply to Claude and Codex.
 
 Invoke the binary from a pre-execution hook and send one JSON request on standard input:
 
@@ -148,6 +148,22 @@ Register the command in your agent's hook configuration using that host's suppor
 Decisions use a `hookSpecificOutput` envelope with `hookEventName: "PreToolUse"` and a reason. In Claude mode, `permission_mode` values `dontAsk` and `bypassPermissions` suppress `ask` output; they do not suppress `block`.
 
 The `hook` subcommand always exits with `0`. Hosts must read its JSON decision, not its exit status. Invalid input or an unrecognized agent produces no decision. This is not fail-closed enforcement. See the [agent protocol specification](docs/ir/agents.md).
+
+### OpenCode V2
+
+The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag with OpenCode V2 2.0.21:
+
+```sh
+mise use -g github:ba0918/command-guardian@0.1.2
+opencode2 plugin add 'github:ba0918/command-guardian#v0.1.2::path:plugins/opencode'
+```
+
+For another release, replace `0.1.2` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
+Then configure the plugin's authenticated connection to the same OpenCode server. Installing the binary or registering the package alone does not complete setup.
+
+Use Linux x86_64 or WSL with explicitly configured Bash and no other hooks that change the command, working directory, or shell.
+Follow the [installation guide](docs/opencode.md) for connection settings and the alternative release-archive installation.
+The isolated installation check uses the public Git package installer with an immutable local Git commit and the same subdirectory selector. Downloading this plugin from the published GitHub tag has not been tested.
 
 ### Shadow mode
 

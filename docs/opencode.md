@@ -8,18 +8,33 @@ Use Linux x86_64 or WSL with OpenCode V2 2.0.21, explicitly configured Bash, and
 
 This is accident prevention, not a security sandbox. `allow` is not proof of safety. Changes to files during approval and changes by other hooks are outside the input-consistency guarantee.
 
-## Install the matching bundle
+## Install with mise and a GitHub package
 
-Install the binary through [the existing mise or source-build route](../README.md#install). Obtain the matching `command-guardian-v<VERSION>-x86_64-unknown-linux-musl.tar.gz` and `.sha256` file from the same GitHub release. Verify the checksum before extracting:
+The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag:
 
 ```sh
-sha256sum -c command-guardian-v<VERSION>-x86_64-unknown-linux-musl.tar.gz.sha256
-tar -xzf command-guardian-v<VERSION>-x86_64-unknown-linux-musl.tar.gz
+mise use -g github:ba0918/command-guardian@0.1.2
+opencode2 plugin add 'github:ba0918/command-guardian#v0.1.2::path:plugins/opencode'
 ```
 
-Place the extracted `opencode/` directory at a stable, user-owned absolute path. Keep `server.js`, `package.json`, `source/`, and `licenses/` together. The manifest version is generated from Cargo.toml. Update the binary and plugin together. No separate npm publication or runtime dependency installation is required; the JavaScript bundle includes dependencies and license notices.
+For another release, replace `0.1.2` in both commands and the configuration below with that release's version. OpenCode V2 2.0.21 supports GitHub package specifications with tags and repository-subdirectory selectors. The `plugin add` command installs the package and adds it to your global configuration. You do not need to place the plugin files yourself or install a separate npm package. See [OpenCode's plugin configuration guide](https://opencode.ai/v2/docs/plugins).
 
-Before this feature is released, build the same archive locally:
+The isolated installation check uses the pinned host's public `plugin add` command with an immutable local Git commit and `::path:plugins/opencode`. It installs the source package and its dependencies. Native approval tests then load that installed package in the real host. Downloading this plugin from the published GitHub tag has not been tested. Releases before 0.1.2 do not contain the plugin.
+
+After adding the package, complete the connection settings below. Update the guardian binary and the plugin's tag together.
+
+## Alternative: install the matching bundle
+
+Obtain `command-guardian-v0.1.2-x86_64-unknown-linux-musl.tar.gz` and its `.sha256` file from [the matching GitHub release](https://github.com/ba0918/command-guardian/releases/tag/v0.1.2). For another release, replace `0.1.2` in the filenames with that release's version. Verify the checksum before extracting:
+
+```sh
+sha256sum -c command-guardian-v0.1.2-x86_64-unknown-linux-musl.tar.gz.sha256
+tar -xzf command-guardian-v0.1.2-x86_64-unknown-linux-musl.tar.gz
+```
+
+Install the binary through [the existing mise or source-build route](../README.md#install), or place the extracted `command-guardian` on PATH. Place the extracted `opencode/` directory at a stable, user-owned absolute path. Keep `server.js`, `package.json`, `source/`, and `licenses/` together. The manifest version is generated from Cargo.toml. Update the binary and plugin together. No separate npm publication or runtime dependency installation is required; the JavaScript bundle includes dependencies and license notices.
+
+To build the same archive locally from the matching release's source checkout:
 
 ```sh
 bun install --frozen-lockfile --cwd plugins/opencode
@@ -29,14 +44,15 @@ scripts/package-release.sh target/x86_64-unknown-linux-musl/release/command-guar
 
 ## Register and connect manually
 
-Edit the OpenCode V2 global configuration yourself, preserving existing settings. Its usual location is `$XDG_CONFIG_HOME/opencode/opencode.json`, or `~/.config/opencode/opencode.json` when XDG_CONFIG_HOME is unset. Add the plugin directory and explicitly select Bash:
+Edit the OpenCode V2 global configuration yourself, preserving existing settings. Its usual location is `$XDG_CONFIG_HOME/opencode/opencode.json`, or `~/.config/opencode/opencode.json` when XDG_CONFIG_HOME is unset. Replace the package string added by `plugin add` with the object below to supply connection options; keep your other plugin entries. Use the same release tag as above and explicitly select Bash:
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "shell": "/bin/bash",
   "plugins": [
     {
-      "package": "/absolute/path/to/opencode",
+      "package": "github:ba0918/command-guardian#v0.1.2::path:plugins/opencode",
       "options": {
         "serverUrl": "http://127.0.0.1:4097",
         "passwordEnv": "OPENCODE_SERVER_PASSWORD"
@@ -45,6 +61,8 @@ Edit the OpenCode V2 global configuration yourself, preserving existing settings
   ]
 }
 ```
+
+For the archive installation instead, set `package` to the extracted plugin directory's stable absolute path, such as `/absolute/path/to/opencode`.
 
 `serverUrl` must identify the server hosting this plugin. It does not discover your service or credentials. `passwordEnv` names an environment variable visible to that server, not a password stored in JSON. Authentication uses HTTP Basic with the host's `opencode` username. Do not point it at another server. Use loopback or protected HTTPS; do not transmit credentials over untrusted HTTP.
 
