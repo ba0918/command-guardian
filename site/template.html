@@ -26,10 +26,10 @@
 <header class="site-header">
   <div class="wrap header-inner">
     <a class="brand" href="#top"><img src="favicon.svg" alt="" width="24" height="24">command-guardian</a>
-    <nav>
+    <nav aria-label="Main navigation" data-aria-en="Main navigation" data-aria-ja="メインナビゲーション">
       <a class="nav-section" href="#demo"><span class="en">Examples</span><span class="ja">判定例</span></a>
-      <a class="nav-section" href="#install"><span class="en">Install</span><span class="ja">導入</span></a>
-      <a class="nav-section" href="#hooks"><span class="en">Agent hooks</span><span class="ja">フック</span></a>
+      <a class="nav-section nav-install" href="#install"><span class="en">Install</span><span class="ja">導入</span></a>
+      <a class="nav-section nav-hooks" href="#hooks"><span class="en">Agent hooks</span><span class="ja">フック</span></a>
       <a class="nav-section" href="#changelog"><span class="en">Changes</span><span class="ja">更新履歴</span></a>
       <a class="nav-github" href="{{repo_url}}" aria-label="GitHub"><svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
       <button type="button" class="lang-toggle" aria-label="Switch language / 言語を切り替え">
@@ -52,9 +52,13 @@
         <span class="en">command-guardian reads a Bash command, works out what it would delete, truncate or format, and answers <code class="chip chip-allow">allow</code>, <code class="chip chip-ask">ask</code> or <code class="chip chip-block">block</code>. Use it from the CLI or as a pre-execution hook for AI coding agents.</span>
         <span class="ja">command-guardian は Bash コマンドを読み、何を削除・切り詰め・フォーマットするのかを取り出して、<code class="chip chip-allow">allow</code>・<code class="chip chip-ask">ask</code>・<code class="chip chip-block">block</code> を返します。CLI からも、AI コーディングエージェントの実行前フックからも使えます。</span>
       </p>
+      <p class="note safety-note">
+        <span class="en">Analyzes supported Bash / POSIX sh syntax and known destructive operations. External scripts and some operations are outside its coverage; <code>allow</code> is not proof of safety. <a href="{{repo_url}}/blob/main/README.md#scope-and-limitations">Scope and limits →</a></span>
+        <span class="ja">対応する Bash / POSIX sh 構文と既知の破壊操作を解析します。外部スクリプトや一部の操作は対象外で、<code>allow</code> は安全の証明ではありません。<a href="{{repo_url}}/blob/main/README-ja.md#対応範囲と制約">対応範囲と制約 →</a></span>
+      </p>
       <div class="install-box">
         <pre class="term term-inline"><span class="prompt">$</span> <span id="install-cmd">mise use -g github:ba0918/command-guardian</span></pre>
-        <button type="button" class="copy" data-copy="#install-cmd" aria-label="Copy install command">
+        <button type="button" class="copy" data-copy="#install-cmd" aria-label="Copy install command" data-aria-en="Copy install command" data-aria-ja="導入コマンドをコピー">
           <span class="copy-label en">Copy</span><span class="copy-label ja">コピー</span>
           <span class="copied-label en">Copied</span><span class="copied-label ja">コピーしました</span>
         </button>
@@ -64,7 +68,7 @@
         <a class="button" href="{{repo_url}}"><span class="en">View on GitHub</span><span class="ja">GitHub で見る</span></a>
       </div>
       </div>
-      <div class="hero-demo" aria-label="Example output">
+      <div class="hero-demo" aria-label="Example output" data-aria-en="Example output" data-aria-ja="判定出力の例">
         <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i></div>
         {{hero_demo}}
       </div>
@@ -74,9 +78,9 @@
   <section class="features">
     <div class="wrap grid3">
       <article class="feature">
-        <h2><span class="en">Reads the shell like Bash does</span><span class="ja">シェルを Bash と同じように読む</span></h2>
-        <p class="en">Variables, <code>bash -c</code>, <code>eval</code>, <code>find -delete</code> and <code>xargs</code> are followed without running anything, so a deletion hidden behind <code>$D</code> is still caught.</p>
-        <p class="ja">変数、<code>bash -c</code>、<code>eval</code>、<code>find -delete</code>、<code>xargs</code> も実行せずに追いかけます。<code>$D</code> の裏に隠れた削除も見逃しません。</p>
+        <h2><span class="en">Follows supported shell syntax</span><span class="ja">対応するシェル構文をたどる</span></h2>
+        <p class="en">Resolves known assignments and reads supported uses of <code>bash -c</code>, <code>eval</code>, <code>find -delete</code> and <code>xargs</code> without executing them.</p>
+        <p class="ja">既知の変数代入を解決し、対応する <code>bash -c</code>、<code>eval</code>、<code>find -delete</code>、<code>xargs</code> の使い方を実行せずに解析します。</p>
       </article>
       <article class="feature">
         <h2><span class="en">Judges by what the path is</span><span class="ja">パスの中身で判断する</span></h2>
@@ -85,8 +89,8 @@
       </article>
       <article class="feature">
         <h2><span class="en">Drops into your AI agent</span><span class="ja">AI エージェントにそのまま組み込める</span></h2>
-        <p class="en">One binary answers Claude Code and Codex pre-execution hooks, so risky commands an agent proposes are stopped or sent back to you for review.</p>
-        <p class="ja">1つの実行ファイルで Claude Code と Codex の実行前フックに応答します。エージェントが出した危険なコマンドを止めたり、確認に回したりできます。</p>
+        <p class="en">Use Claude Code / Codex hook output or the OpenCode V2 plugin. Choose your agent below and verify its setup before relying on it.</p>
+        <p class="ja">Claude Code / Codex 向けのフック出力と、OpenCode V2 プラグインを用意しています。下の案内からエージェントを選び、設定と連携を確認してください。</p>
       </article>
     </div>
   </section>
@@ -152,8 +156,8 @@
 <pre class="term"><span class="prompt">$</span> mise use -g github:ba0918/command-guardian
 <span class="prompt">$</span> command-guardian --help</pre>
         <p>
-          <span class="en">Or build from source with a recent stable Rust toolchain:</span>
-          <span class="ja">最新の安定版 Rust があれば、ソースからもビルドできます。</span>
+          <span class="en">Or build from source on Linux with a recent stable Rust toolchain (including Cargo):</span>
+          <span class="ja">Linux と Cargo を含む新しい安定版 Rust で、ソースからもビルドできます。</span>
         </p>
 <pre class="term"><span class="prompt">$</span> git clone {{repo_url}}.git
 <span class="prompt">$</span> cd command-guardian
@@ -174,15 +178,40 @@
   </section>
 
   <section id="hooks">
+    <div class="wrap">
+      <h2 class="section-title"><span class="en">Connect your agent</span><span class="ja">エージェントに合わせて導入する</span></h2>
+      <p class="section-lead"><span class="en">Start with the binary, then follow the setup and verification for your host.</span><span class="ja">本体を導入したら、使うエージェントの設定と動作確認へ進んでください。</span></p>
+      <div class="grid3 agent-guides">
+        <article class="agent-card">
+          <h3>Claude Code</h3>
+          <p><span class="en">Add a Bash <code>PreToolUse</code> hook. Confirm that your host sends the documented request and honors the JSON decision.</span><span class="ja">Bash の <code>PreToolUse</code> フックを追加。ホストが所定の要求を送り、JSON の判定を反映することを確認します。</span></p>
+          <a href="#claude-setup"><span class="en">Copy the configuration ↓</span><span class="ja">設定例をコピー ↓</span></a>
+          <a class="en" href="{{repo_url}}/blob/main/README.md#agent-hooks">Setup and verification →</a><a class="ja" href="{{repo_url}}/blob/main/README-ja.md#エージェントのフック">設定と動作確認 →</a>
+        </article>
+        <article class="agent-card">
+          <h3>Codex</h3>
+          <p><code>command-guardian hook --agent codex</code></p>
+          <p><span class="en">Use your host's supported hook mechanism. Verify the Bash request format and <code>hookSpecificOutput</code> handling; <code>ask</code> remains in the host's approval flow.</span><span class="ja">ホストが対応する方法で登録。Bash の要求形式と <code>hookSpecificOutput</code> の処理を確認します。<code>ask</code> の確認はホスト側が担います。</span></p>
+          <a class="en" href="{{repo_url}}/blob/main/README.md#agent-hooks">Setup and verification →</a><a class="ja" href="{{repo_url}}/blob/main/README-ja.md#エージェントのフック">設定と動作確認 →</a>
+        </article>
+        <article class="agent-card">
+          <h3>OpenCode V2</h3>
+          <p class="note"><span class="en">guardian 0.1.2+ · host 2.0.21</span><span class="ja">guardian 0.1.2 以降 · ホスト 2.0.21</span></p>
+          <p><span class="en">Register the plugin matching your binary and explicitly select Bash. From guardian 0.1.3, normal startup connects automatically to its own local background service. Explicit servers still need authenticated connection settings. Use Linux x86_64 or WSL; other host versions are unverified.</span><span class="ja">本体と同じ版のプラグインを登録し、Bashを明示設定してください。0.1.3からは通常起動時に自身のローカルサービスへ自動接続します。明示起動したサーバーには認証付き接続設定が必要です。Linux x86_64 / WSL が対象で、他のホスト版は未検証です。</span></p>
+          <a class="en" href="{{repo_url}}/blob/main/README.md#opencode-v2">Installation steps →</a><a class="ja" href="{{repo_url}}/blob/main/README-ja.md#opencode-v2">導入手順 →</a>
+          <a href="{{repo_url}}/blob/main/docs/opencode.md#automatic-connection-to-the-background-service"><span class="en">Connection and verification scope →</span><span class="ja">接続設定と検証範囲（英語）→</span></a>
+        </article>
+      </div>
+    </div>
     <div class="wrap two-col">
       <div>
-        <h2 class="section-title"><span class="en">Guard your AI agent</span><span class="ja">AI エージェントを見張る</span></h2>
+        <h3><span class="en">Claude / Codex hook response</span><span class="ja">Claude / Codex のフック応答</span></h3>
         <p>
           <span class="en">Register <code>command-guardian hook --agent claude</code> (or <code>--agent codex</code>) as a pre-execution hook. It reads one JSON request on standard input and answers with a <code>hookSpecificOutput</code> decision. This is the real response from v{{version}}:</span>
           <span class="ja"><code>command-guardian hook --agent claude</code>（または <code>--agent codex</code>）を実行前フックに登録します。標準入力の JSON 要求を1つ読み、<code>hookSpecificOutput</code> で判定を返します。下は v{{version}} の実際の応答です。</span>
         </p>
         {{hook_demo}}
-        <h3><span class="en">Example: Claude Code</span><span class="ja">設定例: Claude Code</span></h3>
+        <h3 id="claude-setup"><span class="en">Example: Claude Code</span><span class="ja">設定例: Claude Code</span></h3>
         <p>
           <span class="en">Add a <code>PreToolUse</code> hook for the Bash tool to <code>~/.claude/settings.json</code>:</span>
           <span class="ja"><code>~/.claude/settings.json</code> に Bash ツール向けの <code>PreToolUse</code> フックを追加します。</span>
@@ -200,7 +229,7 @@
     ]
   }
 }</pre>
-          <button type="button" class="copy copy-float" data-copy="#claude-settings" aria-label="Copy settings">
+          <button type="button" class="copy copy-float" data-copy="#claude-settings" aria-label="Copy settings" data-aria-en="Copy settings" data-aria-ja="設定をコピー">
             <span class="copy-label en">Copy</span><span class="copy-label ja">コピー</span>
             <span class="copied-label en">Copied</span><span class="copied-label ja">コピーしました</span>
           </button>
@@ -249,7 +278,8 @@ deny = [["push"]]</pre>
   <section id="changelog">
     <div class="wrap">
       <h2 class="section-title"><span class="en">Recent changes</span><span class="ja">最近の更新</span></h2>
-      <div class="releases">{{changelog}}</div>
+      <p class="note ja">更新履歴は原文（英語）を掲載しています。</p>
+      <div class="releases" lang="en">{{changelog}}</div>
       <p class="note"><a href="{{repo_url}}/blob/main/CHANGELOG.md"><span class="en">Full changelog</span><span class="ja">すべての更新履歴</span></a></p>
     </div>
   </section>
@@ -272,23 +302,38 @@ deny = [["push"]]</pre>
   </div>
 </footer>
 
+<p class="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
 <script>
   (function () {
     var root = document.documentElement;
+    var status = document.querySelector(".copy-status");
+    var localize = function () {
+      document.querySelectorAll("[data-aria-en]").forEach(function (element) {
+        element.setAttribute("aria-label", element.getAttribute("data-aria-" + root.lang));
+      });
+      status.textContent = "";
+    };
+    localize();
     document.querySelector(".lang-toggle").addEventListener("click", function () {
       var next = root.dataset.lang === "ja" ? "en" : "ja";
       root.dataset.lang = next;
       root.lang = next;
+      localize();
       try { localStorage.setItem("cg-lang", next); } catch (e) {}
     });
     document.querySelectorAll("button.copy").forEach(function (button) {
       button.addEventListener("click", function () {
         var text = document.querySelector(button.dataset.copy).textContent;
-        if (!navigator.clipboard) return;
+        status.textContent = "";
+        var failed = function () {
+          status.textContent = root.lang === "ja" ? "コピーできませんでした。コードを選択して手動でコピーしてください。" : "Could not copy. Select the code and copy it manually.";
+        };
+        if (!navigator.clipboard) { failed(); return; }
         navigator.clipboard.writeText(text).then(function () {
+          status.textContent = root.lang === "ja" ? "コピーしました。" : "Copied to clipboard.";
           button.classList.add("copied");
           setTimeout(function () { button.classList.remove("copied"); }, 1500);
-        });
+        }).catch(failed);
       });
     });
 
@@ -302,15 +347,20 @@ deny = [["push"]]</pre>
           other.tabIndex = on ? 0 : -1;
           document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
         });
-        if (focus) tab.focus();
+        if (focus) tab.focus({ preventScroll: true });
+        if (window.matchMedia("(max-width: 860px)").matches) {
+          var list = tab.parentElement;
+          list.scrollLeft = tab.offsetLeft - list.offsetLeft;
+        }
       };
       tabs.forEach(function (tab, i) {
         tab.addEventListener("click", function () { select(tab, false); });
         tab.addEventListener("keydown", function (event) {
           var step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
-          if (!step) return;
+          var index = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : step ? (i + step + tabs.length) % tabs.length : null;
+          if (index === null) return;
           event.preventDefault();
-          select(tabs[(i + step + tabs.length) % tabs.length], true);
+          select(tabs[index], true);
         });
       });
       explorer.classList.add("is-tabs");

@@ -296,7 +296,7 @@ def demos(binary: Path, base: Path) -> tuple[str, str, str]:
             f'<span class="chip chip-{verdict}">{verdict}</span><code>{command}</code></button>'
         )
         panels.append(
-            f'<figure class="demo demo-{verdict}" role="tabpanel" id="demo-{index}" aria-labelledby="demo-tab-{index}">'
+            f'<figure class="demo demo-{verdict}" role="tabpanel" tabindex="0" id="demo-{index}" aria-labelledby="demo-tab-{index}">'
             f'<figcaption><span class="chip chip-{verdict}">{verdict}</span>'
             f'<span class="en">{html.escape(demo["en"])}</span>'
             f'<span class="ja">{html.escape(demo["ja"])}</span></figcaption>'
@@ -313,7 +313,7 @@ def demos(binary: Path, base: Path) -> tuple[str, str, str]:
             ))
     explorer = (
         '<div class="demo-explorer">'
-        f'<div class="demo-list" role="tablist" aria-label="Examples">{"".join(tabs)}</div>'
+        f'<div class="demo-list" role="tablist" aria-label="Examples" data-aria-en="Examples" data-aria-ja="判定例">{"".join(tabs)}</div>'
         f'<div class="demo-panels">{"".join(panels)}</div></div>'
     )
     hero_term = '<pre class="term term-wrap hero-term">' + "\n\n".join(text for _, text in sorted(hero)) + "</pre>"
