@@ -202,6 +202,49 @@ fn req_022_claude_allow_returns_nothing() {
     assert!(r.stdout.trim().is_empty(), "{}", r.stdout);
 }
 
+// @kotowari[REQ-001, REQ-022]
+#[test]
+fn req_022_claude_allows_dev_null_redirects() {
+    let home = temp_dir("command-guardian-hook-home-");
+    for command in [
+        "echo x >/dev/null",
+        "echo x 2>/dev/null",
+        "echo x &>\"/dev/null\"",
+    ] {
+        let r = run_hook(
+            &["hook", "--agent", "claude"],
+            &bash_input(command, "/tmp/scratch"),
+            home.path(),
+            &home.path().join(".config"),
+        );
+        assert_eq!(r.code, 0, "{command}: {}", r.stderr);
+        assert!(r.stdout.trim().is_empty(), "{command}: {}", r.stdout);
+    }
+}
+
+// @kotowari[REQ-001, REQ-022]
+#[test]
+fn req_022_claude_dev_null_redirect_does_not_hide_danger() {
+    let home = temp_dir("command-guardian-hook-home-");
+    for command in [
+        "rm -rf /etc/nginx 2>/dev/null",
+        "echo x >/dev/null 2>/etc/log",
+    ] {
+        let r = run_hook(
+            &["hook", "--agent", "claude"],
+            &bash_input(command, "/tmp/scratch"),
+            home.path(),
+            &home.path().join(".config"),
+        );
+        assert_eq!(r.code, 0, "{command}: {}", r.stderr);
+        assert_eq!(
+            envelope(&r.stdout)["hookSpecificOutput"]["permissionDecision"],
+            "deny",
+            "{command}"
+        );
+    }
+}
+
 // @kotowari[REQ-022]
 #[test]
 fn req_022_claude_dont_ask_modes_drop_the_ask() {

@@ -7,10 +7,12 @@
 ### REQ-001: 破壊的効果の抽出
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A1, docs/decision/records/2026-09-30-hook-guardian-scope.md#A11, docs/decision/records/2026-09-30-hook-guardian-scope.md#A12, docs/decision/records/2026-09-30-hook-guardian-scope.md#A38
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A1, docs/decision/records/2026-09-30-hook-guardian-scope.md#A11, docs/decision/records/2026-09-30-hook-guardian-scope.md#A12, docs/decision/records/2026-09-30-hook-guardian-scope.md#A38, docs/decision/records/2026-10-02-dev-null-redirect.md#A1, docs/decision/records/2026-10-02-dev-null-redirect.md#A2
 - verification: unit
 
 コマンドを判定するとき、command-guardian は、コマンド列、パイプ、引用、ヒアドキュメント、コマンド置換、sudo と doas のラッパー、シェルの "bash -c" と "eval" の内側を読み、3 種の破壊的効果と対象パスを取り出す。削除の効果は、"rm"、"rmdir"、"unlink"、"find" の "-delete" と "-exec rm"、"xargs" の "rm"、"shred" から取り出す。切り詰めの効果は、リダイレクトの ">"、"dd" の "of="、"truncate" から取り出す。フォーマットの効果は、"mkfs"、"wipefs"、"dd" のブロックデバイスへの書き込みから取り出す。M1 では、"git clean"、mv と cp の上書き、"sed -i"、"rsync --delete" の効果は取り出さない。
+
+ただし、展開のないリテラルのリダイレクト先が引用除去後に "/dev/null" と完全一致するとき、そのリダイレクトの切り詰め効果は取り出さない。コマンド本体とリダイレクト先の置換内の効果は引き続き取り出す。他の宛先、変数・置換経由の宛先、シンボリックリンク経由の別名、および "truncate" と "dd" はこの例外に含めない。
 
 ### REQ-002: パスの解決
 

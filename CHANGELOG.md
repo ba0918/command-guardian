@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Stop treating literal redirects to `/dev/null`, including quoted paths and stderr redirects, as destructive truncation. Other targets and destructive commands remain checked.
+
 ## [0.1.0] - 2026-10-02
 
 - Provide a CLI and agent hook that inspect Bash commands for destructive effects and return `allow`, `ask`, or `block` based on target paths and configuration.

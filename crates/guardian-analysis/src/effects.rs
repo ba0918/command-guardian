@@ -1179,7 +1179,10 @@ fn extract_redirects(
             scan_word_substitutions(word, ctx, out, asks, depth);
         }
         match &redirect.target {
-            RedirectTarget::Word(word) if ctx.mode == AnalysisMode::Effects => {
+            RedirectTarget::Word(word)
+                if ctx.mode == AnalysisMode::Effects
+                    && !(word.literal() && word.text == "/dev/null") =>
+            {
                 match redirect.kind {
                     RedirectKind::Write
                     | RedirectKind::Clobber

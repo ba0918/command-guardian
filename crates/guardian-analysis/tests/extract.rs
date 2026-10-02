@@ -264,6 +264,72 @@ fn req_001_truncate_command() {
 
 // @kotowari[REQ-001]
 #[test]
+fn req_001_literal_dev_null_redirect_does_not_truncate() {
+    for cmd in [
+        "echo x >/dev/null",
+        "echo x 2>/dev/null",
+        "echo x &>/dev/null",
+        "echo x >|/dev/null",
+        "echo x >&/dev/null",
+        "echo x >\"/dev/null\"",
+        "echo x >'/dev/null'",
+        "echo x >/dev/null 2>&1",
+    ] {
+        assert_eq!(effects(cmd), vec![], "{cmd}");
+    }
+}
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_dev_null_redirect_preserves_other_effects() {
+    for cmd in [
+        "rm -rf /etc/x 2>/dev/null",
+        "echo x >/dev/null$(rm -rf /etc/x)",
+    ] {
+        assert!(
+            effects(cmd).contains(&Effect {
+                op: Op::Delete,
+                target: path("/etc/x"),
+            }),
+            "{cmd}"
+        );
+    }
+    assert_eq!(
+        effects("echo x >/dev/null 2>/etc/log"),
+        vec![Effect {
+            op: Op::Truncate,
+            target: path("/etc/log"),
+        }]
+    );
+}
+
+// @kotowari[REQ-001]
+#[test]
+fn req_001_dev_null_exception_is_limited_to_literal_redirects() {
+    for cmd in [
+        "echo x >/dev/zero",
+        "echo x >/dev/null.log",
+        "echo x >/dev/null/",
+        "echo x >/dev/../dev/null",
+        "dest=/dev/null; echo x >\"$dest\"",
+        "truncate -s 0 /dev/null",
+    ] {
+        assert!(
+            effects(cmd).iter().any(|effect| effect.op == Op::Truncate),
+            "{cmd}"
+        );
+    }
+    assert_eq!(
+        effects("dd if=/dev/zero of=/dev/null"),
+        vec![Effect {
+            op: Op::Format,
+            target: path("/dev/null"),
+        }]
+    );
+}
+
+// @kotowari[REQ-001]
+#[test]
 fn req_001_dd_of_file_and_block_device() {
     assert_eq!(
         effects("dd if=/dev/zero of=/tmp/scratch/img bs=1M count=1"),
