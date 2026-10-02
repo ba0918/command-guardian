@@ -24,3 +24,6 @@
 - A3 findのexecdirで明記された固定相対対象は、起点の子集合に吸収せず未解決の対象として残す。固定絶対対象と供給元の子集合は別々に維持する。
   - why: [REQ-001](../../ir/judgment.md#REQ-001)の明記された対象を落とさず、execdirが起点自身を訪問する場合の親cwdを起点の子集合で代用しない。[REQ-002](../../ir/judgment.md#REQ-002)の確定できないパスの扱いへ戻し、[照合A3](./2026-10-02-rework-ir-conformance.md#A3)の欠落を解消する。述語や実際の探索結果を評価せず、従来の固定対象抽出とUnresolvedを使う。
   - decided_by: 実装者、既存要求への修正の範囲
+- A6 HOME・TMPDIR・PWDと、それらを含む代入・語の連結・tilde・globの解決では、OSパスのバイト列を分類まで保持する。値を使用時まで保持する既存の処理は維持し、分類対象をlossyな文字列から作り直さない。
+  - why: [REQ-002](../../ir/judgment.md#REQ-002)・[REQ-005](../../ir/judgment.md#REQ-005)の対象同一性を守る。非UTF-8のcwdを保護ルートに置いた実バイナリ試験で、PWDの0xffが置換文字へ変わりephemeral・allowになった。標準OsString・OsStr・Pathを使い、[入力境界の承認](./2026-10-02-ir-friction-contracts.md#A4)を表示変換の承認へ拡張しない。
+  - decided_by: 実装者、既存要求への修正の範囲

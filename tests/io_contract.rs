@@ -45,6 +45,49 @@ fn req_017_non_utf8_cwd_and_ignored_hook_arguments_do_not_panic() {
     assert_eq!(output.status.code(), Some(3));
 }
 
+// @kotowari[REQ-002, REQ-005, REQ-006, REQ-014, REQ-017]
+#[test]
+fn req_002_non_utf8_environment_paths_keep_their_identity_during_classification() {
+    use std::os::unix::ffi::OsStringExt;
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home
+        .path()
+        .join(std::ffi::OsString::from_vec(vec![b'c', 0xff]));
+    std::fs::create_dir(&cwd).unwrap();
+    std::fs::write(
+        cwd.join(".command-guardian.toml"),
+        "[paths]\nprotected_roots = ['.']\n",
+    )
+    .unwrap();
+    for text in [
+        "rm -rf \"$PWD\"",
+        "rm -rf \"$PWD/child\"",
+        "rm -rf \"$PWD/\"*",
+        "S=$PWD; rm -rf \"$S\"",
+        "S=$PWD; rm -rf \"$S/child\"",
+        "rm -rf \"$HOME\"",
+        "rm -rf \"$HOME/child\"",
+        "rm -rf ~/child",
+        "S=~/child; rm -rf \"$S\"",
+        "rm -rf \"$TMPDIR\"",
+    ] {
+        let output = command(home.path())
+            .env("HOME", &cwd)
+            .env("TMPDIR", &cwd)
+            .args(["check", text, "--cwd"])
+            .arg(&cwd)
+            .args(["--format", "json"])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{text}: {:?}", output);
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            report["effects"][0]["class"], "protected",
+            "{text}: {report}"
+        );
+    }
+}
+
 // @kotowari[REQ-017]
 #[test]
 fn req_017_check_output_failure_is_an_explicit_failure() {
