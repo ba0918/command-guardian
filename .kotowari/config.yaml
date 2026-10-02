@@ -21,6 +21,7 @@ changes:
     - "plugins/opencode/src/**/*.ts"
     - "plugins/opencode/index.ts"
     - "plugins/opencode/tests/**/*.ts"
+    - "plugins/opencode/tests/**/*.json"
     - "plugins/opencode/package.json"
     - "plugins/opencode/tsconfig.json"
     - "plugins/opencode/bun.lock"
