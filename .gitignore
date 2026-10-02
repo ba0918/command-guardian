@@ -2,3 +2,5 @@
 .agents/worktrees/
 .agents/artifacts/
 /_site/
+/plugins/opencode/node_modules/
+/plugins/opencode/dist/

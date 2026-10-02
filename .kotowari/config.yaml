@@ -18,6 +18,12 @@ changes:
     - "PROJECT.md"
     - ".gitignore"
     - ".ignore"
+    - "plugins/opencode/src/**/*.ts"
+    - "plugins/opencode/index.ts"
+    - "plugins/opencode/tests/**/*.ts"
+    - "plugins/opencode/package.json"
+    - "plugins/opencode/tsconfig.json"
+    - "plugins/opencode/bun.lock"
   exclude:
     - "Cargo.lock"
   records:
@@ -29,6 +35,7 @@ tests:
     - "tests/**/*.rs"
     - "crates/**/src/**/*.rs"
     - "crates/**/tests/**/*.rs"
+    - "plugins/opencode/tests/**/*.ts"
   rust:
     attributes: []
     macros: []
