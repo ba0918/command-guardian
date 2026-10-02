@@ -5,11 +5,14 @@ use guardian_core::Verdict;
 use std::io::Read;
 use std::path::PathBuf;
 
+mod opencode;
+
 /// 呼び出し元のエージェント。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Agent {
     Claude,
     Codex,
+    OpenCode,
 }
 
 /// フックの入力から取り出した判定の材料。
@@ -30,7 +33,13 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
     };
     let mut text = String::new();
     if std::io::stdin().read_to_string(&mut text).is_err() {
+        if agent == Some(Agent::OpenCode) {
+            opencode::unavailable("Could not read hook input.", None);
+        }
         return 0;
+    }
+    if agent == Some(Agent::OpenCode) {
+        return opencode::run(&text);
     }
     let (Some(agent), Some(input)) = (agent, parse_input(&text)) else {
         return 0;
@@ -65,18 +74,19 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
 
 const HELP: &str = "Judge a Bash request from an agent hook; read the JSON request from stdin.
 
-Usage: command-guardian hook --agent claude|codex
+Usage: command-guardian hook --agent claude|codex|opencode
 
 Arguments:
   No positional arguments are required. Hook input is supplied on stdin.
 
 Options:
-  --agent claude|codex  Select the calling agent's protocol.
+  --agent claude|codex|opencode  Select the calling agent's protocol.
   --help, -h           Show help without reading stdin or loading configuration.
 
 Examples:
   command-guardian hook --agent claude < request.json
   command-guardian hook --agent codex < request.json
+  command-guardian hook --agent opencode < request.json
 
 Exit codes:
   always 0, regardless of the verdict. Help also exits with 0.";
@@ -97,6 +107,7 @@ fn parse_agent(args: &[std::ffi::OsString]) -> HookArgs {
             agent = match args.get(i + 1).and_then(|s| s.to_str()) {
                 Some("claude") => Some(Agent::Claude),
                 Some("codex") => Some(Agent::Codex),
+                Some("opencode") => Some(Agent::OpenCode),
                 _ => None,
             };
             i += 2;
@@ -153,5 +164,6 @@ fn decision(agent: Agent, verdict: Verdict, permission_mode: Option<&str>) -> Op
             Verdict::Block => Some("deny"),
             Verdict::Allow | Verdict::Ask => None,
         },
+        Agent::OpenCode => None,
     }
 }
