@@ -48,6 +48,41 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
   }catch(error){server.kill("SIGTERM");throw error;}
 }
 
+// @kotowari[REQ-047, REQ-051, EX-103]
+test("req_047_host_valid_empty_command_waits_for_fresh_approval_and_honors_reply",async()=>{
+  const f=await host();
+  try{
+    for(const decision of ["once","reject"] as const){
+      let completed=false;
+      const run=f.execute("",{workdir:f.project}).then(result=>{completed=true;return result;});
+      let requests=await f.client.permission.list({sessionID:f.session.id});
+      for(let i=0;i<100&&!requests.length&&!completed;i++){
+        await new Promise(resolve=>setTimeout(resolve,20));
+        requests=await f.client.permission.list({sessionID:f.session.id});
+      }
+      expect(requests).toHaveLength(1);
+      expect(completed).toBe(false);
+      const request=requests[0];if(!request)throw new Error("Missing input-uncertainty approval");
+      expect(request.resources).toEqual([""]);
+      expect(request.metadata?.cwd).toBe(f.project);
+      expect(request.metadata?.shell).toBe("/bin/bash");
+      expect(request.metadata?.guardianReason).toBeString();
+      expect(String(request.metadata?.guardianReason).length).toBeGreaterThan(0);
+      await f.client.permission.reply({sessionID:f.session.id,requestID:request.id,decision});
+      const result=await run;
+      expect(completed).toBe(true);
+      expect(typeof result.output).toBe("object");
+      if(typeof result.output!=="object"||result.output===null)throw new Error("Missing host executor result");
+      if(decision==="once"){
+        expect("error" in result.output).toBe(false);
+        expect("content" in result.output).toBe(true);
+      }else expect("error" in result.output).toBe(true);
+      expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+      expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    }
+  }finally{await f.close();}
+},20000);
+
 // @kotowari[REQ-049, EX-083]
 test("req_049_real_host_registered_plugin_blocks_fixture_truncation_even_with_native_allow",async()=>{
   const f=await host();

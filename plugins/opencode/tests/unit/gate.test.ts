@@ -54,8 +54,8 @@ test("req_055_unavailable_shell_reason_requires_approval", async () => {
   expect(displayed).toContain("Unsupported shell");
 });
 
-// @kotowari[REQ-047, EX-103]
-test("req_047_input_uncertainty_is_presented_for_approval", async () => {
+// @kotowari[REQ-051]
+test("req_051_unavailable_reason_is_presented_for_approval", async () => {
   let displayed = "";
   expect(await authorize({ kind: "ask", reason: "Could not establish execution input" }, invocation, async (_input, reason) => { displayed = reason; }, async () => "approved")).toBe("approved");
   expect(displayed).toContain("execution input");

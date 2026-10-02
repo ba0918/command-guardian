@@ -32,6 +32,8 @@
 
 ## Grounds
 
+ホストのcommandは空文字列を含む文字列であり、Rust hookの非空条件とは境界が異なる。pluginは空文字列を保持してhookへ渡し、返されたunavailableを既存のnative承認へ接続する。expected入力とshell create.before入力の両方で同じ変換を使う。空文字列は入力の確立を拒否する理由にしない。これにより、[REQ-047の不確実な入力の承認](../../ir/opencode.md#REQ-047)と[REQ-051の判定不能時の承認](../../ir/opencode.md#REQ-051)を満たす。RustのA1・A2と確定済み影実行の優先順位は変更しない。
+
 - [公式2.0.21のplugin hooks](https://github.com/anomalyco/opencode/tree/v2.0.21/packages/plugin/src/promise)のtool transform/list、shell hook、permission evaluateを使う。内部moduleをruntimeからimportしない。
 - [公式2.0.21のnoninteractive run](https://github.com/anomalyco/opencode/blob/v2.0.21/packages/cli/src/run/noninteractive.ts)はauto時にnative permissionへonceを返す。モデルを使うCLI run自体は今回実行していない。
 - [公式2.0.21のSessionExecution](https://github.com/anomalyco/opencode/blob/v2.0.21/packages/core/src/session/execution.ts)はidle sessionへのinterruptをno-opにする。RPC fixtureのsignal cancellationは実機検証したが、idle sessionへのinterruptをactive session中断の証拠として扱わない。

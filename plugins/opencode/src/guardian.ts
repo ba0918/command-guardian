@@ -33,7 +33,11 @@ export async function judge(binary:string,input:Invocation,signal:AbortSignal):P
   });
 }
 export function executionInput(input:unknown,directory:string,shell:string):Invocation|undefined {
-  if (typeof input !== "object" || input === null || !("command" in input) || typeof input.command !== "string" || input.command.length === 0 || !isAbsolute(directory) || !isAbsolute(shell)) return undefined;
+  // Do not narrow the host's string schema: an empty command can require approval.
+  if (
+    typeof input !== "object" || input === null || !("command" in input) ||
+    typeof input.command !== "string" || !isAbsolute(directory) || !isAbsolute(shell)
+  ) return undefined;
   const workdir = "workdir" in input ? input.workdir : directory;
   if (workdir !== undefined && typeof workdir !== "string") return undefined;
   const cwd = workdir ?? directory;
