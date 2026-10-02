@@ -1,0 +1,324 @@
+version: 1
+entries:
+  - id: rework-ir-friction-independent-review
+    base: 10f104ffdd677f313140312db8b4c178e5378271
+    role: reviewer
+    files:
+      - path: .ignore
+        before: null
+        after: sha256:6ea373279673b4f4aadd9f27fd47011e0f298bf878108c9a5ad704a17739bc3a
+      - path: AGENTS.md
+        before: sha256:8178e5128304e5f016f4c4a80cc1e8a77e5473c817cd803b78d2a122a6218577
+        after: sha256:e95843dbcd2c31e0c02dfbd0fef0221557c06866d50dd2e04f85906ba88cd7cb
+      - path: Cargo.toml
+        before: sha256:95f6e968856abbff6681b9e8a81f0250abb926ac6fab92dc23c8a4b176e0f10e
+        after: sha256:bfd40601d751294c3d89d39e8dfb917ae177941255d24d95211cf5f38591d5d8
+      - path: PROJECT.md
+        before: sha256:08a4cd3a47e680f9dc5f8cbd1adbb294b10074f76592e1cc53a4039fc58334e4
+        after: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
+      - path: crates/guardian-analysis/src/effects.rs
+        before: sha256:4b484c15e044681f990389317489fafa32e11259d5b407c1c654beeb20f30f73
+        after: sha256:bfd1627887cc7e9fe332ee24da28d2d0ded259676aa17be242622779de37c8ce
+      - path: crates/guardian-analysis/tests/extract.rs
+        before: sha256:b7169bb4243654cbd8e3cdaf982b5f1eb7d2c718171143959184e6738e202df8
+        after: sha256:0ab76d32a1403cdc9f49a783f16f55d830574785dfe7980370f69d13de94b882
+      - path: crates/guardian-analysis/tests/resolve.rs
+        before: sha256:4de0490cf8eba8ba9c8ef6f09dd99515016390dcc9240694edf97143f0e61c96
+        after: sha256:605430e358a103405113de6a6089a099731b2dffdf4ec32d07da08de4f1bafbd
+      - path: crates/guardian-app/Cargo.toml
+        before: sha256:2ebadc963184adf1b1a339ae090fa94153c5ea23870f36d4f74dc48e62f4e494
+        after: sha256:4528765cedbd9753d9da807399a50ed3508f622678733994fa6fa81f5f5ccdae
+      - path: crates/guardian-app/src/config_loader.rs
+        before: sha256:b7535962c9ee2f78cb0ceae60d119dee56fec6d06020ac8e4025111c154715cc
+        after: sha256:cd0156853ac3e832bdbafb2c7721ea334c1980a82765444f2fb423c22ad078cb
+      - path: crates/guardian-app/src/runtime/mod.rs
+        before: sha256:1374dd659a94d794d7fd7464d1dda8ff7dd6adccf0617730517166abfcbb29c0
+        after: sha256:7be1f842ad62f2360d891d1aa7a23e0d80ea08d888b6d0aff9dbecd7835c8519
+      - path: crates/guardian-app/src/runtime/worker.rs
+        before: sha256:91e893bf58a685e301e4ae500a55e2653deaed8343d4eeeed83f6d0a7065c4bb
+        after: sha256:a922ac5b5090c67b7c239e932378cd447155669cfe7a506c3c77444d0ea66570
+      - path: crates/guardian-app/tests/config_paths.rs
+        before: null
+        after: sha256:8ab44549663ce22b0b7928aaadbcce420c2bf4e5081fd1184951c13a60f65838
+      - path: crates/guardian-judge/src/classify.rs
+        before: sha256:c11c9d237dc95d9ef619d5255cd3931f0899680da5a8cb2ff9305673948eec7b
+        after: sha256:4ad7850d480869c7572d3da5f8fbfbc371e684eb397f126109da127bdbf0f0f1
+      - path: crates/guardian-judge/tests/classify.rs
+        before: sha256:5ae54317b4232cf5d74b1164a3cfa963eb96839b0d15c2509890c8d16e8dc16d
+        after: sha256:c05c260a615e0a9d39a1a1895d6254cbe0ead30263d797ae487a60d9a99ef3d5
+      - path: crates/guardian-judge/tests/git_classify.rs
+        before: sha256:bc5fe25ea4e13f4ac9180906c0ba67e1481eb04d122063e89cb000345ae15fed
+        after: sha256:205e5e16cdb5d86e1198a4bb44c7f62d09ce2067ac8cc10ca5fd98656b05b2f3
+      - path: crates/guardian-parser/src/lib.rs
+        before: sha256:611d080795fce4a72f4a55a0309b21743c650c6527bcca84c3e40613f1ad5e4d
+        after: sha256:c0b1dd85e86af7127098736d51e02e82c5dd90ba86051f59a600adf21a4fbc11
+      - path: crates/guardian-parser/src/normalize.rs
+        before: sha256:e7e79415732c2a5acf538fc9da2a82e0551023c4b78409f7a12e203239a31f68
+        after: sha256:b415f8431c270c297a578f48c7256cecde5760a0ea7743299bd23f2e542e9b86
+      - path: crates/guardian-parser/tests/contract.rs
+        before: sha256:890ed5fd7d43e27552fea571b46863383963c7a604ac44595f910c860f580eaa
+        after: sha256:a4ef82869fc42f6d5e7262a2bad4d57b90df7b13dd1ee643421c045065d1fbeb
+      - path: crates/guardian-parser/tests/grammar.rs
+        before: sha256:830e1776445cbd65a4636cd1a2465d0218a0ed9b2e645569881847d440b4b7a1
+        after: sha256:322d93d3e207b7cfb8f9603df3e87e0d62567e1d1735fd814dceeae1734008e5
+      - path: crates/guardian-policy/src/config.rs
+        before: sha256:b40b88c266883032243a4ef6b3ee0264676bb3bd976332a661d61508c2fd3c23
+        after: sha256:3ee39a6591145835afa580feb45a50bff48f326ba794bd2c629525775d8a8b36
+      - path: crates/guardian-policy/src/evaluation.rs
+        before: sha256:ba622d266f0b471a96c80a725019c830b14e4ade17d1aea910445dc220db54ec
+        after: sha256:9da61888e7a83a1a9dbbd34e81ad7b20312f3c84918cb650f18d7812807de993
+      - path: crates/guardian-policy/src/guard.rs
+        before: sha256:6b44c811d7d62aa67be12688c7775ff354f11d696f764b5ea315ff7e7caed157
+        after: sha256:2efff6797a1b35f6cea96704669b3c41e30146e6c1f8d922412debddbc51fa20
+      - path: crates/guardian-policy/src/layers.rs
+        before: sha256:2e6c3a2be3e31cb7b2cedab565312549bb505f4028f3f0edd7deb25fbacf5af2
+        after: sha256:e655fe8fc434d0c74e6ceb81927cced869ec4e13cab9d11bb9259b6f9d325f22
+      - path: crates/guardian-policy/tests/evaluation.rs
+        before: sha256:f383314f41b0ef23753bf54248fb03f5a8d6f7c281f93dbdf60f67c8ff09b87e
+        after: sha256:0fc80d5c7b8e374a9b7b63307be4b92ff00cec2ee419aebbc9b4788ec73422d1
+      - path: crates/guardian-policy/tests/guards_flags.rs
+        before: sha256:a975c3f492292a4df15b4980a7aba840431f28911a0467e79125e374693d92fa
+        after: sha256:135ae2c88f13595c37c16705cb2612cd560cf3d47c40a0a84afb6aa53cb69577
+      - path: crates/guardian-policy/tests/guards_shape.rs
+        before: sha256:db72b756bc1b6056dcdb11ea5bb590fe9d464e0b381c34935c4fafc1be66dd55
+        after: sha256:b8797e2b25be86963f294b711cf5b058760720f85eb71e458662ceca7dcbf934
+      - path: crates/guardian-policy/tests/layers.rs
+        before: null
+        after: sha256:214a341ee81236dd65d6b848968d48a783cc7921c8b8fcec024101964b1d2f79
+      - path: src/hook.rs
+        before: sha256:f0f514acc73292fa453ef66a1723aa309f2b83feaa5758b87550933f4534e30c
+        after: sha256:6a088d01dc25b526d08568166d266d310ef616326f1f2a16c09df896a158c79c
+      - path: src/log.rs
+        before: sha256:cebdf196af3f0242a60a0c8edc839561b780334b66443b0daf694e6731d6d377
+        after: sha256:2f48e3260a96de510edf40989456ccab5b84e053817f9640a6022f49d17dcb62
+      - path: src/main.rs
+        before: sha256:eb99f447994ffb25dc54a7e8dcabc8e2c17068d6017ba0ae67f2bb7e812343ed
+        after: sha256:0a262aae0f08c2afd6843e193b23916b23065ac49072878c86f634e72b7ae35a
+      - path: tests/app_config.rs
+        before: sha256:45a232813ee7eb28d6a221055350269ddcd4f413ee71127d2fa2774b32b413d5
+        after: sha256:7a95cf25b95a27121aa1939a49f2160130ad52adb9be356e4df3266f9bb7efdb
+      - path: tests/app_guards_only.rs
+        before: sha256:a523ce0620b510ff19896d572831d537bc96785f8944eccf78c81cde32a21edd
+        after: sha256:7f2bf366fb576ec757d3744917f6504bd6ebf9f68515a459a2321878dc508ada
+      - path: tests/io_contract.rs
+        before: null
+        after: sha256:0d42bb149ee8b1769446313c4a028e477b0d04873baf676d51944443bc0b9059
+      - path: tests/language_help.rs
+        before: sha256:ce85d2d739f0c53711306d4b91d5bdf7c5e9dbd22140f9f6cf3bd29f3e611dea
+        after: sha256:4100c16a1aa89285b8741f99e953df41d55c4b3756bc17998e17ca483c635cb3
+      - path: tests/shadow.rs
+        before: sha256:454848ac65f006043f4761b25d47c4ebf0075c6ff9eef53e1a7f3b5b786b19f6
+        after: sha256:37a4213e19c8da12b8a5d47d4aa998bccb8bfb8dcccb4173daeaf2ff1a8708bf
+    ir:
+      - path: docs/ir/judgment.md
+        sha256: sha256:342c70b54d58783362eaa61587dc654e898d858b61d83bff500db484d8c16f13
+      - path: docs/ir/parser.md
+        sha256: sha256:41c625c6954949bc57bf2cccf2b87debbb86fc9a56717970940b6939180109bf
+      - path: docs/ir/config.md
+        sha256: sha256:3e53bc69c8bf0dfe4267e9ba8cc58173b5d859f5a4e5c616750fb6851ccbbf5e
+      - path: docs/ir/guards.md
+        sha256: sha256:2be5d9f6408f4303ebe430eaaf0d3fa3e9c3a6a8f66785048d048ca98dacb9b2
+      - path: docs/ir/cli.md
+        sha256: sha256:6b5a374fc60cd7a5da39997121b17014da1d89846cd4d432162e188ac8cc077d
+      - path: docs/ir/agents.md
+        sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
+      - path: docs/ir/messages.md
+        sha256: sha256:ea822a1801dfee83d9a7730ba71c1c5d7202fff34fb0cb8f5fbd6f5e5c451a0f
+      - path: docs/ir/shell-state.md
+        sha256: sha256:48566c201311d2fa2479dbce9ebb51b9a288de2737a10b724ece43313ab6069e
+    conclusion: new
+    reason: >-
+      独立レビューとして比較元10f104ffdd677f313140312db8b4c178e5378271から
+      製品候補5c4fb5aaeaafc2a02464c3dbff235f372c02cadbまでを判断した。
+      元reworkの選択31ファイル、照合導入の3ファイル、追加app_config試験の1ファイルを含む。
+      全体差分を読んだ後、各修正候補について変更箇所と直接の呼出元・伝播先を再確認した。
+      filesの35件は候補のchanges設定と両Git treeから列挙し、6文字mode、NUL、blobの全バイトを独立にハッシュした。
+      irの8件も候補のblobから再計算した。実装者記録は判断の入力として照合し、理由やPASSを採用していない。
+      この記録の評決は静的意味レビューのPASSであり、製品試験・ビルド・統合ゲートの独立実行結果ではない。
+
+      parserの変更は回復した前置部があっても元の構文失敗を残し、添字の括弧深さを上限へ算入する。
+      プロセス置換は語の位置をOpaqueとして残す一方、実際の置換本文を別に走査する。
+      lib、normalize、contract、grammarの実装と期待変更はREQ-037/038/039/041に一致し、
+      読めない位置から確定した効果を作る仕様へ変更していない。
+      judgeの変更は入れ子TMPDIRのルート自身を先に保護し、末尾リンク自体のgit所属を親から調べる。
+      classifyとgit_classifyの試験はルート、子集合、追跡済み・未追跡リンク、末尾slashの差を保持する。
+      policyのルート正規化とevaluation試験は字句的parentを対象と同じ表現にそろえ、
+      許可ルート自身を外側の許可ルートで許す欠落を防ぐ。REQ-003/004/005/006/007/013の範囲内である。
+
+      analysisの値は使用前に絶対パスへ固定せず、引用・連結・代入を経て使用時のcwdで解決する。
+      subshell、関数定義、shell起動は親状態と分離し、evalと確定リテラルforは親へ状態を渡す。
+      展開値の末尾slash、引用されたtildeとglob文字、glob由来のChildrenを区別する。
+      findとxargsは明記された固定対象を供給元の子集合と別に保持する。
+      mktempのdry-runとその省略形は作成済みパスへ分類しない。
+      extractとresolveの期待をREQ-001/002/007/008/009および構文木契約へ照合した。
+
+      旧A1では各if分岐が同じ開始状態を持ち、elif条件は到達可能な残りの経路にだけ作用する。
+      elseなしの経路も合流し、共通値以外を未解決にするため、thenの代入を無条件の確定値にできない。
+      この担当がF2として指摘したfalse &&の条件内代入も、短絡右辺の実行・非実行の合流で閉じている。
+      旧A2とこの担当のF1は固定回数でなく状態が安定するまで本文を走査する修正で閉じた。
+      最終の安定状態でも効果を収集してから終了するため、代入連鎖で遅れて未解決になる対象を残せる。
+      各回のcontrol確認、初回だけのInvocation、共有した内側parse cacheを確認した。
+      2/4/8変数の試験期待はこの性質を検査し、リテラル反復の状態継続は別経路で維持される。
+      旧A3はexecdir固定相対対象をUnresolvedとして残す修正で閉じ、固定絶対対象とChildrenは失わない。
+      これらはfixes A1-A5による既存REQ-002等への修正であり、外部コマンドの成否や反復数を実行して選んでいない。
+
+      この担当のF3はOSパスをlossyな文字列から再生成した分類対象の退行だった。
+      fixes A6の後はPWD/HOME/TMPDIR、代入、連結、tilde、相対解決でOsStringとPathのバイトを保つ。
+      非UTF-8 cwdとprotected_roots=['.']を生成してcheckへ渡すio_contract試験は、
+      単独変数・suffix・代入・glob・tildeでprotectedと終了2を要求する。表示だけの変更とは扱わない。
+      F4はPath::parentがvaluable/.のdotを消してglob baseを一段上へずらした退行だった。
+      fixes A7は最初のGlob前のpartsへ引用済みの非空ファイル名断片を足してからresolve_valueを呼ぶ。
+      tilde処理前にもdotを残し、その後のparentがvaluableを返すため、相対・絶対・PWD・tildeの反例を閉じる。
+      通常glob、root、ファイル名prefix、引用tilde、非UTF-8の変数prefixも追跡し、
+      find・for・pipelineへ渡すbaseに今回の変更から生じる別の欠落を認めなかった。
+      実バイナリ試験はvaluable/.victimのfixtureと保護設定を作り、削除本文は実行せずcheckへ渡す構成である。
+      この担当はRED/GREENを実行していない。実行成功の報告と静的な解消判断を区別する。
+
+      appの相対cwd上方探索、利用者設定metadataエラーと不在の区別はconfig_pathsの入力生成とREQ-013/015に合う。
+      runtimeの引用除去サイズ検査は送信前に行い、workerの部分read/writeは一つの絶対期限を共有する。
+      ValidationSessionに設定全体の累積判定上限を加えず、REQ-036/039の隔離境界を維持する。
+      tempfileのdev依存はfixture用、rustixの製品依存はログ取得のdescriptor固定用で、単一バイナリを変えない。
+      guardの誤型verdict/examplesとUnicode単文字flagは規則無効化・文字単位照合の契約に合う。
+      診断付き設定例の拒否はguard-example-diagnostics A1で承認された意味をREQ-034へ反映し、
+      トップレベルとeval内側の解析診断を検査するapp_guards_only試験と対応する。
+
+      旧A4はcontracts A1のファイル単位復旧を採用した変更であり、単なる従来動作の正当化ではない。
+      layersは一般設定の誤型・誤値を個別guard処理の前にErrへ集約する。
+      個別guardの誤りだけは規則を無効化し、正常な一般設定を残す。
+      layers試験とapp_configの両方向の層試験は、不正ファイルを捨て正常な他層を残す更新REQ-015を検査する。
+      旧A5はcontracts A2の拒否条件と保存不能時の例外をREQ-018/019へ明記した変更として扱う。
+      logは専用ディレクトリと末尾ログをNOFOLLOWで取得し、通常ファイル確認後に権限を設定する。
+      排他追記は一判定のレコードを分断しないための修正で、shadow試験の内容・権限・レコード対応を照合した。
+      hookは保存場所なしや保存失敗を固定文面のstderr警告へ変え、空stdoutと終了0を維持する。
+
+      旧A6の実行モード前提はcontracts A3で選ばれた両状態合流とREQ-046の追加で明示された。
+      最終段だけを親と合流し、先行段は他段へ状態を漏らさない。shell種別やlastpipeの綴りで確定側を選ばない。
+      旧A7はcontracts A4の本文・解釈オプションのUTF-8境界とOS cwd受理をREQ-017へ反映した。
+      この承認はlossy表示の承認ではなく、F3の分類対象同一性も別に修正した。
+      出力不能時のcheckの3、hook/helpの0、警告出力失敗時の継続は既存の入口契約を維持する。
+      非allow textの配置はcheck-text-layout A1とREQ-011に対応し、JSON説明とhook理由の配置を変更しない。
+      io_contractとlanguage_helpの期待はこれらの境界を検査し、エージェントのallow/ask/block写像も維持する。
+
+      .ignore、AGENTS.md、PROJECT.mdはchange-conformance A1-A3のローカル照合導入に対応する。
+      Git追跡の除外やCI公開、pre-commitへのchanges追加として解釈していない。
+      歴史的な保留記録は修正と承認済み契約への参照を付けたもので、過去の未承認状態を承認済みに書き換えていない。
+      旧A1-A7とこの担当のF1-F4には、今回の承認範囲と変更バイトに対する残存指摘を認めない。
+      recordedの契約追加を含むため全体結論はnewであり、fixedの要求と定義IRも全て収録する。
+      既存while/case、hardlink、全親経路のsymlink、表示だけのlossy変換の解消は主張しない。
+      利用可能なkotowariのversion表示は0.2.0だった。PROJECTが要求する0.3.0以降のcheck/changesを実行したとは主張しない。
+      最終HEADの確定、両記録の機械検査、製品チェック、統合可否の判断は呼出元に残る。
+    requirements:
+      - REQ-001
+      - REQ-002
+      - REQ-003
+      - REQ-004
+      - REQ-005
+      - REQ-006
+      - REQ-007
+      - REQ-008
+      - REQ-009
+      - REQ-011
+      - REQ-013
+      - REQ-014
+      - REQ-015
+      - REQ-016
+      - REQ-017
+      - REQ-018
+      - REQ-019
+      - REQ-022
+      - REQ-023
+      - REQ-024
+      - REQ-026
+      - REQ-027
+      - REQ-030
+      - REQ-034
+      - REQ-035
+      - REQ-036
+      - REQ-037
+      - REQ-038
+      - REQ-039
+      - REQ-041
+      - REQ-043
+      - REQ-044
+      - REQ-046
+    decisions:
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A5
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A17
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A20
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A21
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A22
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A27
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A29
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A37
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A44
+      - docs/decision/records/2026-09-30-hook-guardian-scope.md#A45
+      - docs/decision/records/2026-10-01-parser.md#A19
+      - docs/decision/records/2026-10-01-parser.md#A20
+      - docs/decision/records/2026-10-01-parser.md#A23
+      - docs/decision/records/2026-10-01-crate-boundaries.md#A2
+      - docs/decision/records/2026-10-01-crate-boundaries.md#A3
+      - docs/decision/records/2026-10-02-cli-language-help.md#A4
+      - docs/decision/records/2026-10-02-check-text-layout.md#A1
+      - docs/decision/records/2026-10-02-guard-example-diagnostics.md#A1
+      - docs/decision/records/2026-10-02-change-conformance.md#A1
+      - docs/decision/records/2026-10-02-change-conformance.md#A2
+      - docs/decision/records/2026-10-02-change-conformance.md#A3
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A1
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A2
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A3
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A4
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A5
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A6
+      - docs/decision/records/2026-10-02-ir-friction-fixes.md#A7
+      - docs/decision/records/2026-10-02-ir-friction-contracts.md#A1
+      - docs/decision/records/2026-10-02-ir-friction-contracts.md#A2
+      - docs/decision/records/2026-10-02-ir-friction-contracts.md#A3
+      - docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
+    handoff: null
+    gaps:
+      - category: spec_conflict
+        disposition: fixed
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A1
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A5
+      - category: spec_conflict
+        disposition: fixed
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A2
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A4
+      - category: spec_conflict
+        disposition: fixed
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A3
+      - category: spec_conflict
+        disposition: fixed
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A6
+      - category: spec_conflict
+        disposition: fixed
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-fixes.md#A7
+      - category: spec_conflict
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-contracts.md#A1
+      - category: missing_spec
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-contracts.md#A2
+      - category: premise_conflict
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-contracts.md#A3
+      - category: missing_spec
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-ir-friction-contracts.md#A4
+      - category: missing_spec
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-check-text-layout.md#A1
+      - category: missing_spec
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-guard-example-diagnostics.md#A1
