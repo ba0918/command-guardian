@@ -1,58 +1,44 @@
 version: 1
 entries:
-- id: opencode-managed-service-implementation
-  base: 256717021e5ceb0b93d8b0bc21e25e1133bafd01
+- id: release-0.1.3-implementation
+  base: 1a2f0383b9a2164f731eab6625e877b5a0bda543
   role: implementer
   files:
+  - path: Cargo.toml
+    before: sha256:26f0e432f8d1db201b3cfbaddd186e2ef2f48a1b6509a3731a2d03ad91f4ac8b
+    after: sha256:abd11bfddd1a355ec4794d00eb2050b373c625b6f74c5b63830b1dda12f3e848
   - path: CHANGELOG.md
-    before: sha256:65e479b27c53762793e502767dd2e0ad023c1bc97dc4e9c7e5f27b83690ed899
-    after: sha256:f22dd4c17ba693f2338a719a398b15d89961d2cf13df011d047fcc19a4160af4
+    before: sha256:f22dd4c17ba693f2338a719a398b15d89961d2cf13df011d047fcc19a4160af4
+    after: sha256:7f1e2fbb6ebafb35b83a6ac13e5b80bfd4ecb1be1151cb5325ab98feee82efd1
   - path: README.md
-    before: sha256:6c518e209f209be32cfbefd343bc696e44a2ffdb5e54d73586f95a9e02850623
-    after: sha256:3f2ea58ae9ac2943c896d9bc671851e5c86855d6e30bf2dc92d5e64baf25498a
+    before: sha256:3f2ea58ae9ac2943c896d9bc671851e5c86855d6e30bf2dc92d5e64baf25498a
+    after: sha256:668ce83e73f2150d0457dc1899a58aeb09aba76a64e48c56686fb8a713cc05c7
   - path: README-ja.md
-    before: sha256:b6a4c7a4ec6fab1df87693a813d5aea4125d6bf64e32d6aa280cf0266889c14c
-    after: sha256:ec1be145ef4f36e521d123b70ac1856d8fafb24f18915a15974703456cd4a1a8
+    before: sha256:ec1be145ef4f36e521d123b70ac1856d8fafb24f18915a15974703456cd4a1a8
+    after: sha256:37748e205eab516f157562d150e04136c7d7be601a94c0eeb347afa1cb15e01c
   - path: docs/opencode.md
-    before: sha256:58e5a55c605751b5fffb7382971b57babcbe858c9ac9050636e9fb49e1702e06
-    after: sha256:b3598b3dad12a0bf9d96310115773413887e336452af79d860538f176d2ad17b
-  - path: plugins/opencode/src/index.ts
-    before: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
-    after: sha256:997bead58252ffdf928596c8d610718edc2f1c3c2cbe8186c7ca2a650ec188d2
-  - path: plugins/opencode/src/connection.ts
-    before: null
-    after: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
-  - path: plugins/opencode/tests/integration/host.test.ts
-    before: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
-    after: sha256:539cfd69a09a8109f95465305a9efe4066ef5ce92bba790b0b0512e364950770
-  - path: plugins/opencode/tests/unit/connection.test.ts
-    before: null
-    after: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
+    before: sha256:b3598b3dad12a0bf9d96310115773413887e336452af79d860538f176d2ad17b
+    after: sha256:d470644f1aa9ad0b205371cb7608e7c987e67e4798ad3a020ff202c32c66e062
   ir:
-  - path: docs/ir/opencode.md
-    sha256: sha256:545a307cc4b2d6a6828afbb84f0006c94c44ead538b24ea804ab5205530398ec
+  - path: docs/ir/release.md
+    sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
   - path: docs/ir/opencode-delivery.md
     sha256: sha256:6cf5704d4363ee5cf9a7049d334df353e39834a9a88e8b4b53c4bb3f7a8cfb88
-  conclusion: new
+  - path: docs/ir/opencode.md
+    sha256: sha256:545a307cc4b2d6a6828afbb84f0006c94c44ead538b24ea804ab5205530398ec
+  conclusion: existing
   reason: >-
-    接続設定の配布時に必要だった手動の認証設定を、自身の管理サービスの登録確認で置き換える。
-    通信前に登録PID・URL・認証情報とloopback HTTPを確認し、検証済み接続先を固定する。
-    SDKのサーバー情報で自身のPIDと2.0.21を照合し、自動接続のリダイレクトを拒否する。
-    discoverによる検証前の認証送信を避けるA3の具体化は、利用者が承認した修正範囲内である。
-    明示設定を一つでも指定した場合は従来の接続だけを使い、自動接続へ切り替えない。
-    承認経路が確定しない場合の未実行と、既存のallow・block・native承認を維持する。
-    A2・A3の判断をREQ-052・REQ-057とEX-106からEX-110に反映した。
-    導入手順は0.1.2と未公開版を区別し、本体と同版のプラグインを登録する範囲に留める。
-    型検査、24件のunit試験、固定OpenCode 2.0.21と実バイナリによる12件の隔離連携試験は成功した。
-    個人サービスの操作、モデル呼出し、WSL固有の観測、版更新とリリースは行っていない。
-  requirements: [REQ-047, REQ-048, REQ-049, REQ-052, REQ-056, REQ-057, REQ-058]
-  decisions:
-  - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
-  - docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+    利用者が承認した0.1.3の公開に向け、既存の自動接続を同版の本体とプラグインとして配布する。
+    Cargo.tomlを版の正本として0.1.3へ更新し、Cargo.lockの本体版も一致させた。
+    既存のUnreleased項目を日付付き見出しへ昇格し、0.1.2から0.1.3への比較リンクを追加した。
+    両言語READMEと導入ガイドの版付き例を0.1.3へ揃え、自動接続を未公開扱いから変更した。
+    公開するOpenCode V2の起動・登録コマンドは正式名のopencodeに揃えた。
+    0.1.2の明示接続条件と初回プラグイン対応版、対応ホスト版2.0.21は維持する。
+    RustとTypeScriptの製品コード、要求と決定の意味、CIの公開条件には変更を加えない。
+    同版manifestは既存のpackage-release.shが正本から生成し、既存CIが全検査後にタグと成果物を公開する。
+    版・lock・CHANGELOG見出しと比較リンクは機械的に一致を確認した。
+    タグを先行作成せず、公開済みタグも再利用しない。最終HEADの照合と製品検査後にmainへ送出する。
+  requirements: [REQ-025, REQ-052, REQ-056, REQ-057, REQ-058]
+  decisions: []
   handoff: null
-  gaps:
-  - category: missing_spec
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
-    - docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+  gaps: []

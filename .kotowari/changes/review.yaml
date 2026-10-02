@@ -1,76 +1,69 @@
 version: 1
 entries:
-- id: opencode-managed-service-independent-conformance
-  base: 256717021e5ceb0b93d8b0bc21e25e1133bafd01
+- id: release-0.1.3-independent-conformance
+  base: 1a2f0383b9a2164f731eab6625e877b5a0bda543
   role: reviewer
   files:
+  - path: Cargo.toml
+    before: sha256:26f0e432f8d1db201b3cfbaddd186e2ef2f48a1b6509a3731a2d03ad91f4ac8b
+    after: sha256:abd11bfddd1a355ec4794d00eb2050b373c625b6f74c5b63830b1dda12f3e848
   - path: CHANGELOG.md
-    before: sha256:65e479b27c53762793e502767dd2e0ad023c1bc97dc4e9c7e5f27b83690ed899
-    after: sha256:f22dd4c17ba693f2338a719a398b15d89961d2cf13df011d047fcc19a4160af4
+    before: sha256:f22dd4c17ba693f2338a719a398b15d89961d2cf13df011d047fcc19a4160af4
+    after: sha256:7f1e2fbb6ebafb35b83a6ac13e5b80bfd4ecb1be1151cb5325ab98feee82efd1
   - path: README.md
-    before: sha256:6c518e209f209be32cfbefd343bc696e44a2ffdb5e54d73586f95a9e02850623
-    after: sha256:3f2ea58ae9ac2943c896d9bc671851e5c86855d6e30bf2dc92d5e64baf25498a
+    before: sha256:3f2ea58ae9ac2943c896d9bc671851e5c86855d6e30bf2dc92d5e64baf25498a
+    after: sha256:668ce83e73f2150d0457dc1899a58aeb09aba76a64e48c56686fb8a713cc05c7
   - path: README-ja.md
-    before: sha256:b6a4c7a4ec6fab1df87693a813d5aea4125d6bf64e32d6aa280cf0266889c14c
-    after: sha256:ec1be145ef4f36e521d123b70ac1856d8fafb24f18915a15974703456cd4a1a8
+    before: sha256:ec1be145ef4f36e521d123b70ac1856d8fafb24f18915a15974703456cd4a1a8
+    after: sha256:37748e205eab516f157562d150e04136c7d7be601a94c0eeb347afa1cb15e01c
   - path: docs/opencode.md
-    before: sha256:58e5a55c605751b5fffb7382971b57babcbe858c9ac9050636e9fb49e1702e06
-    after: sha256:b3598b3dad12a0bf9d96310115773413887e336452af79d860538f176d2ad17b
-  - path: plugins/opencode/src/index.ts
-    before: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
-    after: sha256:997bead58252ffdf928596c8d610718edc2f1c3c2cbe8186c7ca2a650ec188d2
-  - path: plugins/opencode/src/connection.ts
-    before: null
-    after: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
-  - path: plugins/opencode/tests/integration/host.test.ts
-    before: sha256:d0192afd56521e1c9131eb6016ec844dc9e8d60215e3cb1c53aa10b6748576d6
-    after: sha256:539cfd69a09a8109f95465305a9efe4066ef5ce92bba790b0b0512e364950770
-  - path: plugins/opencode/tests/unit/connection.test.ts
-    before: null
-    after: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
+    before: sha256:b3598b3dad12a0bf9d96310115773413887e336452af79d860538f176d2ad17b
+    after: sha256:d470644f1aa9ad0b205371cb7608e7c987e67e4798ad3a020ff202c32c66e062
   ir:
-  - path: docs/ir/opencode.md
-    sha256: sha256:545a307cc4b2d6a6828afbb84f0006c94c44ead538b24ea804ab5205530398ec
+  - path: docs/ir/release.md
+    sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
   - path: docs/ir/opencode-delivery.md
     sha256: sha256:6cf5704d4363ee5cf9a7049d334df353e39834a9a88e8b4b53c4bb3f7a8cfb88
-  conclusion: new
+  - path: docs/ir/opencode.md
+    sha256: sha256:545a307cc4b2d6a6828afbb84f0006c94c44ead538b24ea804ab5205530398ec
+  conclusion: existing
   reason: >-
-    独立したCode/Documentのstandard照合で、候補全体と両IR、旧A10の更新、
-    新しいA2・A3の理由と判断者を確認した。手動接続だけだった要求の変更は、
-    呼出元が示した利用者承認済みの自動接続と探索前検証の範囲に収まる。
-    新経路は登録を一度だけ読み、自身のPID、文字列のURLと非空の認証情報、
-    loopback HTTPを通信前に検証する。認証付きSDK接続の宛先を固定し、
-    サーバー応答のPIDと2.0.21を照合する。SDKの固定版ソースでも注入fetchが
-    情報取得と後続要求に使われることを確認し、redirect:errorが継続して適用される。
-    discoverの検証前通信と登録再読込は製品経路から除かれている。
-    明示オプションが一つでもあれば登録を読まず従来経路だけを使うため、
-    不完全な設定や認証失敗を自動接続で隠さない。接続を確定できない場合は
-    shellを不明として承認経路へ進み、その経路がなければ実行せず失敗を返す。
-    確定済み影実行の既存優先順位、native権限、実行単位の承認、中断後の未再開、
-    起動入力との対応付けは変更されていない。
-    追加検証の条件は利用者の登録設定、登録差替え、HTTP応答、明示設定不備から
-    生じ得るもので、製品の接続・実行を対象としREQ-052とEX-106からEX-110に対応する。
-    隔離連携試験はモデルを呼ばず、接続なしのallow・block・native承認と
-    EX-109の未実行を実ホストで確認する構成である。
-    導入説明は0.1.2と未公開機能を区別し、同版の本体とpluginの登録、Bash条件、
-    手動接続の例外、未検証環境と保証の限界を維持する。仕様にない新しい製品規則、
-    個人設定の変更、別サービス起動、認証情報の書出しは認められなかった。
-    独立実行した型検査、書込みのない純粋関数3試験、transportとreadFileを置換した
-    接続検査は成功した。接続検査では不正登録の通信0件、登録差替え後も固定した宛先、
-    redirect:error、一呼出し一読込、応答PID・版の不一致拒否、明示不備時の探索不使用を観測した。
-    書込み制限により一時ファイルを作るunit試験と連携試験は再実行しておらず、
-    実装者の24unit・12integrationという実行件数を独立観測とは扱わない。
-    各ファイルのmode込みhashと両IRのhashは比較元とworking bytesから独立に再計算した。
-    この記録は凍結working bytesの適合判断であり、統合の最終changes検査は
-    呼出元が両記録をコミットして候補HEADを確定した後に行う必要がある。
-  requirements: [REQ-047, REQ-048, REQ-049, REQ-050, REQ-051, REQ-052, REQ-053, REQ-054, REQ-055, REQ-056, REQ-057, REQ-058]
-  decisions:
-  - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
-  - docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+    独立したstandard強度のCode/Document照合で、承認済み0.1.3公開の準備差分を
+    REQ-025とREQ-052、REQ-056からREQ-058、およびPROJECT.mdの公開手順に照合した。
+    比較元は呼出元指定のGit commitと現在のHEADが一致することを確認した。
+    Cargo.tomlのpackage.versionが正本として0.1.3になり、Cargo.lockは本体packageの
+    版だけを追従させている。lockは変更列挙からの既存除外に従いfilesには含めないが、
+    byte比較とTOML解析で依存やchecksumが変わらないことを独立に確認した。
+    CHANGELOGの既存Unreleased本文はそのまま2026-10-03の0.1.3見出しへ昇格し、
+    v0.1.2からv0.1.3への比較リンクが正本の版と一致する。公開済み版の記述を
+    改変せず、未公開実装中だけの修正を利用者向けの追加修正履歴にしていない。
+    両言語READMEと導入ガイドの版付きコマンド、Git package指定、archive名、
+    checksum確認、releaseリンクは0.1.3で対応し、本体とpluginを同版で登録する。
+    起動と登録の公開コマンドは、利用者が訂正した正式名opencodeへ統一されている。
+    固定SDKの既存サービス起動名もopencodeであり、個人aliasを利用者の前提にしない
+    訂正はREQ-056の再現可能な登録手順とREQ-057の既存V2対応条件内に収まる。
+    公開文書の5箇所を確認し、新しいコマンド機能や対応版を追加する変更ではないと判断した。
+    初回対応が0.1.2である説明、0.1.2と明示サーバーの手動認証設定、2.0.21の
+    ホスト条件、Bashと他hookの制約、未検証環境と承認の保証限界は維持されている。
+    自動接続を0.1.3からの機能とする記述は既存REQ-052の登録事前検証と接続固定を
+    配布するもので、新しい接続挙動や追加の製品規則を導入していない。
+    全対象のsecurity確認でも認証情報の追加、unsafeな接続案内、個人設定の自動変更、
+    モデル呼出しや既存安全条件の削除は認められなかった。
+    既存package-release.shは正本からplugin manifestとarchive名を生成する。
+    既存CIのreleaseはRust両targetとTypeScript・隔離連携・展開archive検証および
+    check/changesの成功を前提に同じcommitをタグ付けし、公開済みタグを変更しない。
+    今回その条件や製品ロジック、IR、decisionの意味に変更はなく、仕様の欠落や
+    仕様上の根拠がない変更も認められないためexistingと判断した。
+    正本・lock・見出し・日付・比較リンク・Unreleased本文・導入コマンドを
+    書込みなしで機械検査し、filesのmode込みhashと全関連IRのhashを独立再計算した。
+    コマンド名訂正後の候補全体でも同じ検査を行い、両記録が同一bytesと全関連IRを
+    対象とすることを確認した。呼出元が報告したGNU/muslの全Rust検査、24unit、
+    release実バイナリと展開bundleの各12integration、manifestの0.1.3一致は
+    本レビュー自身の実行観測とは区別する。
+    この記録は凍結working bytesの適合判断であり、製品チェックの再実行、最終commitの
+    changes検査、タグと成果物の公開成功を観測した記録ではない。それらは呼出元とCIの
+    後続ゲートに残り、公開前にタグを作成する操作は行っていない。
+  requirements: [REQ-025, REQ-052, REQ-056, REQ-057, REQ-058]
+  decisions: []
   handoff: null
-  gaps:
-  - category: missing_spec
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-03-opencode-managed-service.md#A2
-    - docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+  gaps: []

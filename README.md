@@ -154,12 +154,12 @@ The `hook` subcommand always exits with `0`. Hosts must read its JSON decision, 
 The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag with OpenCode V2 2.0.21:
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.1.2
-opencode2 plugin add 'github:ba0918/command-guardian#v0.1.2::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.1.3
+opencode plugin add 'github:ba0918/command-guardian#v0.1.3::path:plugins/opencode'
 ```
 
-For another release, replace `0.1.2` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
-For 0.1.2, configure the plugin's authenticated connection to the same OpenCode server after registration. The unreleased version automatically connects to its own local background service when connection options are omitted; explicit servers still need connection settings. See the [installation guide](docs/opencode.md#automatic-connection-to-the-background-service).
+For another release, replace `0.1.3` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
+From 0.1.3, the plugin automatically connects to its own local background service when connection options are omitted. Explicit servers and 0.1.2 still need connection settings. See the [installation guide](docs/opencode.md#automatic-connection-to-the-background-service).
 
 Use Linux x86_64 or WSL with explicitly configured Bash and no other hooks that change the command, working directory, or shell.
 Follow the [installation guide](docs/opencode.md) for connection settings and the alternative release-archive installation.
