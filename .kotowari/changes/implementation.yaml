@@ -9,7 +9,7 @@ entries:
         after: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
       - path: lefthook.yml
         before: sha256:e987a1b35c9b5018b56a8ecb018017b0f9d8785fe4fd0c724d7b64e7235ad941
-        after: sha256:fa9b91aaaed87958c5d6c975c7451fe8c955cacfddd14b5b7ebf386a38913138
+        after: sha256:857ca40a00657e4c99276db1c42c6e1c8adf7f0085387b369cbdec05d5b17650
       - path: PROJECT.md
         before: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
         after: sha256:52d5ead44cf207cd5c42ba77289b0e66d930a5e68a91b89164a3ff87b1f009ad
@@ -17,7 +17,7 @@ entries:
       - path: docs/ir/release.md
         sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
     conclusion: existing
-    reason: REQ-025のCIビルド・テストとGitHub配布を運用設定で実現し、変更照合の既存方針をCIとpre-pushに適用する。製品の動作とIRは変更しない。自動公開の開始条件とpush前検査は利用者の承認に従う。
+    reason: REQ-025のCIビルド・テストとGitHub配布を運用設定で実現し、変更照合の既存方針をCIとpre-pushに適用する。Gitの通信FDを試験前に閉じ、低FD上限の試験にも通常の実行環境を渡す。製品の動作とIRは変更しない。自動公開の開始条件とpush前検査は利用者の承認に従う。
     requirements: [REQ-025]
     decisions:
       - docs/decision/records/2026-10-02-change-conformance.md#A1

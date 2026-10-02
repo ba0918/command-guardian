@@ -44,6 +44,8 @@ pre-push:
         done
         test -s "$ranges" || exit 0
         unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
+        # Gitの通信FDを試験へ継承すると、低FD上限の試験で動的リンクに失敗する。
+        exec 3<&- 4>&- 5<&-
         cargo fmt --all --check
         for target in x86_64-unknown-linux-gnu x86_64-unknown-linux-musl; do
           cargo clippy --workspace --all-targets --locked --target "$target" -- -D warnings

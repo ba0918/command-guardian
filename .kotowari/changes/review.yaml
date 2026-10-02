@@ -9,7 +9,7 @@ entries:
         after: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
       - path: lefthook.yml
         before: sha256:e987a1b35c9b5018b56a8ecb018017b0f9d8785fe4fd0c724d7b64e7235ad941
-        after: sha256:fa9b91aaaed87958c5d6c975c7451fe8c955cacfddd14b5b7ebf386a38913138
+        after: sha256:857ca40a00657e4c99276db1c42c6e1c8adf7f0085387b369cbdec05d5b17650
       - path: PROJECT.md
         before: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
         after: sha256:52d5ead44cf207cd5c42ba77289b0e66d930a5e68a91b89164a3ff87b1f009ad
@@ -23,8 +23,11 @@ entries:
       PR実headとmerge-base、push before/after、両Rustターゲット、独立記録の照合、pre-pushのstdinと比較元を確認した。
       CI公開・自動リリース・pre-pushへの適用は利用者が明示承認した範囲であり、新しい製品要求としてIRに追加しない。
       リリースは検査したSHAにタグをcreate-onlyで作成し、競合する既存タグでは停止して再利用しない。
-      Unreleasedの現候補は公開を開始しない。actionlint、shell構文、kotowariの検査結果を確認した。
-      製品のGNU・musl全検査成功は呼出元の報告であり、本担当は再実行していない。公開とmise導入は未実行である。
+      今回の通信FD3・4・5のcloseはhookの子shellだけに作用し、Git親プロセスや標準入出力を変更しない。
+      低FD上限で動的リンクが失敗する呼出元の診断に対応し、試験を弱めず通常の子プロセス環境へ戻す運用修正である。
+      利用者が初回0.1.0公開を承認した。英語CHANGELOGの日付入り見出しとCargoの正本版、実rootからの比較リンク、抽出される非空の公開文を照合した。
+      actionlint、lefthook validate、shell構文を本担当が確認した。GNU・musl全検査と実push hookでの該当CLI試験成功は呼出元の報告であり、修正後の全検査は最終候補で再確認する。
+      公開とmise導入は本担当では未実行である。最終commitのreview段階changesは呼出元に残る。
     requirements: [REQ-025]
     decisions:
       - docs/decision/records/2026-10-02-change-conformance.md#A1
