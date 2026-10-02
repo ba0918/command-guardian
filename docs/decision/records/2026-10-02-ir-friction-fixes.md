@@ -27,3 +27,6 @@
 - A6 HOME・TMPDIR・PWDと、それらを含む代入・語の連結・tilde・globの解決では、OSパスのバイト列を分類まで保持する。値を使用時まで保持する既存の処理は維持し、分類対象をlossyな文字列から作り直さない。
   - why: [REQ-002](../../ir/judgment.md#REQ-002)・[REQ-005](../../ir/judgment.md#REQ-005)の対象同一性を守る。非UTF-8のcwdを保護ルートに置いた実バイナリ試験で、PWDの0xffが置換文字へ変わりephemeral・allowになった。標準OsString・OsStr・Pathを使い、[入力境界の承認](./2026-10-02-ir-friction-contracts.md#A4)を表示変換の承認へ拡張しない。
   - decided_by: 実装者、既存要求への修正の範囲
+- A7 globの直前のprefixがファイル名の断片であることを保持してから、供給元のディレクトリを求める。隠しファイルglobの末尾のdotをディレクトリ成分として正規化し、baseを一段上へずらさない。
+  - why: [REQ-002](../../ir/judgment.md#REQ-002)のglob供給元を守る。OS文字列への修正時にPath::parentを断片へ直接使うと、`valuable/.*`のbaseがvaluableからcwdへずれ、保護ルートを迂回する。実バイナリ試験でallow・exit0を確認した。標準OsStringにglobのファイル名断片を残してからPath::parentを使い、別のpathparserは導入しない。
+  - decided_by: 実装者、既存要求への修正の範囲

@@ -1247,15 +1247,14 @@ fn resolve_glob(word: &Word, ctx: &Context) -> Resolved {
     else {
         return Resolved::Unresolved(word.text.clone());
     };
-    let prefix = Word::from_parts(word.parts[..first_glob].to_vec());
+    // glob直前の「.」はファイル名の断片であり、tilde展開や親取得で消してはいけない。
+    let mut prefix_parts = word.parts[..first_glob].to_vec();
+    prefix_parts.push(Part::Quoted("*".into()));
+    let prefix = Word::from_parts(prefix_parts);
     let Value::Text(prefix) = resolve_value(&prefix, ctx) else {
         return Resolved::Unresolved(word.text.clone());
     };
-    let base = if prefix.as_encoded_bytes().ends_with(b"/") {
-        Path::new(&prefix)
-    } else {
-        Path::new(&prefix).parent().unwrap_or(Path::new(""))
-    };
+    let base = Path::new(&prefix).parent().unwrap_or(Path::new(""));
     if base.as_os_str().is_empty() {
         return ctx
             .cwd

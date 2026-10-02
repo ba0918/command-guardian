@@ -88,6 +88,45 @@ fn req_002_non_utf8_environment_paths_keep_their_identity_during_classification(
     }
 }
 
+// @kotowari[REQ-002, REQ-005, REQ-006, REQ-014]
+#[test]
+fn req_002_hidden_file_globs_keep_the_protected_directory_as_their_base() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = home.path().join("work");
+    let protected = cwd.join("valuable");
+    std::fs::create_dir_all(&protected).unwrap();
+    std::fs::write(protected.join(".victim"), "unchanged").unwrap();
+    std::fs::write(
+        cwd.join(".command-guardian.toml"),
+        "[paths]\nprotected_roots = ['valuable']\n",
+    )
+    .unwrap();
+    for text in [
+        "rm -f valuable/.*".to_string(),
+        format!("rm -f {}/.*", protected.display()),
+        "rm -f \"$PWD/valuable/\".*".into(),
+        "rm -f ~/valuable/.*".into(),
+    ] {
+        let output = command(home.path())
+            .env("HOME", &cwd)
+            .args(["check", &text, "--cwd"])
+            .arg(&cwd)
+            .args(["--format", "json"])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{text}: {:?}", output);
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            report["effects"][0]["class"], "protected",
+            "{text}: {report}"
+        );
+    }
+    assert_eq!(
+        std::fs::read_to_string(protected.join(".victim")).unwrap(),
+        "unchanged"
+    );
+}
+
 // @kotowari[REQ-017]
 #[test]
 fn req_017_check_output_failure_is_an_explicit_failure() {
