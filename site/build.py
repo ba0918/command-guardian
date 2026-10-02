@@ -32,10 +32,37 @@ REPO_URL = f"https://github.com/{REPO}"
 # so the page always shows what the current main actually does.
 DEMOS = [
     {
+        "command": 'D=~; rm -rf "$D"',
+        "hero": True,
+        "expect": "block",
+        "en": "Variables are resolved without running anything: this deletes your home directory.",
+        "ja": "コマンドを実行せずに変数を解決し、ホームディレクトリの削除だと見抜きます。",
+    },
+    {
+        "command": "rm -rf .git",
+        "expect": "block",
+        "en": "Repository metadata is protected.",
+        "ja": "リポジトリの管理情報は保護対象です。",
+    },
+    {
+        "command": "rm -rf src",
+        "hero": True,
+        "expect": "ask",
+        "en": "Uncommitted changes would be lost, so it asks first.",
+        "ja": "コミットしていない変更が消えるため、確認を求めます。",
+    },
+    {
         "command": "rm -rf dist",
+        "hero": True,
         "expect": "allow",
         "en": "A committed, unchanged directory in a Git worktree can be recreated.",
         "ja": "Gitで管理され、変更のないディレクトリは元に戻せます。",
+    },
+    {
+        "command": "git push origin main",
+        "expect": "ask",
+        "en": "A project guard in .command-guardian.toml asks before pushing.",
+        "ja": ".command-guardian.toml のguard規則で、push前に確認を求めます。",
     },
     {
         "command": "rm -rf /tmp/build-cache",
@@ -48,30 +75,6 @@ DEMOS = [
         "expect": "allow",
         "en": "Discarding output to /dev/null is not a truncation.",
         "ja": "/dev/null への出力の破棄は切り詰めとして扱いません。",
-    },
-    {
-        "command": "rm -rf src",
-        "expect": "ask",
-        "en": "Uncommitted changes would be lost, so it asks first.",
-        "ja": "コミットしていない変更が消えるため、確認を求めます。",
-    },
-    {
-        "command": "git push origin main",
-        "expect": "ask",
-        "en": "A project guard in .command-guardian.toml asks before pushing.",
-        "ja": ".command-guardian.toml のguard規則で、push前に確認を求めます。",
-    },
-    {
-        "command": "rm -rf .git",
-        "expect": "block",
-        "en": "Repository metadata is protected.",
-        "ja": "リポジトリの管理情報は保護対象です。",
-    },
-    {
-        "command": 'D=~; rm -rf "$D"',
-        "expect": "block",
-        "en": "Variables are resolved without running anything: this deletes your home directory.",
-        "ja": "コマンドを実行せずに変数を解決し、ホームディレクトリの削除だと見抜きます。",
     },
     {
         "command": "dd if=/dev/zero of=/dev/sda",
@@ -274,26 +277,46 @@ def run(binary: Path, home: Path, project: Path, args: list[str], stdin: str | N
     return proc.returncode, shown
 
 
-def demos(binary: Path, base: Path) -> tuple[str, str]:
+def demos(binary: Path, base: Path) -> tuple[str, str, str]:
     home, project = fixture(base)
-    cards = []
-    for demo in DEMOS:
+    tabs, panels, hero = [], [], []
+    for index, demo in enumerate(DEMOS):
         code, output = run(binary, home, project, ["check", demo["command"]])
         verdict = {0: "allow", 1: "ask", 2: "block"}.get(code)
         if verdict is None:
             fail(f"check {demo['command']!r} exited with {code}: {output}")
         if verdict != demo["expect"]:
             warn(f"demo {demo['command']!r} now returns {verdict}, expected {demo['expect']}")
-        quoted = "'" + demo["command"].replace("'", "'\\''") + "'"
-        cards.append(
-            f'<figure class="demo demo-{verdict}">'
+        quoted = html.escape(repr_single(demo["command"]))
+        command = html.escape(demo["command"])
+        selected = "true" if index == 0 else "false"
+        tabs.append(
+            f'<button type="button" role="tab" id="demo-tab-{index}" aria-controls="demo-{index}" '
+            f'aria-selected="{selected}" class="demo-tab demo-{verdict}">'
+            f'<span class="chip chip-{verdict}">{verdict}</span><code>{command}</code></button>'
+        )
+        panels.append(
+            f'<figure class="demo demo-{verdict}" role="tabpanel" id="demo-{index}" aria-labelledby="demo-tab-{index}">'
             f'<figcaption><span class="chip chip-{verdict}">{verdict}</span>'
             f'<span class="en">{html.escape(demo["en"])}</span>'
             f'<span class="ja">{html.escape(demo["ja"])}</span></figcaption>'
-            f'<pre class="term term-wrap"><span class="prompt">$</span> command-guardian check {html.escape(quoted)}\n'
+            f'<pre class="term term-wrap"><span class="prompt">$</span> command-guardian check {quoted}\n'
             f"{html.escape(output)}\n"
             f'<span class="exit">exit {code}</span></pre></figure>'
         )
+        if demo.get("hero"):
+            first = output.splitlines()[0] if output else ""
+            hero.append((
+                ["allow", "ask", "block"].index(verdict),
+                f'<span class="prompt">$</span> command-guardian check {quoted}\n'
+                f'<span class="v-{verdict}">{html.escape(first)}</span>',
+            ))
+    explorer = (
+        '<div class="demo-explorer">'
+        f'<div class="demo-list" role="tablist" aria-label="Examples">{"".join(tabs)}</div>'
+        f'<div class="demo-panels">{"".join(panels)}</div></div>'
+    )
+    hero_term = '<pre class="term term-wrap hero-term">' + "\n\n".join(text for _, text in sorted(hero)) + "</pre>"
 
     request = {
         "tool_name": "Bash",
@@ -312,7 +335,7 @@ def demos(binary: Path, base: Path) -> tuple[str, str]:
         f'<pre class="term term-wrap"><span class="prompt">$</span> echo {html.escape(repr_single(shown_request))} |\n'
         f"    command-guardian hook --agent claude\n{html.escape(output)}</pre>"
     )
-    return "".join(cards), hook
+    return explorer, hook, hero_term
 
 
 def repr_single(text: str) -> str:
@@ -341,7 +364,7 @@ def build(binary: Path, out: Path) -> None:
     version = cargo["package"]["version"]
     readme_en = sections((ROOT / "README.md").read_text())
     readme_ja = sections((ROOT / "README-ja.md").read_text())
-    demo_cards, hook_demo = demos(binary, ROOT / "target" / "site-demo")
+    demo_cards, hook_demo, hero_demo = demos(binary, ROOT / "target" / "site-demo")
     sha = git_commit()
 
     values = {
@@ -353,6 +376,7 @@ def build(binary: Path, out: Path) -> None:
         "lead_ja": lead(readme_ja),
         "demos": demo_cards,
         "hook_demo": hook_demo,
+        "hero_demo": hero_demo,
         "targets_en": table(section(readme_en, "How targets affect the verdict", "README.md"), "README.md"),
         "targets_ja": table(section(readme_ja, "対象パスと判定の関係", "README-ja.md"), "README-ja.md"),
         "exit_en": table(section(readme_en, "Check a command", "README.md"), "README.md"),

@@ -27,11 +27,11 @@
   <div class="wrap header-inner">
     <a class="brand" href="#top"><img src="favicon.svg" alt="" width="24" height="24">command-guardian</a>
     <nav>
-      <a href="#demo"><span class="en">Demo</span><span class="ja">デモ</span></a>
-      <a href="#install"><span class="en">Install</span><span class="ja">導入</span></a>
-      <a href="#hooks"><span class="en">Agent hooks</span><span class="ja">フック</span></a>
-      <a href="#changelog"><span class="en">Changes</span><span class="ja">更新履歴</span></a>
-      <a href="{{repo_url}}">GitHub</a>
+      <a class="nav-section" href="#demo"><span class="en">Examples</span><span class="ja">判定例</span></a>
+      <a class="nav-section" href="#install"><span class="en">Install</span><span class="ja">導入</span></a>
+      <a class="nav-section" href="#hooks"><span class="en">Agent hooks</span><span class="ja">フック</span></a>
+      <a class="nav-section" href="#changelog"><span class="en">Changes</span><span class="ja">更新履歴</span></a>
+      <a class="nav-github" href="{{repo_url}}" aria-label="GitHub"><svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
       <button type="button" class="lang-toggle" aria-label="Switch language / 言語を切り替え">
         <span class="en">日本語</span><span class="ja">English</span>
       </button>
@@ -41,7 +41,8 @@
 
 <main id="top">
   <section class="hero">
-    <div class="wrap">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
       <p class="eyebrow">v{{version}} · Linux x86_64 · MIT</p>
       <h1>
         <span class="en">Stop destructive shell commands <em>before</em> they run.</span>
@@ -52,15 +53,41 @@
         <span class="ja">command-guardian は Bash コマンドを読み、何を削除・切り詰め・フォーマットするのかを取り出して、<code class="chip chip-allow">allow</code>・<code class="chip chip-ask">ask</code>・<code class="chip chip-block">block</code> を返します。CLI からも、AI コーディングエージェントの実行前フックからも使えます。</span>
       </p>
       <div class="install-box">
-        <pre class="term term-inline"><span class="prompt">$</span> <span class="copy-src">mise use -g github:ba0918/command-guardian</span></pre>
-        <button type="button" class="copy" data-copy=".install-box .copy-src">
-          <span class="en">Copy</span><span class="ja">コピー</span>
+        <pre class="term term-inline"><span class="prompt">$</span> <span id="install-cmd">mise use -g github:ba0918/command-guardian</span></pre>
+        <button type="button" class="copy" data-copy="#install-cmd" aria-label="Copy install command">
+          <span class="copy-label en">Copy</span><span class="copy-label ja">コピー</span>
+          <span class="copied-label en">Copied</span><span class="copied-label ja">コピーしました</span>
         </button>
       </div>
       <div class="cta">
-        <a class="button primary" href="#demo"><span class="en">See it decide</span><span class="ja">判定を見る</span></a>
+        <a class="button primary" href="#demo"><span class="en">Try the examples</span><span class="ja">判定例を見る</span></a>
         <a class="button" href="{{repo_url}}"><span class="en">View on GitHub</span><span class="ja">GitHub で見る</span></a>
       </div>
+      </div>
+      <div class="hero-demo" aria-label="Example output">
+        <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        {{hero_demo}}
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="wrap grid3">
+      <article class="feature">
+        <h2><span class="en">Reads the shell like Bash does</span><span class="ja">シェルを Bash と同じように読む</span></h2>
+        <p class="en">Variables, <code>bash -c</code>, <code>eval</code>, <code>find -delete</code> and <code>xargs</code> are followed without running anything, so a deletion hidden behind <code>$D</code> is still caught.</p>
+        <p class="ja">変数、<code>bash -c</code>、<code>eval</code>、<code>find -delete</code>、<code>xargs</code> も実行せずに追いかけます。<code>$D</code> の裏に隠れた削除も見逃しません。</p>
+      </article>
+      <article class="feature">
+        <h2><span class="en">Judges by what the path is</span><span class="ja">パスの中身で判断する</span></h2>
+        <p class="en">Temporary files and clean Git checkouts are allowed. Uncommitted work asks first. System directories, <code>.git</code> and your home are blocked.</p>
+        <p class="ja">一時ファイルや変更のない Git 管理下は許可、未コミットの作業は確認、システム領域・<code>.git</code>・ホームは拒否します。</p>
+      </article>
+      <article class="feature">
+        <h2><span class="en">Drops into your AI agent</span><span class="ja">AI エージェントにそのまま組み込める</span></h2>
+        <p class="en">One binary answers Claude Code and Codex pre-execution hooks, so risky commands an agent proposes are stopped or sent back to you for review.</p>
+        <p class="ja">1つの実行ファイルで Claude Code と Codex の実行前フックに応答します。エージェントが出した危険なコマンドを止めたり、確認に回したりできます。</p>
+      </article>
     </div>
   </section>
 
@@ -86,7 +113,7 @@
 
   <section id="demo" class="band">
     <div class="wrap">
-      <h2 class="section-title"><span class="en">See it decide</span><span class="ja">判定の例</span></h2>
+      <h2 class="section-title"><span class="en">Pick a command, see the verdict</span><span class="ja">コマンドを選んで、判定を見る</span></h2>
       <p class="section-lead">
         <span class="en">Every result below is real output from v{{version}}, generated by running the binary built from commit <a href="{{repo_url}}/commit/{{commit}}"><code>{{commit_short}}</code></a> inside a sample Git project. Nothing is executed: the checker only reads the command.</span>
         <span class="ja">下の結果はすべて、コミット <a href="{{repo_url}}/commit/{{commit}}"><code>{{commit_short}}</code></a> からビルドした v{{version}} を、サンプルの Git プロジェクト内で実際に動かした出力です。コマンドは実行されず、読み取って判定するだけです。</span>
@@ -155,6 +182,29 @@
           <span class="ja"><code>command-guardian hook --agent claude</code>（または <code>--agent codex</code>）を実行前フックに登録します。標準入力の JSON 要求を1つ読み、<code>hookSpecificOutput</code> で判定を返します。下は v{{version}} の実際の応答です。</span>
         </p>
         {{hook_demo}}
+        <h3><span class="en">Example: Claude Code</span><span class="ja">設定例: Claude Code</span></h3>
+        <p>
+          <span class="en">Add a <code>PreToolUse</code> hook for the Bash tool to <code>~/.claude/settings.json</code>:</span>
+          <span class="ja"><code>~/.claude/settings.json</code> に Bash ツール向けの <code>PreToolUse</code> フックを追加します。</span>
+        </p>
+        <div class="code-copy">
+<pre class="term" id="claude-settings">{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "command-guardian hook --agent claude" }
+        ]
+      }
+    ]
+  }
+}</pre>
+          <button type="button" class="copy copy-float" data-copy="#claude-settings" aria-label="Copy settings">
+            <span class="copy-label en">Copy</span><span class="copy-label ja">コピー</span>
+            <span class="copied-label en">Copied</span><span class="copied-label ja">コピーしました</span>
+          </button>
+        </div>
       </div>
       <div>
         <h3><span class="en">Decisions per agent</span><span class="ja">エージェントごとの応答</span></h3>
@@ -186,8 +236,11 @@ reason = "Review the destination and commits before pushing."
 verdict = "ask"
 deny = [["push"]]</pre>
         <div>
-          <div class="en">{{settings_en}}</div>
-          <div class="ja">{{settings_ja}}</div>
+          <details class="settings">
+            <summary><span class="en">All settings</span><span class="ja">設定項目の一覧</span></summary>
+            <div class="en">{{settings_en}}</div>
+            <div class="ja">{{settings_ja}}</div>
+          </details>
         </div>
       </div>
     </div>
@@ -238,6 +291,31 @@ deny = [["push"]]</pre>
         });
       });
     });
+
+    var explorer = document.querySelector(".demo-explorer");
+    if (explorer) {
+      var tabs = Array.prototype.slice.call(explorer.querySelectorAll('[role="tab"]'));
+      var select = function (tab, focus) {
+        tabs.forEach(function (other) {
+          var on = other === tab;
+          other.setAttribute("aria-selected", on ? "true" : "false");
+          other.tabIndex = on ? 0 : -1;
+          document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
+        });
+        if (focus) tab.focus();
+      };
+      tabs.forEach(function (tab, i) {
+        tab.addEventListener("click", function () { select(tab, false); });
+        tab.addEventListener("keydown", function (event) {
+          var step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+          if (!step) return;
+          event.preventDefault();
+          select(tabs[(i + step + tabs.length) % tabs.length], true);
+        });
+      });
+      explorer.classList.add("is-tabs");
+      select(tabs[0], false);
+    }
   })();
 </script>
 </body>
