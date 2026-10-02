@@ -1,26 +1,49 @@
 version: 1
 entries:
-  - id: ci-implementation
-    base: e13017e1f70fef529f1782067ba479b3d010e889
+  - id: dev-null-implementation
+    base: 47b9f7f5b281e1829b6a3b3aa7b8db1834e7f20a
     role: implementer
     files:
-      - path: .github/workflows/ci.yml
-        before: null
-        after: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
-      - path: lefthook.yml
-        before: sha256:e987a1b35c9b5018b56a8ecb018017b0f9d8785fe4fd0c724d7b64e7235ad941
-        after: sha256:857ca40a00657e4c99276db1c42c6e1c8adf7f0085387b369cbdec05d5b17650
-      - path: PROJECT.md
-        before: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
-        after: sha256:52d5ead44cf207cd5c42ba77289b0e66d930a5e68a91b89164a3ff87b1f009ad
+      - path: crates/guardian-analysis/src/effects.rs
+        before: sha256:bfd1627887cc7e9fe332ee24da28d2d0ded259676aa17be242622779de37c8ce
+        after: sha256:7433388c17177b7f0c2a03069abac4889eed14a5ec61376cf9e2487d5bd3b485
+      - path: crates/guardian-analysis/tests/extract.rs
+        before: sha256:0ab76d32a1403cdc9f49a783f16f55d830574785dfe7980370f69d13de94b882
+        after: sha256:44862d44a22cdd79c93b2d5957f8a1793a04f6db8698152e99101375b9c02867
+      - path: tests/hook.rs
+        before: sha256:2ebf34bef32d4e0c85feab4cc32af059fdae805be43e9857c14bebd398b2e869
+        after: sha256:388aa938ec6fd1db393f452e5db085044280b21383d579c9f069919097aad6dc
+    ir:
+      - path: docs/ir/judgment.md
+        sha256: sha256:2b640bfd37d10a35bfdea8a8666966ae1fa82a3717c10bb6e63d3899add0efe6
+      - path: docs/ir/agents.md
+        sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
+    conclusion: new
+    reason: 利用者が承認した出力破棄の例外をREQ-001へ反映した。既存のリテラル判定を使い、引用除去後に/dev/nullと完全一致する宛先だけを除外する。置換の走査と他の効果抽出は維持し、REQ-022のhookでも許可と危険操作の拒否を検証した。
+    requirements: [REQ-001, REQ-022]
+    decisions:
+      - docs/decision/records/2026-10-02-dev-null-redirect.md#A1
+      - docs/decision/records/2026-10-02-dev-null-redirect.md#A2
+    handoff: null
+    gaps:
+      - category: spec_conflict
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-dev-null-redirect.md#A1
+          - docs/decision/records/2026-10-02-dev-null-redirect.md#A2
+  - id: release-011-implementation
+    base: 47b9f7f5b281e1829b6a3b3aa7b8db1834e7f20a
+    role: implementer
+    files:
+      - path: Cargo.toml
+        before: sha256:bfd40601d751294c3d89d39e8dfb917ae177941255d24d95211cf5f38591d5d8
+        after: sha256:fa8f78e1cb39f23f5e8bf298d5222250bb92737a5b94459b0ea19737753074b7
     ir:
       - path: docs/ir/release.md
         sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
     conclusion: existing
-    reason: REQ-025のCIビルド・テストとGitHub配布を運用設定で実現し、変更照合の既存方針をCIとpre-pushに適用する。Gitの通信FDを試験前に閉じ、低FD上限の試験にも通常の実行環境を渡す。製品の動作とIRは変更しない。自動公開の開始条件とpush前検査は利用者の承認に従う。
+    reason: 利用者が承認した0.1.1配布のため正本の版を更新し、Cargo.lockと日付入りCHANGELOGおよび比較リンクを揃える。REQ-025の単一Linux実行ファイル配布と既存の検証後自動公開の仕組みは変更しない。
     requirements: [REQ-025]
-    decisions:
-      - docs/decision/records/2026-10-02-change-conformance.md#A1
-      - docs/decision/records/2026-10-02-change-conformance.md#A2
+    decisions: []
     handoff: null
     gaps: []

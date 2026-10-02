@@ -1,36 +1,62 @@
 version: 1
 entries:
-  - id: ci-independent-review
-    base: e13017e1f70fef529f1782067ba479b3d010e889
+  - id: dev-null-independent-review
+    base: 47b9f7f5b281e1829b6a3b3aa7b8db1834e7f20a
     role: reviewer
     files:
-      - path: .github/workflows/ci.yml
-        before: null
-        after: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
-      - path: lefthook.yml
-        before: sha256:e987a1b35c9b5018b56a8ecb018017b0f9d8785fe4fd0c724d7b64e7235ad941
-        after: sha256:857ca40a00657e4c99276db1c42c6e1c8adf7f0085387b369cbdec05d5b17650
-      - path: PROJECT.md
-        before: sha256:c7de4b2f75e3d877fc69b5f0c54cfe2e46b620b4855c80b4c8a2e83778c8d393
-        after: sha256:52d5ead44cf207cd5c42ba77289b0e66d930a5e68a91b89164a3ff87b1f009ad
+      - path: crates/guardian-analysis/src/effects.rs
+        before: sha256:bfd1627887cc7e9fe332ee24da28d2d0ded259676aa17be242622779de37c8ce
+        after: sha256:7433388c17177b7f0c2a03069abac4889eed14a5ec61376cf9e2487d5bd3b485
+      - path: crates/guardian-analysis/tests/extract.rs
+        before: sha256:0ab76d32a1403cdc9f49a783f16f55d830574785dfe7980370f69d13de94b882
+        after: sha256:44862d44a22cdd79c93b2d5957f8a1793a04f6db8698152e99101375b9c02867
+      - path: tests/hook.rs
+        before: sha256:2ebf34bef32d4e0c85feab4cc32af059fdae805be43e9857c14bebd398b2e869
+        after: sha256:388aa938ec6fd1db393f452e5db085044280b21383d579c9f069919097aad6dc
+    ir:
+      - path: docs/ir/judgment.md
+        sha256: sha256:2b640bfd37d10a35bfdea8a8666966ae1fa82a3717c10bb6e63d3899add0efe6
+      - path: docs/ir/agents.md
+        sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
+    conclusion: new
+    reason: >-
+      Independently reviewed base 47b9f7f5b281e1829b6a3b3aa7b8db1834e7f20a against candidate 6d73984fa34ebc53972107d3b5390057175319de and computed mode-plus-blob and IR hashes directly from those Git snapshots.
+      The caller explicitly reports user approval for the narrow REQ-001 exception, and decision A1 and A2 and the added requirement paragraph describe that same scope without widening it.
+      Word.literal accepts only literal and quoted parts without glob expansion; Word.text is their quote-removed spelling. The guard therefore excludes exactly /dev/null, not resolved variables, substitutions, other devices, normalized path aliases or differently named symlinks.
+      Redirect substitution scanning precedes the guard, while command-body scanning and truncate and dd extraction are unchanged. The change affects only effect-mode redirect extraction and leaves invocation collection intact.
+      Three added analysis tests assert the absent truncate effect, retained dangerous bodies and substitutions, ordinary target truncation and exclusion boundaries. Two added real-binary hook tests assert REQ-022 allow output and retained deny output without mocks. No existing test expectations were weakened.
+      Observed cargo test -p guardian-analysis --locked passing all 99 tests, cargo test -p command-guardian --locked --test hook passing all 14 tests, and cargo test --workspace --locked passing with no failures.
+      No blocking implementation or specification finding was found for the pinned comparison. Full GNU and musl release gates and publication remain the caller and existing CI's responsibility.
+    requirements: [REQ-001, REQ-022]
+    decisions:
+      - docs/decision/records/2026-10-02-dev-null-redirect.md#A1
+      - docs/decision/records/2026-10-02-dev-null-redirect.md#A2
+    handoff: null
+    gaps:
+      - category: spec_conflict
+        disposition: recorded
+        refs:
+          - docs/decision/records/2026-10-02-dev-null-redirect.md#A1
+          - docs/decision/records/2026-10-02-dev-null-redirect.md#A2
+  - id: release-011-independent-review
+    base: 47b9f7f5b281e1829b6a3b3aa7b8db1834e7f20a
+    role: reviewer
+    files:
+      - path: Cargo.toml
+        before: sha256:bfd40601d751294c3d89d39e8dfb917ae177941255d24d95211cf5f38591d5d8
+        after: sha256:fa8f78e1cb39f23f5e8bf298d5222250bb92737a5b94459b0ea19737753074b7
     ir:
       - path: docs/ir/release.md
         sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
     conclusion: existing
     reason: >-
-      呼出元が確定した比較元と現在の候補について、全対象のGit mode・blobと関連IRのidentityを独立に再計算した。
-      REQ-025のCIビルド・試験とLinux x86_64配布を実現する運用設定であり、製品コード・試験・IRの意味は変更しない。
-      PR実headとmerge-base、push before/after、両Rustターゲット、独立記録の照合、pre-pushのstdinと比較元を確認した。
-      CI公開・自動リリース・pre-pushへの適用は利用者が明示承認した範囲であり、新しい製品要求としてIRに追加しない。
-      リリースは検査したSHAにタグをcreate-onlyで作成し、競合する既存タグでは停止して再利用しない。
-      今回の通信FD3・4・5のcloseはhookの子shellだけに作用し、Git親プロセスや標準入出力を変更しない。
-      低FD上限で動的リンクが失敗する呼出元の診断に対応し、試験を弱めず通常の子プロセス環境へ戻す運用修正である。
-      利用者が初回0.1.0公開を承認した。英語CHANGELOGの日付入り見出しとCargoの正本版、実rootからの比較リンク、抽出される非空の公開文を照合した。
-      actionlint、lefthook validate、shell構文を本担当が確認した。GNU・musl全検査と実push hookでの該当CLI試験成功は呼出元の報告であり、修正後の全検査は最終候補で再確認する。
-      公開とmise導入は本担当では未実行である。最終commitのreview段階changesは呼出元に残る。
+      Independently computed the manifest and related IR hashes from the pinned Git snapshots. PROJECT.md identifies Cargo.toml package.version as canonical.
+      A Python assertion over candidate Git blobs confirmed manifest and generated Cargo.lock both declare command-guardian 0.1.1, the changelog has the dated 2026-10-02 heading and the comparison link runs from v0.1.0 to v0.1.1. The lock diff changes only this package version.
+      The release note describes the exact literal redirect exception and preservation of destructive checks. TODO.md closes only the approved issue and links its decision record.
+      The existing CI is unchanged and its release job depends on both target-matrix product checks and change conformance, derives the version from Cargo.toml, requires the matching changelog and link, and creates the tag on the checked push SHA before publishing the Linux x86_64 musl binary and LICENSE archive.
+      This preserves REQ-025 and introduces no distribution contract change. The caller reports user authorization to publish 0.1.1. This reviewer did not commit, push, create a tag, or independently verify an already published 0.1.1 artifact.
+      The caller must commit both current records, pin the final HEAD and rerun check and review-phase changes before integration; published release and install verification are not claimed here.
     requirements: [REQ-025]
-    decisions:
-      - docs/decision/records/2026-10-02-change-conformance.md#A1
-      - docs/decision/records/2026-10-02-change-conformance.md#A2
+    decisions: []
     handoff: null
     gaps: []
