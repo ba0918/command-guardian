@@ -40,10 +40,15 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
     const session=await client.session.create({title:"model-free guardian fixture"});
     return {root,project,sentinel,client,session,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
       server.kill("SIGTERM");await new Promise<void>(resolve=>server.once("exit",()=>resolve()));
-      const diagnostics=await readFile(join(home,"data/opencode/log/opencode.log"),"utf8").catch(()=>"");
-      const safe=(diagnostics.split("\n").filter(line=>line.includes("plugin")||line.includes("level=WARN")||line.includes("level=ERROR")).join("\n")+"\n"+logs).replaceAll(root,"<fixture>").replaceAll(resolve(import.meta.dir,"../../../.."),"<worktree>");
-      await writeFile(resolve(import.meta.dir,"../../../../.agents/artifacts/native-fixture-diagnostics.log"),safe);
-      await rm(root,{recursive:true,force:true});
+      try {
+        const diagnostics=await readFile(join(home,"data/opencode/log/opencode.log"),"utf8").catch(()=>"");
+        const safe=(diagnostics.split("\n").filter(line=>line.includes("plugin")||line.includes("level=WARN")||line.includes("level=ERROR")).join("\n")+"\n"+logs).replaceAll(root,"<fixture>").replaceAll(resolve(import.meta.dir,"../../../.."),"<worktree>");
+        const artifacts=resolve(import.meta.dir,"../../../../.agents/artifacts");
+        await mkdir(artifacts,{recursive:true});
+        await writeFile(join(artifacts,"native-fixture-diagnostics.log"),safe);
+      } finally {
+        await rm(root,{recursive:true,force:true});
+      }
     }};
   }catch(error){server.kill("SIGTERM");throw error;}
 }
