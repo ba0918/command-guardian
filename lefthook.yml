@@ -20,3 +20,39 @@ pre-commit:
       priority: 4
       glob: "*.{rs,md,yaml}"
       run: scripts/kotowari-check.sh
+
+pre-push:
+  commands:
+    full-check:
+      use_stdin: true
+      run: |
+        set -eu
+        head=$(git rev-parse HEAD)
+        test -z "$(git status --porcelain)" || { echo "未コミット変更があります" >&2; exit 1; }
+        ranges=$(mktemp)
+        trap 'rm -f "$ranges"' EXIT
+        while read -r local_ref local_sha remote_ref remote_sha; do
+          case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+          test "$local_sha" = "$head" || { echo "HEAD以外は検査できません" >&2; exit 1; }
+          case "$remote_ref" in
+            refs/heads/main) base=$remote_sha ;;
+            refs/heads/*) base=$(git merge-base origin/main "$head") ;;
+            *) echo "タグはリリースCIで発行してください" >&2; exit 1 ;;
+          esac
+          git cat-file -e "$base^{commit}"
+          printf '%s\n' "$base" >> "$ranges"
+        done
+        test -s "$ranges" || exit 0
+        unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
+        cargo fmt --all --check
+        for target in x86_64-unknown-linux-gnu x86_64-unknown-linux-musl; do
+          cargo clippy --workspace --all-targets --locked --target "$target" -- -D warnings
+          cargo test --workspace --all-targets --locked --target "$target"
+          cargo build --release --locked --target "$target"
+        done
+        kotowari check --format json
+        while read -r base; do
+          kotowari changes --base "$base" --head "$head" --phase review --format json
+        done < "$ranges"
+        test "$(git rev-parse HEAD)" = "$head"
+        test -z "$(git status --porcelain)"

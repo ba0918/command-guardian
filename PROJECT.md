@@ -69,7 +69,20 @@ kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
 中間コミットとpre-commitフックには "changes" を要求しない。
 任意の実装者自己検査には "kotowari changes --base HEAD --staged --phase implementation" を使えるが、独立レビューの代わりにはならない。
 "status" のcompleteだけでは変更照合の完了とは扱わない。
-CIは現時点で追加しない。公開する際は、PRのmerge-baseと実head、またはpushイベントのbefore/afterを使い、新規ブランチのゼロbeforeから比較元を推測しない。
+CIはmainへのpushと全PRで実行する。PRはイベントbaseと実headのmerge-baseを使い、合成mergeコミットを検査しない。pushはイベントbefore/afterを使い、ゼロbeforeと履歴不足は失敗させる。
+
+### CIとpush前の検査
+
+CIとlefthookのpre-pushでfmt、gnu/muslのclippy・全テスト・release build、kotowari check/changes reviewを実行する。
+ローカルの前提はrustfmt、clippy、両Rustターゲット、musl-tools、kotowari 0.3.0以降。クローンごとに "lefthook install" でフックを有効にする。
+push前に "git fetch origin main" を行う。作業ブランチはorigin/mainとのmerge-base、mainは送出先の旧SHAで照合する。比較元不明、未コミット変更、HEAD以外の送出は停止する。
+CIとフックは開発運用の設定であり、製品IRへ要求を追加しない。
+
+### リリース
+
+版の正本は "Cargo.toml" の "[package].version"。
+CHANGELOGを "## [VERSION] - YYYY-MM-DD" に昇格し、対応する比較リンクを添えてmainへ統合すると、全検査成功後に未公開のvVERSIONを自動公開する。Unreleasedの間は公開しない。
+GitHub ReleasesにはLinux x86_64 muslバイナリとLICENSEのtar.gz、SHA256を置く。タグは検査したcommitへ付け、公開済みタグは移動・再利用しない。
 
 ### 製品の実装と試験
 
