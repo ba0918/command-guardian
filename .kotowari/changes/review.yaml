@@ -1,32 +1,146 @@
 version: 1
 entries:
-  - id: landing-page-independent-review
-    base: 21d443baf7c97a55c3a8799963d2423ccab07a88
+  - id: opencode-v2-whole-branch-conformance-review
+    base: 5b6e2b8de22368430a4726d06dbdc4ded4dd9d5b
     role: reviewer
     files:
-      - path: .github/workflows/pages.yml
-        before: null
-        after: sha256:ef7a967083537c31f87c6c34f29a96ca45baff8aac7b33ce3d99ffd06d4e1b6d
+      - path: .github/workflows/ci.yml
+        before: sha256:e2818285dc54ab0041612c1cea3c1cf2409f47b1c87ada84ef1c4b7e8bb50677
+        after: sha256:bb910de370653a9ff6a943228e9c2329f0be2b8ac31d6738fab2f5633ad2262b
       - path: .gitignore
-        before: sha256:381a55bf4ca10e0ac9750af0adbfebfe6fc12548faa0f80d00cc66c421f2e4fc
-        after: sha256:bca5511b4255d71ed9671ddf15081e8a7245138cbc7a5699fdde5920ab74db75
+        before: sha256:bca5511b4255d71ed9671ddf15081e8a7245138cbc7a5699fdde5920ab74db75
+        after: sha256:b7a6db778b7c820a497461acaa220aca46b64511975f60fbf78a583e8b5c90d0
+      - path: CHANGELOG.md
+        before: sha256:5d905e86eaddd1896f7d22d28fb269cb9eb322df405dcbb5cf92477968fe754d
+        after: sha256:2903c7f2f25cc39056e3e519909fa0049e3084f3166e62f046b6826367c42e9d
       - path: PROJECT.md
-        before: sha256:52d5ead44cf207cd5c42ba77289b0e66d930a5e68a91b89164a3ff87b1f009ad
-        after: sha256:079579d2c9c571990fdd8a81f37dd2e7a8faddb50dd8c75688c4220d119a23da
-    ir: []
-    conclusion: new
+        before: sha256:079579d2c9c571990fdd8a81f37dd2e7a8faddb50dd8c75688c4220d119a23da
+        after: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
+      - path: README.md
+        before: sha256:15af5b954c2e5b13a1a357e191a3b329f573a413ed755a8b010ef664e9d71143
+        after: sha256:dac310b58452ecb5b52127c12bb12ab597f23a479c1d585a6e62fdbbc2da7eaf
+      - path: docs/opencode.md
+        before: null
+        after: sha256:d8e07778ac225157317050807fe42d602f94c0874bcac9db2af0dd4cf78e647f
+      - path: plugins/opencode/bun.lock
+        before: null
+        after: sha256:ee3cae53b9efbfbdbc541b0caa52961d72c1a4834a6b76527c6774ca3adfbd29
+      - path: plugins/opencode/index.ts
+        before: null
+        after: sha256:a294f0a5082ed50056292002e1edd323bf099aa20cbd1f038d30d1124a1fd157
+      - path: plugins/opencode/licenses/opencode-LICENSE.txt
+        before: null
+        after: sha256:1b9a45847866f283b86cbca738e2500dd8fce1c72986f532337b0608e13ed7a3
+      - path: plugins/opencode/package.json
+        before: null
+        after: sha256:92d7d2c888b9f715075bdf063435649c6325e185f0bbd4a666e549b83fcfa554
+      - path: plugins/opencode/src/approval.ts
+        before: null
+        after: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
+      - path: plugins/opencode/src/gate.ts
+        before: null
+        after: sha256:7cff3be711d45cf2353e18ad469120aeb7c65f1e5171e7b47da23813ac02528b
+      - path: plugins/opencode/src/guardian.ts
+        before: null
+        after: sha256:5c5b0edf23534b7ec6395ce68e8043ef3609daf7f6927d4d5cca8f77b87c089e
+      - path: plugins/opencode/src/index.ts
+        before: null
+        after: sha256:f8b88db628f26824ebad05f1cd24d793fdcc63e4d9343a5d2651700465e83e65
+      - path: plugins/opencode/tests/integration/bridge/index.ts
+        before: null
+        after: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
+      - path: plugins/opencode/tests/integration/bridge/package.json
+        before: null
+        after: sha256:e402e47c3a5392b07a39af1e3f6c3bccebbfbf19f6ea3bd382dc9b8e560496f7
+      - path: plugins/opencode/tests/integration/host.test.ts
+        before: null
+        after: sha256:3a390fa7505fffcc50d2eaf5462c6ed0a594013a7042cb8b3ac5229a35a15b3d
+      - path: plugins/opencode/tests/unit/approval.test.ts
+        before: null
+        after: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
+      - path: plugins/opencode/tests/unit/gate.test.ts
+        before: null
+        after: sha256:e6e55f2114636b2838911416239685bb1cec0ada7df2c6fd993a7b8a1dcdb2e3
+      - path: plugins/opencode/tests/unit/guardian.test.ts
+        before: null
+        after: sha256:3bb2faaa7e575fa34d65c6b2aef694a7a487915f57103b94d2646d87bf5e7207
+      - path: plugins/opencode/tsconfig.json
+        before: null
+        after: sha256:8abe5992767495943ff67610b3e901030002be10fe2556187961d751a16796f6
+      - path: scripts/package-release.sh
+        before: null
+        after: sha256:1a8315271d9f736c3d0e272c6a000db0cfa12ad57f94714f714f0528dc3b4da1
+      - path: src/hook.rs
+        before: sha256:6a088d01dc25b526d08568166d266d310ef616326f1f2a16c09df896a158c79c
+        after: sha256:a435de13e72f6d1883995653be081752dcbe0ed7419149540a2dfb143c8ff112
+      - path: src/hook/opencode.rs
+        before: null
+        after: sha256:92da82470ac157954395af611512b51c5010b8f82f2132b75bc6a134ca31c0e3
+      - path: tests/opencode_hook.rs
+        before: null
+        after: sha256:ab0ce2e5e09a7be02ded2b45dd0a340927073b04113480fc5c73283b68c32c9b
+    ir:
+      - path: docs/ir/cli.md
+        sha256: sha256:a9c0c22d80aa795dba8acf34bb413a05c5e6b5c6d8e03c3ba2250e96f9f3ecee
+      - path: docs/ir/opencode.md
+        sha256: sha256:68690909633bb2d99a7e7eb3ccf30e2d86007ecc495f6368035b0874a01465c8
+      - path: docs/ir/opencode-delivery.md
+        sha256: sha256:2282c00e8ac1b8e501ddef21c4496d2bfba9fde52cd96368043ac63981d8b48b
+    conclusion: existing
     reason: >-
-      Independently reviewed base 21d443baf7c97a55c3a8799963d2423ccab07a88 against candidate 48185b5fa9d6840a0640f015cb17ca43b822d8b4 and computed mode-plus-blob hashes directly from those Git snapshots.
-      Of the eight changed paths only the workflow, .gitignore and PROJECT.md match the configured change globs; site/ and the decision record are outside them. No src, crates, tests, Cargo.toml, Cargo.lock or docs/ir path changes, so product behavior, IR and external contracts are untouched.
-      The Pages workflow grants only contents read at top level, checks out without persisted credentials, and grants pages write and id-token write only to the deploy job. Upload and deploy are both gated on a non pull_request event, so PRs touching site/ or the workflow build without publishing; push to main and manual dispatch deploy.
-      After cargo build --release --locked, python3 site/build.py --out to a scratch directory outside the repository exited 0 with no demo warnings, all eight demos returned their expected allow, ask or block verdicts from the real binary, the hook demo printed JSON, no placeholder was left unresolved, and the output referenced no external script, stylesheet or font.
-      The decision record A1 to A3 and the new PROJECT.md section match this behavior: Cargo.toml version, CHANGELOG entries and README headings and tables are read at build time, missing headings fail the build, verdict mismatches only warn, and _site/ is the ignored default output.
-      Non-blocking observations: the PR path filter omits README.md, README-ja.md, CHANGELOG.md and Cargo.toml, so a README heading rename that breaks the page build is first detected on main; the fixture is written under target/site-demo inside the repository; workflow_dispatch from a non-main ref would deploy unless the github-pages environment restricts branches; Pages must be enabled with the GitHub Actions source in repository settings, which is outside the code.
-      No blocking finding was found. Integration checks on the final HEAD remain the caller's responsibility.
-    requirements: []
+      Independent whole-branch comparison finds the added OpenCode path implements
+      the approved shell-tool contract without changing check or the Claude/Codex
+      response branches. The Rust entry reuses the existing engine and shadow log;
+      its explicit unavailable/shadow distinction supports the approved failure and
+      confirmed-shadow priorities. The adapter retains the original executor,
+      snapshots its input, resolves cwd lexically, and compares host shell input in
+      the same asynchronous execution context. The former host-valid empty-command
+      rejection is removed from both shared conversion callers; Rust unavailable
+      now reaches native approval rather than an adapter input error. Remaining
+      conversion guards have no established producer under the pinned native input
+      schema, absolute location contract, and supported explicit Bash conditions.
+      Approval evaluation preserves native deny while preventing saved allow from
+      skipping a fresh request. Request/session identity and terminal cancellation
+      checks prevent a reply from authorizing another or cancelled execution; stream
+      loss and unload end pending waits without a new approval deadline or history.
+      Host-derived executor fixtures cover real registration, native permissions,
+      preserved inputs, once/reject responses, concurrency and RPC cancellation,
+      rather than using test marks as proof of those behaviors. Model-driven active
+      session interruption and auto execution remain unobserved; pinned upstream
+      source and the documented limits do not claim those trials occurred. The
+      release script bundles current TypeScript and declared runtime dependencies,
+      derives the manifest version from Cargo.toml and carries license notices;
+      CI also exercises the extracted bundle. Installation remains manual and
+      same-server authentication explicit. These representations, dependency pins
+      and modules stay within D1; they add no unsupported consequential meaning or
+      approved-requirement change. No specification gap remains in this comparison.
+    requirements:
+      - REQ-016
+      - REQ-018
+      - REQ-045
+      - REQ-047
+      - REQ-048
+      - REQ-049
+      - REQ-050
+      - REQ-051
+      - REQ-052
+      - REQ-053
+      - REQ-054
+      - REQ-055
+      - REQ-056
+      - REQ-057
+      - REQ-058
     decisions:
-      - docs/decision/records/2026-10-02-landing-page.md#A1
-      - docs/decision/records/2026-10-02-landing-page.md#A2
-      - docs/decision/records/2026-10-02-landing-page.md#A3
+      - docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
+      - docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
+      - docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+      - docs/decision/records/2026-10-02-opencode-v2-hook.md#A24
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A1
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A2
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A3
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A4
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A5
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A6
+      - docs/decision/records/2026-10-02-opencode-v2-protocol.md#A7
     handoff: null
     gaps: []
