@@ -218,19 +218,16 @@ def changelog(text: str, limit: int = 5) -> str:
     ):
         version, date, body = match.groups()
         items = [line[2:].strip() for line in body.splitlines() if line.startswith("- ")]
-        if not items:
+        # The public page lists published releases only; Unreleased has no date.
+        if not items or not date:
             continue
         entries.append((version, date, items))
     if not entries:
         fail("no release found in CHANGELOG.md")
     out = []
     for version, date, items in entries[:limit]:
-        label = f"v{version}" if date else version
-        if date:
-            tag = f'<a href="{REPO_URL}/releases/tag/v{version}">{html.escape(label)}</a>'
-        else:
-            tag = html.escape(label)
-        when = f'<time datetime="{date}">{date}</time>' if date else ""
+        tag = f'<a href="{REPO_URL}/releases/tag/v{version}">v{html.escape(version)}</a>'
+        when = f'<time datetime="{date}">{date}</time>'
         lis = "".join(f"<li>{inline(item)}</li>" for item in items)
         out.append(f'<article class="release"><h3>{tag}</h3>{when}<ul>{lis}</ul></article>')
     return "".join(out)
