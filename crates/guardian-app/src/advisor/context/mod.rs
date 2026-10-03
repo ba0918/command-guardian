@@ -1,4 +1,4 @@
-use guardian_advisor::{bounded_context, ContentBlock, ContextMessage, ContextWindow, Role};
+use guardian_advisor::{ContentBlock, ContextMessage, ContextWindow, Role, bounded_context};
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -7,8 +7,8 @@ use std::time::Instant;
 
 mod claude;
 pub use claude::{
-    acquire_claude, claude_context, load_claude_cache, process_claude_event, update_claude_cache,
-    CacheLimits,
+    CacheLimits, acquire_claude, claude_context, load_claude_cache, process_claude_event,
+    update_claude_cache,
 };
 
 pub(super) fn read_transcript(

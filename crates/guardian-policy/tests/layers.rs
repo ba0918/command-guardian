@@ -46,12 +46,14 @@ fn req_015_invalid_general_values_reject_the_whole_file() {
         );
         assert!(result.is_err(), "{invalid}: {result:?}");
     }
-    assert!(parse_layer(
-        "trusted_projects = [false]\n[mode]\nenforce = false",
-        Path::new("/work"),
-        None
-    )
-    .is_err());
+    assert!(
+        parse_layer(
+            "trusted_projects = [false]\n[mode]\nenforce = false",
+            Path::new("/work"),
+            None
+        )
+        .is_err()
+    );
 }
 
 // @kotowari[REQ-015, REQ-034]

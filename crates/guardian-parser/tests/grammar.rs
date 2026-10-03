@@ -3,8 +3,8 @@
 //! 文法要素のコーパスに対して、OSS パーサの構文木に現れる語・リダイレクト・
 //! 置換・複合構文を数え、正規化した構文木の対応する数を数えて比べる。
 
-use brush_parser::{ast as raw, parse_tokens, uncached_tokenize_str, word, ParserOptions};
-use guardian_parser::{parse, Command, Compound, Part, RedirectTarget, Script};
+use brush_parser::{ParserOptions, ast as raw, parse_tokens, uncached_tokenize_str, word};
+use guardian_parser::{Command, Compound, Part, RedirectTarget, Script, parse};
 
 mod common;
 use common::CORPUS;

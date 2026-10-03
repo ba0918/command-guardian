@@ -3,8 +3,8 @@
 //! 構文の入れ子と置換の再帰の段数を数え、128 段を超えた時点で打ち切る。
 //! 字句解析はしない。判定に使う構文木そのものが持つ入れ子だけを見る。
 
-use crate::ast::*;
 use crate::LIMIT_DEPTH;
+use crate::ast::*;
 
 /// 構文の入れ子と置換の再帰が上限を超えるか。超えた時点で打ち切る。
 pub(crate) fn exceeds(script: &Script) -> bool {

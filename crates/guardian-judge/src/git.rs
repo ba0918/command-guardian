@@ -146,17 +146,18 @@ fn collect_status(mut command: Command, deadline: Instant) -> Result<String, Git
         if status.is_none() {
             status = child.0.try_wait().map_err(failed)?;
         }
-        if let Some(status) = status {
-            if out_eof && err_eof {
-                return if status.success() {
-                    Ok(text.report())
-                } else {
-                    Err(GitFailure::Failed(GitError(format!(
-                        "git status が失敗した: {}",
-                        String::from_utf8_lossy(&error_text).trim()
-                    ))))
-                };
-            }
+        if let Some(status) = status
+            && out_eof
+            && err_eof
+        {
+            return if status.success() {
+                Ok(text.report())
+            } else {
+                Err(GitFailure::Failed(GitError(format!(
+                    "git status が失敗した: {}",
+                    String::from_utf8_lossy(&error_text).trim()
+                ))))
+            };
         }
         if !progress {
             std::thread::sleep(

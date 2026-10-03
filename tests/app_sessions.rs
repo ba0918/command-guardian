@@ -90,15 +90,17 @@ fn req_039_failed_start_is_internal_and_children_are_reaped() {
         assert!(runtime.judgment().parse("true").failures.is_empty());
         assert_ne!(children(), before);
         let deep = format!("echo {}true{}", "$(".repeat(2000), ")".repeat(2000));
-        assert!(runtime
-            .judgment()
-            .parse(&deep)
-            .failures
-            .iter()
-            .any(|f| matches!(
-                f,
-                guardian_core::Failure::Limit | guardian_core::Failure::TooDeep
-            )));
+        assert!(
+            runtime
+                .judgment()
+                .parse(&deep)
+                .failures
+                .iter()
+                .any(|f| matches!(
+                    f,
+                    guardian_core::Failure::Limit | guardian_core::Failure::TooDeep
+                ))
+        );
         assert!(runtime.judgment().parse("true").failures.is_empty());
     }
     assert_eq!(children(), before);

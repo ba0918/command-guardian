@@ -1,4 +1,4 @@
-use guardian_app::advisor::wire::{read_reply, write_frame, FrameKind, Reply};
+use guardian_app::advisor::wire::{FrameKind, Reply, read_reply, write_frame};
 use guardian_app::advisor::worker::{Request, Settings, Source};
 use std::io::Write;
 use std::net::Shutdown;
@@ -9,8 +9,8 @@ use std::time::{Duration, Instant};
 
 // @kotowari[REQ-advisor-011, EX-advisor-021, EX-advisor-022]
 #[test]
-fn real_advice_child_delivers_authentication_failure_before_private_log_and_reports_unsafe_save_without_payload(
-) {
+fn real_advice_child_delivers_authentication_failure_before_private_log_and_reports_unsafe_save_without_payload()
+ {
     for debug in [false, true] {
         for unsafe_save in [false, true] {
             let home = tempfile::tempdir().unwrap();
@@ -155,8 +155,8 @@ fn real_binary_rejects_invalid_version_nonce_kind_length_and_request_schema_with
 
 // @kotowari[REQ-advisor-018, REQ-advisor-019, REQ-advisor-012]
 #[test]
-fn real_binary_dispatch_uses_inherited_socket_before_public_arguments_and_missing_auth_has_no_stdout(
-) {
+fn real_binary_dispatch_uses_inherited_socket_before_public_arguments_and_missing_auth_has_no_stdout()
+ {
     let home = tempfile::tempdir().unwrap();
     let (mut parent, child_socket) = UnixStream::pair().unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_command-guardian"))

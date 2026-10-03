@@ -1,8 +1,8 @@
+use guardian_app::Report;
 use guardian_app::advisor::{
     service::{self, Completion},
     worker::{Logging, Request, Settings, Source},
 };
-use guardian_app::Report;
 use guardian_core::Verdict;
 use guardian_policy::config::AdvisorConfig;
 use std::path::Path;
@@ -174,8 +174,8 @@ s.shutdown(socket.SHUT_WR)
 
     // @kotowari[REQ-advisor-017, REQ-advisor-018, REQ-advisor-021, EX-advisor-034, EX-advisor-042]
     #[test]
-    fn blocked_acquisition_in_child_is_killed_at_whole_deadline_and_native_cli_keeps_allow_without_model_query(
-    ) {
+    fn blocked_acquisition_in_child_is_killed_at_whole_deadline_and_native_cli_keeps_allow_without_model_query()
+     {
         use std::time::Duration;
         let fixture = tempfile::tempdir().unwrap();
         let fifo = fixture.path().join("acquisition-fifo");
@@ -437,10 +437,12 @@ open(sys.argv[3],'w').write('model query reached')
                 assert!(report.message.is_empty());
             } else {
                 assert!(json["reason"].as_str().unwrap().contains(risk));
-                assert!(json["reason"]
-                    .as_str()
-                    .unwrap()
-                    .contains("fixture-machine-reason"));
+                assert!(
+                    json["reason"]
+                        .as_str()
+                        .unwrap()
+                        .contains("fixture-machine-reason")
+                );
                 assert!((2..=4).contains(&report.message.lines().count()));
                 assert!(report.message.lines().all(|line| !line.is_empty()));
                 assert!(report.message.contains(risk));
@@ -449,9 +451,11 @@ open(sys.argv[3],'w').write('model query reached')
                     report.verdict, report.message
                 );
             }
-            assert!(!String::from_utf8(output)
-                .unwrap()
-                .contains("fixture-private"));
+            assert!(
+                !String::from_utf8(output)
+                    .unwrap()
+                    .contains("fixture-private")
+            );
         }
         for machine in [Verdict::Allow, Verdict::Ask] {
             let report = fixture_report_from(
@@ -495,10 +499,12 @@ open(sys.argv[3],'w').write('model query reached')
         assert!(human.contains("/fixture/work/notes.txt"));
         assert!(human.to_ascii_lowercase().contains("delete"));
         assert!((2..=4).contains(&human.lines().count()));
-        assert!(json["reason"]
-            .as_str()
-            .unwrap()
-            .contains("major_destructive"));
+        assert!(
+            json["reason"]
+                .as_str()
+                .unwrap()
+                .contains("major_destructive")
+        );
         assert_eq!(json["effects"][0]["path"], "/fixture/work/notes.txt");
         eprintln!("known-effect native JSON: {json}");
     }

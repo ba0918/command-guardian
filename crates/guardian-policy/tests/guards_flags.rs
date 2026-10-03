@@ -149,7 +149,9 @@ deny-env = ["GIT_CONFIG_COUNT"]
 
     // フック自身の環境は見ない。
     let key = "COMMAND_GUARDIAN_PROBE_ENV";
-    std::env::set_var(key, "1");
+    // SAFETY: この試験バイナリの他の試験も guardian-policy も環境変数を読まないため、
+    // 並列実行中の書換えと読取りが競合しない。
+    unsafe { std::env::set_var(key, "1") };
     let rs = rules(&format!(
         r#"
 [[commands.guard]]
@@ -159,5 +161,6 @@ deny-env = ["{key}"]
 "#
     ));
     assert!(!matches(&rs, "git status"));
-    std::env::remove_var(key);
+    // SAFETY: set_var と同じ理由で競合しない。
+    unsafe { std::env::remove_var(key) };
 }

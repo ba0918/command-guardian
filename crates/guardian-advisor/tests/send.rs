@@ -1,4 +1,4 @@
-use guardian_advisor::{redact_secrets, SendPermit, Skip};
+use guardian_advisor::{SendPermit, Skip, redact_secrets};
 
 // @kotowari[REQ-advisor-009, EX-advisor-017, EX-advisor-018]
 #[test]

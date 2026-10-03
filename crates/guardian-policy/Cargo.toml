@@ -1,7 +1,7 @@
 [package]
 name = "guardian-policy"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "設定・ルール・見張り・判定の合成・文面"
 
 [dependencies]

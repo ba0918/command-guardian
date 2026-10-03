@@ -1,4 +1,4 @@
-use guardian_advisor::{bounded_context, ContentBlock, ContextMessage, Role, ScopeEvidence};
+use guardian_advisor::{ContentBlock, ContextMessage, Role, ScopeEvidence, bounded_context};
 
 fn message(order: u64, role: Role, text: &str) -> ContextMessage {
     ContextMessage {
@@ -41,9 +41,11 @@ fn unanswered_user_and_consecutive_roles_count_without_concatenation() {
     assert_eq!(context.messages[2].role, Role::Assistant);
     assert_eq!(context.messages[3].text, "use that proposal");
     assert!(context.window_may_omit_constraints);
-    assert!(bounded_context(&input, "fixture-session", 7, true, 0)
-        .messages
-        .is_empty());
+    assert!(
+        bounded_context(&input, "fixture-session", 7, true, 0)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, REQ-advisor-007, EX-advisor-014]

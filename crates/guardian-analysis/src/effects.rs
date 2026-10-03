@@ -265,10 +265,10 @@ fn extract_pipeline(
         let command_ctx = child.as_mut().unwrap_or(&mut *ctx);
         children_sources =
             extract_command(command, command_ctx, out, asks, depth, children_sources);
-        if index + 1 == pipeline.commands.len() {
-            if let Some(child) = child {
-                ctx.merge_state(&child);
-            }
+        if index + 1 == pipeline.commands.len()
+            && let Some(child) = child
+        {
+            ctx.merge_state(&child);
         }
     }
 }
@@ -794,11 +794,11 @@ fn scan_parts_substitutions(
         if !ctx.check(asks) {
             return;
         }
-        if let Part::Substitution(substitution) = part {
-            if let Some(script) = &substitution.body {
-                let mut child = ctx.clone();
-                extract_script(script, &mut child, out, asks, depth + 1);
-            }
+        if let Part::Substitution(substitution) = part
+            && let Some(script) = &substitution.body
+        {
+            let mut child = ctx.clone();
+            extract_script(script, &mut child, out, asks, depth + 1);
         }
     }
 }
@@ -965,18 +965,17 @@ fn find_effects(args: &[Word], ctx: &mut Context, out: &mut Vec<Effect>) -> Vec<
     for (index, word) in args.iter().enumerate() {
         if word.text == "-delete" {
             has_delete = true;
-        } else if word.text == "-exec" || word.text == "-execdir" {
-            if let Some(next) = args.get(index + 1) {
-                if basename(&next.text) == "rm" {
-                    has_delete = true;
-                    let tail = &args[index + 2..];
-                    let end = tail
-                        .iter()
-                        .position(|word| word.text == ";" || word.text == "+")
-                        .unwrap_or(tail.len());
-                    rm_fixed_effects(&tail[..end], Some("{}"), word.text == "-execdir", ctx, out);
-                }
-            }
+        } else if (word.text == "-exec" || word.text == "-execdir")
+            && let Some(next) = args.get(index + 1)
+            && basename(&next.text) == "rm"
+        {
+            has_delete = true;
+            let tail = &args[index + 2..];
+            let end = tail
+                .iter()
+                .position(|word| word.text == ";" || word.text == "+")
+                .unwrap_or(tail.len());
+            rm_fixed_effects(&tail[..end], Some("{}"), word.text == "-execdir", ctx, out);
         }
     }
     let mut sources = Vec::new();
@@ -1062,16 +1061,14 @@ fn rm_fixed_effects(
         if placeholder.is_some_and(|placeholder| word.text == placeholder) {
             continue;
         }
-        if source_relative {
-            if let Value::Text(text) = resolve_value(word, ctx) {
-                let path = Path::new(&text);
-                if !path.is_absolute() {
-                    out.push(Effect {
-                        op: Op::Delete,
-                        target: Target::Unresolved(word.text.clone()),
-                    });
-                    continue;
-                }
+        if source_relative && let Value::Text(text) = resolve_value(word, ctx) {
+            let path = Path::new(&text);
+            if !path.is_absolute() {
+                out.push(Effect {
+                    op: Op::Delete,
+                    target: Target::Unresolved(word.text.clone()),
+                });
+                continue;
             }
         }
         out.push(Effect {

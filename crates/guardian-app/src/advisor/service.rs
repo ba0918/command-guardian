@@ -2,7 +2,7 @@ use super::{
     wire::{self, FrameKind, Reply},
     worker::{self, Request},
 };
-use guardian_advisor::{combine, eligible, Failure, ScopeEvidence};
+use guardian_advisor::{Failure, ScopeEvidence, combine, eligible};
 use guardian_core::Verdict;
 use guardian_policy::config::AdvisorConfig;
 use std::io::Read;
@@ -41,7 +41,7 @@ impl Completion {
                 Ok(Some(status)) => {
                     warning.log_incomplete = !status.success();
                     if let Some(mut stderr) = child.stderr.take() {
-                        use rustix::fs::{fcntl_getfl, fcntl_setfl, OFlags};
+                        use rustix::fs::{OFlags, fcntl_getfl, fcntl_setfl};
                         if fcntl_getfl(&stderr)
                             .and_then(|flags| fcntl_setfl(&stderr, flags | OFlags::NONBLOCK))
                             .is_ok()
@@ -388,8 +388,8 @@ if mode=='loghang':
 
     // @kotowari[REQ-advisor-011, REQ-advisor-018]
     #[test]
-    fn completed_advice_is_available_before_a_stopped_log_writer_is_reaped_and_never_changes_afterward(
-    ) {
+    fn completed_advice_is_available_before_a_stopped_log_writer_is_reaped_and_never_changes_afterward()
+     {
         let started = Instant::now();
         let (evaluation, completion) = start_with(
             &request(),

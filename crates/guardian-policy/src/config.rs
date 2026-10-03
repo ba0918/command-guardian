@@ -45,10 +45,10 @@ pub struct Config {
 impl Config {
     pub fn builtin(tmpdir: Option<&Path>) -> Config {
         let mut allowed = vec![PathBuf::from("/tmp"), PathBuf::from("/var/tmp")];
-        if let Some(t) = tmpdir.filter(|t| !t.as_os_str().is_empty()) {
-            if !allowed.contains(&t.to_path_buf()) {
-                allowed.push(t.to_path_buf());
-            }
+        if let Some(t) = tmpdir.filter(|t| !t.as_os_str().is_empty())
+            && !allowed.contains(&t.to_path_buf())
+        {
+            allowed.push(t.to_path_buf());
         }
         Config {
             advisor: AdvisorConfig::default(),

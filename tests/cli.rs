@@ -208,10 +208,12 @@ deny = [["push"]]
     assert_eq!(r.code, 1, "{}", r.stdout);
     let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
     assert_eq!(value["rules"][0]["program"], "git");
-    assert!(value["rules"][0]["reason"]
-        .as_str()
-        .unwrap()
-        .contains("push は確認"));
+    assert!(
+        value["rules"][0]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("push は確認")
+    );
 
     let r = run(
         &["check", "git push origin main", "--cwd", "/tmp/scratch"],
@@ -501,10 +503,12 @@ fn req_017_json_has_a_top_level_reason_for_a_parse_ask() {
     assert_eq!(r.code, 1, "stdout: {} stderr: {}", r.stdout, r.stderr);
     let value: serde_json::Value = serde_json::from_str(&r.stdout).unwrap();
     assert_eq!(value["verdict"], "ask");
-    assert!(value["reason"]
-        .as_str()
-        .unwrap()
-        .contains("command syntax could not be read"));
+    assert!(
+        value["reason"]
+            .as_str()
+            .unwrap()
+            .contains("command syntax could not be read")
+    );
     assert!(value["effects"].as_array().unwrap().is_empty());
 }
 

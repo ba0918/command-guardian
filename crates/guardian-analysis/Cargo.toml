@@ -1,7 +1,7 @@
 [package]
 name = "guardian-analysis"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "正規化したシェル構文からの効果と起動情報の抽出"
 
 [dependencies]

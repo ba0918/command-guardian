@@ -115,8 +115,8 @@ fn cli_rejects_linked_or_locked_advice_log_and_keeps_one_mechanical_json_with_pa
 
 // @kotowari[REQ-advisor-009, REQ-advisor-011, REQ-advisor-021, EX-advisor-018, EX-advisor-042]
 #[test]
-fn real_cli_secret_oversize_and_non_utf8_cwd_preserve_mechanical_result_without_model_authentication(
-) {
+fn real_cli_secret_oversize_and_non_utf8_cwd_preserve_mechanical_result_without_model_authentication()
+ {
     for (command, expected) in [
         ("printf api_key=fixture-secret-private".to_owned(), "secret"),
         (format!("printf {}", "x".repeat(70000)), "size"),
@@ -253,11 +253,13 @@ fn real_claude_prompt_hook_updates_only_verified_bounded_cache_and_never_judges_
     assert!(output.stderr.is_empty());
     let cache = home.path().join("state/command-guardian/advisor-context");
     assert_eq!(fs::read_dir(&cache).unwrap().count(), 1);
-    assert!(!home
-        .path()
-        .join("state/command-guardian/advisor.jsonl")
-        .exists());
-    use guardian_app::advisor::context::{load_claude_cache, CacheLimits};
+    assert!(
+        !home
+            .path()
+            .join("state/command-guardian/advisor.jsonl")
+            .exists()
+    );
+    use guardian_app::advisor::context::{CacheLimits, load_claude_cache};
     use guardian_app::state::AdvisorState;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
     let deadline = Instant::now() + Duration::from_secs(1);
@@ -285,8 +287,8 @@ fn real_claude_prompt_hook_updates_only_verified_bounded_cache_and_never_judges_
 
 // @kotowari[REQ-advisor-020, REQ-advisor-021, EX-advisor-040, EX-advisor-047, EX-advisor-049]
 #[test]
-fn real_opencode_fd_ack_starts_advice_and_missing_ack_or_off_or_block_delivers_mechanical_json_without_advice(
-) {
+fn real_opencode_fd_ack_starts_advice_and_missing_ack_or_off_or_block_delivers_mechanical_json_without_advice()
+ {
     use std::io::Read;
     use std::os::fd::AsRawFd;
     use std::os::unix::{net::UnixStream, process::CommandExt};
@@ -404,8 +406,8 @@ fn real_opencode_fd_ack_starts_advice_and_missing_ack_or_off_or_block_delivers_m
 
 // @kotowari[REQ-advisor-021, REQ-advisor-011, EX-advisor-024, EX-advisor-042]
 #[test]
-fn claude_and_codex_authentication_fallback_keep_allow_silent_and_shadow_keeps_its_original_body_log(
-) {
+fn claude_and_codex_authentication_fallback_keep_allow_silent_and_shadow_keeps_its_original_body_log()
+ {
     for agent in ["claude", "codex"] {
         for enforce in [true, false] {
             let home = tempfile::tempdir().unwrap();
@@ -458,8 +460,8 @@ fn claude_and_codex_authentication_fallback_keep_allow_silent_and_shadow_keeps_i
 
 // @kotowari[REQ-advisor-021, REQ-advisor-011, EX-advisor-024, EX-advisor-042]
 #[test]
-fn cli_invokes_adviser_without_authentication_then_emits_original_allow_once_and_private_failure_metadata(
-) {
+fn cli_invokes_adviser_without_authentication_then_emits_original_allow_once_and_private_failure_metadata()
+ {
     let home = tempfile::tempdir().unwrap();
     let config = home.path().join("config/command-guardian");
     fs::create_dir_all(&config).unwrap();

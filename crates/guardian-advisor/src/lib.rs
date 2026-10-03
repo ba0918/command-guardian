@@ -5,10 +5,10 @@ mod json;
 mod secrets;
 pub use client::{AdvisorClient, SendPermit};
 pub use context::{
-    bounded_context, ContentBlock, ContextMessage, ContextWindow, Role, SentMessage,
+    ContentBlock, ContextMessage, ContextWindow, Role, SentMessage, bounded_context,
 };
 pub use json::parse_unique_json;
-pub use secrets::{redact_secrets, Skip};
+pub use secrets::{Skip, redact_secrets};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {

@@ -465,7 +465,9 @@ fn req_002_conditional_loop_assignments_do_not_become_certain_paths() {
 // @kotowari[REQ-002]
 #[test]
 fn req_002_conditional_loop_directory_changes_leave_relative_targets_unresolved() {
-    let result = effects("cd /etc; for x in /a; do if test flag; then cd /tmp; fi; done; rm victim; rm /etc/absolute");
+    let result = effects(
+        "cd /etc; for x in /a; do if test flag; then cd /tmp; fi; done; rm victim; rm /etc/absolute",
+    );
     assert_eq!(result.len(), 2);
     assert!(
         matches!(result[0].target, Target::Unresolved(_)),
@@ -478,7 +480,9 @@ fn req_002_conditional_loop_directory_changes_leave_relative_targets_unresolved(
 #[test]
 fn req_002_equal_branch_values_and_unchanged_bindings_remain_resolvable() {
     assert_eq!(
-        effects("T=/etc/unchanged; for x in /a; do if test flag; then S=/etc/x; else S=/etc/x; fi; done; rm \"$S\" \"$T\""),
+        effects(
+            "T=/etc/unchanged; for x in /a; do if test flag; then S=/etc/x; else S=/etc/x; fi; done; rm \"$S\" \"$T\""
+        ),
         vec![delete(p("/etc/x")), delete(p("/etc/unchanged"))]
     );
 }

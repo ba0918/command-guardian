@@ -1,5 +1,5 @@
 use guardian_advisor::Mode;
-use guardian_app::advisor::control::{negotiation_deadline, probe_deadline, Control};
+use guardian_app::advisor::control::{Control, negotiation_deadline, probe_deadline};
 use guardian_core::Verdict;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
@@ -100,9 +100,11 @@ fn real_control_fd_requires_matching_probe_and_first_timely_ack_and_never_retrie
         if let Some(deadline) = deadline {
             assert_eq!(deadline.duration_since(finished), Duration::from_secs(10));
         }
-        assert!(control
-            .start(Mode::Enforce, Verdict::Allow, Instant::now(), 10000)
-            .is_none());
+        assert!(
+            control
+                .start(Mode::Enforce, Verdict::Allow, Instant::now(), 10000)
+                .is_none()
+        );
         assert!(finished.elapsed() < Duration::from_millis(500));
         child.join().unwrap();
     }
@@ -116,9 +118,11 @@ fn off_never_probes_and_block_never_notifies_or_starts_advice() {
         .unwrap();
     let mut control = Control::new(socket, [7; 16]);
     assert!(!control.probe(Mode::Off));
-    assert!(control
-        .start(Mode::Off, Verdict::Allow, Instant::now(), 2000)
-        .is_none());
+    assert!(
+        control
+            .start(Mode::Off, Verdict::Allow, Instant::now(), 2000)
+            .is_none()
+    );
     assert!(peer.read(&mut [0; 1]).is_err());
     let (socket, mut peer) = UnixStream::pair().unwrap();
     let child = std::thread::spawn(move || {
@@ -133,8 +137,10 @@ fn off_never_probes_and_block_never_notifies_or_starts_advice() {
     });
     let mut control = Control::new(socket, [7; 16]);
     assert!(control.probe(Mode::Enforce));
-    assert!(control
-        .start(Mode::Enforce, Verdict::Block, Instant::now(), 2000)
-        .is_none());
+    assert!(
+        control
+            .start(Mode::Enforce, Verdict::Block, Instant::now(), 2000)
+            .is_none()
+    );
     child.join().unwrap();
 }

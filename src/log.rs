@@ -32,7 +32,7 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
     let base = dir.parent().expect("ログのディレクトリには親がある");
     DirBuilder::new().recursive(true).mode(0o700).create(base)?;
     let base = File::open(base)?;
-    use rustix::fs::{mkdirat, openat, Mode, OFlags};
+    use rustix::fs::{Mode, OFlags, mkdirat, openat};
     let private_mode = Mode::from_bits_truncate(0o700);
     match mkdirat(&base, "command-guardian", private_mode) {
         Ok(()) | Err(rustix::io::Errno::EXIST) => {}

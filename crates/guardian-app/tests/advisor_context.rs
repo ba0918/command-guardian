@@ -40,22 +40,30 @@ fn unknown_version_session_turn_or_call_never_establishes_correspondence() {
     for field in ["session_id", "turn_id", "tool_use_id"] {
         let mut value = hook();
         value[field] = json!("unmatched");
-        assert!(codex_context(&value, &transcript(), 65536, 3)
-            .messages
-            .is_empty());
+        assert!(
+            codex_context(&value, &transcript(), 65536, 3)
+                .messages
+                .is_empty()
+        );
     }
     let changed = String::from_utf8(transcript())
         .unwrap()
         .replace("0.160.0", "0.159.0");
-    assert!(codex_context(&hook(), changed.as_bytes(), 65536, 3)
-        .messages
-        .is_empty());
-    assert!(codex_context(&hook(), &transcript(), 2, 3)
-        .messages
-        .is_empty());
-    assert!(codex_context(&hook(), b"malformed", 65536, 3)
-        .messages
-        .is_empty());
+    assert!(
+        codex_context(&hook(), changed.as_bytes(), 65536, 3)
+            .messages
+            .is_empty()
+    );
+    assert!(
+        codex_context(&hook(), &transcript(), 2, 3)
+            .messages
+            .is_empty()
+    );
+    assert!(
+        codex_context(&hook(), b"malformed", 65536, 3)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, EX-advisor-011, EX-advisor-012]
@@ -90,9 +98,11 @@ fn ambiguous_duplicate_session_fields_are_not_silently_replaced() {
         "\"session_id\":\"other-session\",\"session_id\":\"fixture-session\"",
         1,
     );
-    assert!(codex_context(&hook(), bytes.as_bytes(), 65536, 3)
-        .messages
-        .is_empty());
+    assert!(
+        codex_context(&hook(), bytes.as_bytes(), 65536, 3)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, EX-advisor-012]
@@ -100,9 +110,11 @@ fn ambiguous_duplicate_session_fields_are_not_silently_replaced() {
 fn duplicate_source_order_or_execution_boundary_cannot_verify_provenance() {
     let original = String::from_utf8(transcript()).unwrap();
     let invalid_order = original.replace("\"ordinal\":2", "\"ordinal\":1");
-    assert!(codex_context(&hook(), invalid_order.as_bytes(), 65536, 3)
-        .messages
-        .is_empty());
+    assert!(
+        codex_context(&hook(), invalid_order.as_bytes(), 65536, 3)
+            .messages
+            .is_empty()
+    );
     let boundary = original
         .lines()
         .find(|line| line.contains("\"ordinal\":3"))
@@ -111,9 +123,11 @@ fn duplicate_source_order_or_execution_boundary_cannot_verify_provenance() {
         "{original}{}\n",
         boundary.replace("\"ordinal\":3", "\"ordinal\":5")
     );
-    assert!(codex_context(&hook(), duplicated.as_bytes(), 65536, 3)
-        .messages
-        .is_empty());
+    assert!(
+        codex_context(&hook(), duplicated.as_bytes(), 65536, 3)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, EX-advisor-011, EX-advisor-012]
@@ -130,16 +144,20 @@ fn direct_acquisition_is_bounded_and_does_not_create_a_session_cache() {
     assert_eq!(context.messages.len(), 1);
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
     assert!(acquire_codex(&value, 2, 3, deadline).messages.is_empty());
-    assert!(acquire_codex(&value, 65536, 0, deadline)
-        .messages
-        .is_empty());
+    assert!(
+        acquire_codex(&value, 65536, 0, deadline)
+            .messages
+            .is_empty()
+    );
     assert!(
         acquire_codex(&value, 65536, 3, Instant::now() - Duration::from_millis(1))
             .messages
             .is_empty()
     );
     std::fs::remove_file(path).unwrap();
-    assert!(acquire_codex(&value, 65536, 3, deadline)
-        .messages
-        .is_empty());
+    assert!(
+        acquire_codex(&value, 65536, 3, deadline)
+            .messages
+            .is_empty()
+    );
 }

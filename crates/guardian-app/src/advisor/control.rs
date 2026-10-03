@@ -1,4 +1,4 @@
-use guardian_advisor::{eligible, Mode};
+use guardian_advisor::{Mode, eligible};
 use guardian_core::Verdict;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};

@@ -378,15 +378,15 @@ fn option_value_hit(name: &str, values: &[WordMatch], words: &[String]) -> bool 
     while i < words.len() {
         let w = &words[i];
         if w == name {
-            if let Some(value) = words.get(i + 1) {
-                if values.iter().any(|m| m.is_match(value)) {
-                    return true;
-                }
-            }
-        } else if let Some(rest) = w.strip_prefix(&format!("{name}=")) {
-            if values.iter().any(|m| m.is_match(rest)) {
+            if let Some(value) = words.get(i + 1)
+                && values.iter().any(|m| m.is_match(value))
+            {
                 return true;
             }
+        } else if let Some(rest) = w.strip_prefix(&format!("{name}="))
+            && values.iter().any(|m| m.is_match(rest))
+        {
+            return true;
         }
         i += 1;
     }

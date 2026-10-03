@@ -1,5 +1,5 @@
 use guardian_advisor::{Failure, RawDistribution, ScopeEvidence};
-use guardian_app::advisor::wire::{read_reply, write_reply, FrameKind, Reply};
+use guardian_app::advisor::wire::{FrameKind, Reply, read_reply, write_reply};
 use std::io::Write;
 use std::net::Shutdown;
 use std::os::unix::net::UnixStream;

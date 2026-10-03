@@ -1,5 +1,5 @@
 use crate::state::AdvisorState;
-use guardian_advisor::{bounded_context, ContentBlock, ContextMessage, ContextWindow, Role};
+use guardian_advisor::{ContentBlock, ContextMessage, ContextWindow, Role, bounded_context};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;

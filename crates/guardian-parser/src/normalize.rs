@@ -1,9 +1,9 @@
 //! OSS パーサの構文木を、正規化した構文木へ写す。すべての位置を 1 回ずつ訪問する。
 
 use crate::ast::*;
-use crate::{catch, Failure, LIMIT_DEPTH};
+use crate::{Failure, LIMIT_DEPTH, catch};
 use brush_parser::ast as raw;
-use brush_parser::{word, ParserOptions};
+use brush_parser::{ParserOptions, word};
 
 /// 字句解析と構文解析の設定。対象は bash と POSIX sh（REQ-035）。
 pub(crate) fn options() -> ParserOptions {

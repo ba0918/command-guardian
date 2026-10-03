@@ -1,6 +1,6 @@
 use guardian_advisor::{
-    combine, eligible, Assessment, Failure, Mode, Questions, RawDistribution, Risk, Scope,
-    ScopeEvidence, State,
+    Assessment, Failure, Mode, Questions, RawDistribution, Risk, Scope, ScopeEvidence, State,
+    combine, eligible,
 };
 use guardian_core::Verdict;
 

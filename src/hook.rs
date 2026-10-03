@@ -41,33 +41,30 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
     if agent == Some(Agent::OpenCode) {
         return opencode::run(&text);
     }
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
-        if value
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text)
+        && value
             .get("hook_event_name")
             .is_some_and(|event| event != "PreToolUse")
+    {
+        if agent == Some(Agent::Claude)
+            && matches!(
+                value["hook_event_name"].as_str(),
+                Some("UserPromptSubmit" | "MessageDisplay")
+            )
         {
-            if agent == Some(Agent::Claude)
-                && matches!(
-                    value["hook_event_name"].as_str(),
-                    Some("UserPromptSubmit" | "MessageDisplay")
-                )
+            let cwd = value["cwd"]
+                .as_str()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/"));
+            if let Ok(engine) = build_engine(cwd)
+                && engine.config().advisor.mode.as_str() != "off"
+                && let guardian_app::advisor::worker::Source::Claude(hook) =
+                    guardian_app::advisor::worker::Source::from_hook(true, &text)
             {
-                let cwd = value["cwd"]
-                    .as_str()
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| PathBuf::from("/"));
-                if let Ok(engine) = build_engine(cwd) {
-                    if engine.config().advisor.mode.as_str() != "off" {
-                        if let guardian_app::advisor::worker::Source::Claude(hook) =
-                            guardian_app::advisor::worker::Source::from_hook(true, &text)
-                        {
-                            crate::advisor::cache_event(&engine.config().advisor, hook);
-                        }
-                    }
-                }
+                crate::advisor::cache_event(&engine.config().advisor, hook);
             }
-            return 0;
         }
+        return 0;
     }
     let (Some(agent), Some(input)) = (agent, parse_input(&text)) else {
         return 0;
@@ -218,7 +215,7 @@ fn decision(agent: Agent, verdict: Verdict, permission_mode: Option<&str>) -> Op
 #[cfg(test)]
 mod advisor_output_tests {
     use super::*;
-    use guardian_advisor::{combine, Assessment, Mode, RawDistribution, ScopeEvidence};
+    use guardian_advisor::{Assessment, Mode, RawDistribution, ScopeEvidence, combine};
 
     // @kotowari[REQ-advisor-021, REQ-011, REQ-023, REQ-022, EX-advisor-041]
     #[test]
@@ -233,13 +230,11 @@ mod advisor_output_tests {
         assert!(response(Agent::Codex, &ask, None).is_none());
         assert!(response(Agent::Claude, &ask, Some("dontAsk")).is_none());
         assert_eq!(
-            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]
-                ["permissionDecision"],
+            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]["permissionDecision"],
             "ask"
         );
         assert_eq!(
-            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]
-                ["permissionDecisionReason"],
+            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]["permissionDecisionReason"],
             ask.message
         );
         let block = crate::advisor::operational_tests::fixture_report(
@@ -250,13 +245,11 @@ mod advisor_output_tests {
         );
         assert_eq!(block.verdict, Verdict::Block);
         assert_eq!(
-            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]
-                ["permissionDecision"],
+            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]["permissionDecision"],
             "deny"
         );
         assert_eq!(
-            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]
-                ["permissionDecisionReason"],
+            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]["permissionDecisionReason"],
             block.message
         );
         let known = crate::advisor::operational_tests::fixture_known_deletion_report();
@@ -274,8 +267,8 @@ mod advisor_output_tests {
 
     // @kotowari[REQ-advisor-003, REQ-022, REQ-023]
     #[test]
-    fn validated_major_destructive_matched_advice_becomes_ask_but_codex_still_has_no_output_decision(
-    ) {
+    fn validated_major_destructive_matched_advice_becomes_ask_but_codex_still_has_no_output_decision()
+     {
         let answer = Assessment::validate(
             RawDistribution {
                 selected: "major_destructive".into(),

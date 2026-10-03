@@ -3,8 +3,8 @@ mod wire;
 mod worker;
 
 use guardian_parser::{Failure, Outcome, Script};
-pub use worker::run_if_child;
 pub use worker::ParserRuntime;
+pub use worker::run_if_child;
 
 impl ParserRuntime {
     pub fn judgment(&mut self) -> JudgmentSession<'_> {

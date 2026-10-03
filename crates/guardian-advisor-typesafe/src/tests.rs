@@ -196,7 +196,10 @@ fn http_fixture(
             }
             requests.push(request);
             std::thread::sleep(delay);
-            let response = format!("HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nLocation: http://{address}/redirected\r\nConnection: close\r\n\r\n", body.len());
+            let response = format!(
+                "HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nLocation: http://{address}/redirected\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.write_all(&body);
         }

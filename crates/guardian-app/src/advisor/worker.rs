@@ -366,25 +366,24 @@ fn run() -> Result<(), Failure> {
         return Err(Failure::InvalidResponse);
     }
     if let Source::ClaudeEvent(hook) = &request.source {
-        if request.settings.context_exchanges > 0 {
-            if let (Some(base), Ok(now)) = (
+        if request.settings.context_exchanges > 0
+            && let (Some(base), Ok(now)) = (
                 &request.state_base,
                 SystemTime::now().duration_since(UNIX_EPOCH),
-            ) {
-                if let Ok(state) = AdvisorState::open(base, deadline) {
-                    context::process_claude_event(
-                        &state,
-                        hook,
-                        context::CacheLimits {
-                            max_bytes,
-                            exchanges: request.settings.context_exchanges,
-                            ttl: request.settings.context_ttl_seconds,
-                            now: now.as_secs(),
-                            deadline,
-                        },
-                    );
-                }
-            }
+            )
+            && let Ok(state) = AdvisorState::open(base, deadline)
+        {
+            context::process_claude_event(
+                &state,
+                hook,
+                context::CacheLimits {
+                    max_bytes,
+                    exchanges: request.settings.context_exchanges,
+                    ttl: request.settings.context_ttl_seconds,
+                    now: now.as_secs(),
+                    deadline,
+                },
+            );
         }
         return wire::write_reply(
             &mut socket,
@@ -556,8 +555,8 @@ mod tests {
     }
     // @kotowari[REQ-advisor-017, REQ-advisor-009, EX-advisor-018]
     #[test]
-    fn expired_budget_secret_or_large_body_never_enters_model_boundary_and_late_answer_is_not_adopted(
-    ) {
+    fn expired_budget_secret_or_large_body_never_enters_model_boundary_and_late_answer_is_not_adopted()
+     {
         let mut client = Client {
             calls: 0,
             delay: Duration::ZERO,

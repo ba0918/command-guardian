@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -63,11 +63,12 @@ fn req_048_opencode_returns_each_verdict_without_writing_shadow_logs() {
         assert_eq!(response["verdict"], verdict);
         assert!(response["reason"].is_string());
     }
-    assert!(!f
-        .root
-        .path()
-        .join("state/command-guardian/shadow.log")
-        .exists());
+    assert!(
+        !f.root
+            .path()
+            .join("state/command-guardian/shadow.log")
+            .exists()
+    );
 }
 
 // @kotowari[REQ-048, REQ-051, REQ-055]
@@ -119,9 +120,10 @@ fn req_048_unsupported_shell_in_shadow_warns_without_bash_judgment() {
     assert_eq!(response["mode"]["enforce"], false);
     assert!(response.get("verdict").is_none());
     assert!(stderr.contains("shell"));
-    assert!(!f
-        .root
-        .path()
-        .join("state/command-guardian/shadow.log")
-        .exists());
+    assert!(
+        !f.root
+            .path()
+            .join("state/command-guardian/shadow.log")
+            .exists()
+    );
 }

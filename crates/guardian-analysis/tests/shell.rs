@@ -1,7 +1,7 @@
 //! S4: シェル起動の認識（REQ-035）。
 
-use guardian_analysis::{shell_invocation, ShellInvocation};
-use guardian_parser::{parse, Command, Word};
+use guardian_analysis::{ShellInvocation, shell_invocation};
+use guardian_parser::{Command, Word, parse};
 
 /// 入力の最初の単純コマンドの語。
 fn words(command: &str) -> Vec<Word> {

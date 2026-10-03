@@ -1,6 +1,6 @@
 //! S8: 読めない構文は ask のコーパス（REQ-038）。
 
-use guardian_parser::{Failure, Outcome, LIMIT_DEPTH};
+use guardian_parser::{Failure, LIMIT_DEPTH, Outcome};
 fn parse(input: &str) -> Outcome {
     guardian_app::runtime::ParserRuntime::new(env!("CARGO_BIN_EXE_command-guardian").into())
         .validation()

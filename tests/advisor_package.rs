@@ -35,14 +35,16 @@ fn distributed_single_binary_runs_outside_checkout_and_carries_rust_dependency_l
         .map(|entry| entry.unwrap().path())
         .find(|path| path.extension().is_some_and(|extension| extension == "gz"))
         .unwrap();
-    assert!(Command::new("tar")
-        .arg("-xzf")
-        .arg(archive)
-        .arg("-C")
-        .arg(&extracted)
-        .status()
-        .unwrap()
-        .success());
+    assert!(
+        Command::new("tar")
+            .arg("-xzf")
+            .arg(archive)
+            .arg("-C")
+            .arg(&extracted)
+            .status()
+            .unwrap()
+            .success()
+    );
     let result = Command::new(extracted.join("command-guardian"))
         .arg("--help")
         .current_dir(fixture.path())
@@ -52,9 +54,11 @@ fn distributed_single_binary_runs_outside_checkout_and_carries_rust_dependency_l
         .unwrap();
     assert!(result.status.success());
     assert!(result.stderr.is_empty());
-    assert!(String::from_utf8(result.stdout)
-        .unwrap()
-        .contains("command-guardian check"));
+    assert!(
+        String::from_utf8(result.stdout)
+            .unwrap()
+            .contains("command-guardian check")
+    );
     let licenses = extracted.join("licenses/rust");
     let notice = fs::read_to_string(licenses.join("NOTICE.txt")).unwrap();
     assert!(notice.contains("ureq 3.4.2"));

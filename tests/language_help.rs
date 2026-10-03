@@ -151,9 +151,11 @@ fn delimiter_and_option_values_do_not_trigger_help() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(3));
-    assert!(String::from_utf8(out.stderr)
-        .unwrap()
-        .contains("Unknown --format"));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("Unknown --format")
+    );
     let out = command(home.path())
         .args(["hook", "--agent", "--help"])
         .output()
@@ -173,10 +175,12 @@ fn custom_name_and_path_remain_original_json_data() {
     let (code, value) = json_check(home.path(), "rm 資料.txt");
     assert_eq!(code, 1);
     assert_eq!(value["rules"][0]["program"], "削除確認");
-    assert!(value["rules"][0]["reason"]
-        .as_str()
-        .unwrap()
-        .contains("削除確認"));
+    assert!(
+        value["rules"][0]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("削除確認")
+    );
     assert_eq!(value["effects"][0]["path"], "/tmp/資料.txt");
     let mut keys: Vec<_> = value
         .as_object()
@@ -201,7 +205,12 @@ fn guard_reason_retains_raw_newlines_and_escapes_only_message() {
             .replace('\\', "\\\\")
             .replace('\r', "\\r")
             .replace('\n', "\\n");
-        config(home.path(), &format!("[[commands.guard]]\nprogram = 'git'\ndeny = [['push']]\nverdict = 'ask'\nreason = \"{escaped}\"\n"));
+        config(
+            home.path(),
+            &format!(
+                "[[commands.guard]]\nprogram = 'git'\ndeny = [['push']]\nverdict = 'ask'\nreason = \"{escaped}\"\n"
+            ),
+        );
         let (code, value) = json_check(home.path(), "git push origin main");
         assert_eq!(code, 1);
         assert_eq!(value["rules"][0]["reason"], reason);
@@ -281,7 +290,12 @@ fn warning_retains_the_real_toml_library_error_detail() {
 fn shadow_preserves_command_while_hook_and_log_use_english_messages() {
     let home = fixture();
     for enforce in [false, true] {
-        config(home.path(), &format!("[mode]\nenforce = {enforce}\n[[rules.custom]]\nname = '削除確認'\npattern = 'rm'\nverdict = 'ask'\n"));
+        config(
+            home.path(),
+            &format!(
+                "[mode]\nenforce = {enforce}\n[[rules.custom]]\nname = '削除確認'\npattern = 'rm'\nverdict = 'ask'\n"
+            ),
+        );
         for agent in ["claude", "codex"] {
             let text = if enforce {
                 "rm -rf /etc/nginx"

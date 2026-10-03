@@ -298,10 +298,11 @@ fn req_019_state_home_falls_back_to_home_local_state() {
         &xdg,
         None,
     );
-    assert!(home
-        .path()
-        .join(".local/state/command-guardian/shadow.log")
-        .is_file());
+    assert!(
+        home.path()
+            .join(".local/state/command-guardian/shadow.log")
+            .is_file()
+    );
 }
 
 // @kotowari[REQ-018]
@@ -368,10 +369,11 @@ fn req_019_empty_state_home_falls_back_to_home_local_state() {
         .unwrap();
     let out = child.wait_with_output().unwrap();
     assert_eq!(out.status.code(), Some(0));
-    assert!(home
-        .path()
-        .join(".local/state/command-guardian/shadow.log")
-        .is_file());
+    assert!(
+        home.path()
+            .join(".local/state/command-guardian/shadow.log")
+            .is_file()
+    );
     assert!(!scratch.path().join("command-guardian/shadow.log").exists());
 }
 

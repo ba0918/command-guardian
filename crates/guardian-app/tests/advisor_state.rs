@@ -1,6 +1,6 @@
 use guardian_app::state::AdvisorState;
 use std::fs;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{PermissionsExt, symlink};
 use std::time::{Duration, Instant};
 
 fn deadline() -> Instant {
@@ -48,10 +48,12 @@ fn bounded_cache_is_private_and_only_reused_for_its_session_before_expiry() {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     assert_eq!(entries.len(), 1);
-    assert!(!entries[0]
-        .file_name()
-        .to_string_lossy()
-        .contains("fixture-session"));
+    assert!(
+        !entries[0]
+            .file_name()
+            .to_string_lossy()
+            .contains("fixture-session")
+    );
     assert_eq!(
         entries[0].metadata().unwrap().permissions().mode() & 0o777,
         0o600
@@ -66,28 +68,34 @@ fn exact_ttl_future_clock_and_expired_deadline_never_return_old_context() {
     state
         .save_context("fixture-session", b"fixture window", 100, deadline())
         .unwrap();
-    assert!(state
-        .load_context("fixture-session", 99, 86400, 65536, deadline())
-        .unwrap()
-        .is_none());
-    assert!(state
-        .load_context("fixture-session", 100 + 86400, 86400, 65536, deadline())
-        .unwrap()
-        .is_none());
+    assert!(
+        state
+            .load_context("fixture-session", 99, 86400, 65536, deadline())
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        state
+            .load_context("fixture-session", 100 + 86400, 86400, 65536, deadline())
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(
         fs::read_dir(root.path().join("command-guardian/advisor-context"))
             .unwrap()
             .count(),
         0
     );
-    assert!(state
-        .save_context(
-            "fixture-session",
-            b"late window",
-            100,
-            Instant::now() - Duration::from_millis(1)
-        )
-        .is_err());
+    assert!(
+        state
+            .save_context(
+                "fixture-session",
+                b"late window",
+                100,
+                Instant::now() - Duration::from_millis(1)
+            )
+            .is_err()
+    );
 }
 
 // @kotowari[REQ-advisor-010, EX-advisor-020]
@@ -103,21 +111,29 @@ fn symlinks_and_multiple_hardlinks_are_rejected_without_changing_their_target() 
     let link = root.path().join("hardlink");
     fs::hard_link(&file, &link).unwrap();
     let before = fs::read(&link).unwrap();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .is_err());
-    assert!(state
-        .save_context("fixture-session", b"replacement", 102, deadline())
-        .is_err());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .is_err()
+    );
+    assert!(
+        state
+            .save_context("fixture-session", b"replacement", 102, deadline())
+            .is_err()
+    );
     assert_eq!(fs::read(&link).unwrap(), before);
     fs::remove_file(&file).unwrap();
     symlink(&link, &file).unwrap();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .is_err());
-    assert!(state
-        .save_context("fixture-session", b"replacement", 102, deadline())
-        .is_err());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .is_err()
+    );
+    assert!(
+        state
+            .save_context("fixture-session", b"replacement", 102, deadline())
+            .is_err()
+    );
     assert_eq!(fs::read(&link).unwrap(), before);
 }
 
@@ -135,17 +151,23 @@ fn malformed_oversized_and_insecure_cache_files_are_not_adopted() {
         .unwrap()
         .unwrap()
         .path();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 2, deadline())
-        .is_err());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 2, deadline())
+            .is_err()
+    );
     fs::write(&file, b"malformed frame").unwrap();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .is_err());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .is_err()
+    );
     fs::set_permissions(&file, fs::Permissions::from_mode(0o644)).unwrap();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .is_err());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .is_err()
+    );
 }
 
 // @kotowari[REQ-advisor-010, EX-advisor-020]
@@ -165,12 +187,16 @@ fn directory_symlink_or_wider_permissions_never_enable_cache_access() {
     )
     .unwrap();
     let state = AdvisorState::open(root.path(), deadline()).unwrap();
-    assert!(state
-        .save_context("fixture-session", b"fixture window", 100, deadline())
-        .is_err());
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .is_err());
+    assert!(
+        state
+            .save_context("fixture-session", b"fixture window", 100, deadline())
+            .is_err()
+    );
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .is_err()
+    );
     assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
     fs::set_permissions(
         root.path().join("command-guardian"),
@@ -191,10 +217,12 @@ fn opening_state_alone_does_not_create_a_conversation_cache() {
             .unwrap(),
         None
     );
-    assert!(!root
-        .path()
-        .join("command-guardian/advisor-context")
-        .exists());
+    assert!(
+        !root
+            .path()
+            .join("command-guardian/advisor-context")
+            .exists()
+    );
 }
 
 // @kotowari[REQ-advisor-010]
@@ -212,13 +240,17 @@ fn acquisition_bound_includes_the_encoded_cache_frame_not_just_its_payload() {
         .unwrap()
         .path();
     let encoded_size = fs::metadata(file).unwrap().len() as usize;
-    assert!(state
-        .load_context("fixture-session", 101, 86400, encoded_size - 1, deadline())
-        .is_err());
-    assert!(state
-        .load_context("fixture-session", 101, 86400, encoded_size, deadline())
-        .unwrap()
-        .is_some());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, encoded_size - 1, deadline())
+            .is_err()
+    );
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, encoded_size, deadline())
+            .unwrap()
+            .is_some()
+    );
 }
 
 // @kotowari[REQ-advisor-010, EX-advisor-020]
@@ -230,9 +262,11 @@ fn invalidating_a_failed_update_prevents_reusing_the_previous_prompt() {
         .save_context("fixture-session", b"old prompt", 100, deadline())
         .unwrap();
     state.remove_context("fixture-session", deadline()).unwrap();
-    assert!(state
-        .load_context("fixture-session", 101, 86400, 65536, deadline())
-        .unwrap()
-        .is_none());
+    assert!(
+        state
+            .load_context("fixture-session", 101, 86400, 65536, deadline())
+            .unwrap()
+            .is_none()
+    );
     state.remove_context("fixture-session", deadline()).unwrap();
 }

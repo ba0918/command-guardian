@@ -2,7 +2,7 @@
 
 use guardian_core::Verdict;
 mod app_support;
-use app_support::{invocations, parse_guard_rules_document, Engine, EngineEnv};
+use app_support::{Engine, EngineEnv, invocations, parse_guard_rules_document};
 use guardian_policy::guard::GuardRule;
 use std::path::{Path, PathBuf};
 

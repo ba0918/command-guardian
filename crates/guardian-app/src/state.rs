@@ -1,4 +1,4 @@
-use rustix::fs::{mkdirat, open, openat, unlinkat, AtFlags, Mode, OFlags};
+use rustix::fs::{AtFlags, Mode, OFlags, mkdirat, open, openat, unlinkat};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{DirBuilder, File};

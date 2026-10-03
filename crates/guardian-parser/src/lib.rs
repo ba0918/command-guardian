@@ -19,7 +19,7 @@ mod normalize;
 pub use ast::*;
 
 use brush_parser::{ParserOptions, Token};
-use normalize::{options, parse_program, parse_tokens, tokenize, unquoted_word, Normalizer};
+use normalize::{Normalizer, options, parse_program, parse_tokens, tokenize, unquoted_word};
 
 /// コマンド文字列の上限（REQ-039）。置換の再帰読みでは累計で測る。
 pub const LIMIT_BYTES: usize = 1024 * 1024;
@@ -192,10 +192,10 @@ pub(crate) fn strip_quotes_inner(input: &str) -> Result<String, Failure> {
                 if matches!(tokens.get(index), Some(Token::Word(_, _))) {
                     index += 1;
                 }
-                if let Some(Token::Word(_, span)) = tokens.get(index) {
-                    if span.start.index == span.end.index {
-                        index += 1;
-                    }
+                if let Some(Token::Word(_, span)) = tokens.get(index)
+                    && span.start.index == span.end.index
+                {
+                    index += 1;
                 }
             }
             Token::Word(word, _) => {
@@ -263,9 +263,11 @@ mod tests {
             "git push origin"
         );
         assert_eq!(strip_quotes("echo a\\ b").unwrap(), "echo a b");
-        assert!(strip_quotes("cat <<EOF\nbody\nEOF")
-            .unwrap()
-            .starts_with("cat << EOF"));
+        assert!(
+            strip_quotes("cat <<EOF\nbody\nEOF")
+                .unwrap()
+                .starts_with("cat << EOF")
+        );
     }
 
     // @kotowari[REQ-038]

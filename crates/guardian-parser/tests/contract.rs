@@ -1,6 +1,6 @@
 //! S2: 正規化した構文木の契約（REQ-041）。
 
-use guardian_parser::{parse, AndOrOp, Command, Compound, Part, RedirectKind, RedirectTarget};
+use guardian_parser::{AndOrOp, Command, Compound, Part, RedirectKind, RedirectTarget, parse};
 
 fn first_command(command: &str) -> Command {
     let outcome = parse(command);

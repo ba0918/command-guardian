@@ -140,7 +140,10 @@ pub fn advisor_explanation(
             "major destruction lacks sufficiently confirmed matching instructions",
             "Obtain concrete user instructions covering the target, operation and all effects, or narrow the operation before checking again.",
         ),
-        _ => ("destructive effects require intervention", "No applicable alternative."),
+        _ => (
+            "destructive effects require intervention",
+            "No applicable alternative.",
+        ),
     };
     let intervention = format!("Advisor classification {}: {detail}", risk.as_str());
     let reason = if mechanical_reason.is_empty() {

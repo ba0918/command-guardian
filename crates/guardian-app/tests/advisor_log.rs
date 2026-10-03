@@ -4,7 +4,7 @@ use guardian_app::state::AdvisorState;
 use guardian_core::Verdict;
 use guardian_policy::config::AdvisorConfig;
 use std::fs;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{PermissionsExt, symlink};
 use std::time::{Duration, Instant};
 
 fn deadline() -> Instant {
@@ -71,8 +71,8 @@ fn default_record_contains_only_classified_metadata_and_redacts_detected_model_s
 
 // @kotowari[REQ-advisor-011, EX-advisor-022]
 #[test]
-fn explicit_debug_records_only_redacted_candidate_and_log_refuses_links_unsafe_mode_or_expired_deadline(
-) {
+fn explicit_debug_records_only_redacted_candidate_and_log_refuses_links_unsafe_mode_or_expired_deadline()
+ {
     let root = tempfile::tempdir().unwrap();
     let state = AdvisorState::open(root.path(), deadline()).unwrap();
     let config = AdvisorConfig {

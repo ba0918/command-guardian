@@ -14,11 +14,13 @@ fn req_039_cumulative_substitution_reads_are_measured() {
         ")".repeat(100)
     );
     assert!(input.len() < LIMIT_BYTES);
-    assert!(runtime()
-        .validation()
-        .parse(&input)
-        .failures
-        .contains(&Failure::TooLarge));
+    assert!(
+        runtime()
+            .validation()
+            .parse(&input)
+            .failures
+            .contains(&Failure::TooLarge)
+    );
 }
 // @kotowari[REQ-039]
 #[test]
@@ -50,9 +52,11 @@ fn req_036_strip_quotes_survives_a_deep_input() {
         "$(".repeat(2000),
         ")".repeat(2000)
     );
-    assert!(runtime()
-        .validation()
-        .strip_quotes(&deep)
-        .unwrap()
-        .contains("git push origin main"));
+    assert!(
+        runtime()
+            .validation()
+            .strip_quotes(&deep)
+            .unwrap()
+            .contains("git push origin main")
+    );
 }

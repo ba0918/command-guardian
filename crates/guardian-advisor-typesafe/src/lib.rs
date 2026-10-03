@@ -1,6 +1,6 @@
 use guardian_advisor::{AdvisorClient, Assessment, Failure, RawDistribution};
 use guardian_advisor::{Role, ScopeEvidence, SendPermit, Skip, State};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::io::Read;
 use std::time::{Duration, Instant};
 

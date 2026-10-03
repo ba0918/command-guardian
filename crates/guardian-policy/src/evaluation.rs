@@ -1,5 +1,5 @@
 //! 観測済みの値から規則と最悪値を合成する。
-use crate::{message, Config};
+use crate::{Config, message};
 use guardian_core::{
     Ask, Class, Invocation, ObservedPath, Op, ProtectedKind, Target, Verdict, Why,
 };
@@ -245,10 +245,10 @@ fn compose_message(effects: &[EffectReport], rules: &[RuleReport]) -> String {
     String::new()
 }
 fn compose_reason(effects: &[EffectReport], rules: &[RuleReport], asks: &[Ask]) -> String {
-    if let Some(effect) = worst_effect(effects) {
-        if effect.verdict == Verdict::Block {
-            return message::reason_line(effect.class, &effect.why);
-        }
+    if let Some(effect) = worst_effect(effects)
+        && effect.verdict == Verdict::Block
+    {
+        return message::reason_line(effect.class, &effect.why);
     }
     if let Some(rule) = rules.iter().find(|rule| rule.verdict == Verdict::Block) {
         return rule.reason.clone();

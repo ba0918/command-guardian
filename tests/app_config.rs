@@ -127,7 +127,12 @@ fn invalid_user_advice_discards_the_whole_file_not_just_the_advice() {
         let dir = fixture_dir("advisor-invalid-");
         let root = dir.path();
         let user = root.join("user.toml");
-        write(&user, &format!("[mode]\nenforce=false\n[paths]\nprotected_roots=['/tmp/rejected-user-fixture']\n[advisor]\n{invalid}\n"));
+        write(
+            &user,
+            &format!(
+                "[mode]\nenforce=false\n[paths]\nprotected_roots=['/tmp/rejected-user-fixture']\n[advisor]\n{invalid}\n"
+            ),
+        );
         write(
             &root.join(".command-guardian.toml"),
             "[paths]\nprotected_roots=['/tmp/valid-project-layer']\n",
@@ -159,10 +164,11 @@ fn project_advice_does_not_hide_invalid_toml_syntax() {
         "[paths]\nprotected_roots=['/tmp/rejected-project-fixture']\n[advisor]\nmodel='unclosed\n",
     );
     let e = engine(None, root);
-    assert!(!e
-        .config()
-        .protected_roots
-        .contains(&PathBuf::from("/tmp/rejected-project-fixture")));
+    assert!(
+        !e.config()
+            .protected_roots
+            .contains(&PathBuf::from("/tmp/rejected-project-fixture"))
+    );
     assert!(!e.check("true").warnings.is_empty());
 }
 
@@ -173,17 +179,23 @@ fn invalid_command_container_discards_the_file_but_preserves_other_layers() {
         let dir = fixture_dir("command-container-");
         let root = dir.path();
         let user = root.join("user.toml");
-        write(&user, &format!("{commands}\n[mode]\nenforce=false\n[paths]\nprotected_roots=['/tmp/rejected-container']\n"));
+        write(
+            &user,
+            &format!(
+                "{commands}\n[mode]\nenforce=false\n[paths]\nprotected_roots=['/tmp/rejected-container']\n"
+            ),
+        );
         write(
             &root.join(".command-guardian.toml"),
             "[paths]\nprotected_roots=['/tmp/valid-project-layer']\n",
         );
         let e = engine(Some(&user), root);
         assert!(e.config().enforce);
-        assert!(!e
-            .config()
-            .protected_roots
-            .contains(&PathBuf::from("/tmp/rejected-container")));
+        assert!(
+            !e.config()
+                .protected_roots
+                .contains(&PathBuf::from("/tmp/rejected-container"))
+        );
         assert_eq!(
             verdict_of(&e, "rm /tmp/valid-project-layer/x"),
             Verdict::Block
@@ -198,7 +210,10 @@ fn invalid_individual_guard_keeps_the_files_other_settings_and_valid_guard() {
     let dir = fixture_dir("individual-guard-");
     let root = dir.path();
     let user = root.join("user.toml");
-    write(&user, "[paths]\nprotected_roots=['/tmp/valid-user-layer']\n[[commands.guard]]\nprogram=42\n[[commands.guard]]\nprogram='fixture-command'\nreason='fixture guard'\nverdict='block'\ndeny=[['dangerous']]\n");
+    write(
+        &user,
+        "[paths]\nprotected_roots=['/tmp/valid-user-layer']\n[[commands.guard]]\nprogram=42\n[[commands.guard]]\nprogram='fixture-command'\nreason='fixture guard'\nverdict='block'\ndeny=[['dangerous']]\n",
+    );
     let e = engine(Some(&user), root);
     assert_eq!(verdict_of(&e, "rm /tmp/valid-user-layer/x"), Verdict::Block);
     assert_eq!(verdict_of(&e, "fixture-command dangerous"), Verdict::Block);
@@ -246,11 +261,12 @@ fn req_013_lists_append_and_scalars_take_the_later_layer() {
     let e = engine(Some(&user), &root);
     assert_eq!(verdict_of(&e, "rm -rf /home/you/a/x"), Verdict::Block);
     assert_eq!(verdict_of(&e, "rm -rf /home/you/b/x"), Verdict::Block);
-    assert!(e
-        .check("rm -rf /home/you/c/x")
-        .warnings
-        .iter()
-        .any(|w| w.contains("unknown.verdict")));
+    assert!(
+        e.check("rm -rf /home/you/c/x")
+            .warnings
+            .iter()
+            .any(|w| w.contains("unknown.verdict"))
+    );
     assert_eq!(verdict_of(&e, "rm -rf /home/you/c/x"), Verdict::Block);
 }
 
@@ -289,11 +305,12 @@ fn req_015_invalid_general_user_settings_discard_that_file_but_keep_a_valid_proj
         verdict_of(&e, "rm /tmp/project-protected/x"),
         Verdict::Block
     );
-    assert!(e
-        .check("true")
-        .warnings
-        .iter()
-        .any(|w| w.contains("user configuration")));
+    assert!(
+        e.check("true")
+            .warnings
+            .iter()
+            .any(|w| w.contains("user configuration"))
+    );
 }
 
 // @kotowari[REQ-013, REQ-015]
@@ -306,19 +323,24 @@ fn req_015_invalid_general_project_settings_keep_the_valid_user_layer() {
         &user,
         "[paths]\nprotected_roots = ['/tmp/user-protected']\n",
     );
-    write(&root.join(".command-guardian.toml"), "rules = []\n[paths]\nprotected_roots = ['/tmp/rejected-project']\n[mode]\nenforce = false\n");
+    write(
+        &root.join(".command-guardian.toml"),
+        "rules = []\n[paths]\nprotected_roots = ['/tmp/rejected-project']\n[mode]\nenforce = false\n",
+    );
     let e = engine(Some(&user), &root);
     assert!(e.config().enforce);
     assert_eq!(verdict_of(&e, "rm /tmp/user-protected/x"), Verdict::Block);
-    assert!(!e
-        .config()
-        .protected_roots
-        .contains(&PathBuf::from("/tmp/rejected-project")));
-    assert!(e
-        .check("true")
-        .warnings
-        .iter()
-        .any(|w| w.contains("project configuration")));
+    assert!(
+        !e.config()
+            .protected_roots
+            .contains(&PathBuf::from("/tmp/rejected-project"))
+    );
+    assert!(
+        e.check("true")
+            .warnings
+            .iter()
+            .any(|w| w.contains("project configuration"))
+    );
 }
 
 // @kotowari[REQ-014, EX-014]

@@ -36,7 +36,7 @@ pub trait AdvisorClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{combine, Failure, Mode, ScopeEvidence};
+    use crate::{Failure, Mode, ScopeEvidence, combine};
     use guardian_core::Verdict;
     use std::time::Duration;
 

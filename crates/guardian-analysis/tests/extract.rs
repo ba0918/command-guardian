@@ -111,9 +111,11 @@ fn req_008_execdir_relative_targets_use_the_source_directory_not_parent_cwd() {
             children
         ]
     );
-    assert!(effects("find /tmp/scratch -execdir rm ../outside {} +")
-        .iter()
-        .any(|effect| matches!(effect.target, Target::Unresolved(_))));
+    assert!(
+        effects("find /tmp/scratch -execdir rm ../outside {} +")
+            .iter()
+            .any(|effect| matches!(effect.target, Target::Unresolved(_)))
+    );
 }
 
 // @kotowari[REQ-001, REQ-002, REQ-008]

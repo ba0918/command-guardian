@@ -40,9 +40,11 @@ fn req_010_unterminated_quotes_are_parse_errors() {
     }
     // 閉じた入力は失敗にしない。
     assert!(analyze("rm -rf /etc/foo", &env()).diagnostics.is_empty());
-    assert!(analyze("rm -rf $(rm /etc/foo)", &env())
-        .diagnostics
-        .is_empty());
+    assert!(
+        analyze("rm -rf $(rm /etc/foo)", &env())
+            .diagnostics
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-039]

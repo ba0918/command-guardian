@@ -1,6 +1,6 @@
 //! パスの分類。fs を見て 4 分類する。設定は読まない。
 
-use crate::git::{find_worktree_root, GitFailure, GitRunner, SystemGit};
+use crate::git::{GitFailure, GitRunner, SystemGit, find_worktree_root};
 use guardian_core::{Class, Failure, ObservedPath, ProtectedKind, Why};
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -159,21 +159,22 @@ impl Judge {
         }
 
         if !children {
-            if let Some(home) = &self.env.home {
-                if !home.as_os_str().is_empty() && path == home {
-                    return Ok(Classification::new(
-                        Class::Protected,
-                        Why::Protected(ProtectedKind::Home),
-                    ));
-                }
+            if let Some(home) = &self.env.home
+                && !home.as_os_str().is_empty()
+                && path == home
+            {
+                return Ok(Classification::new(
+                    Class::Protected,
+                    Why::Protected(ProtectedKind::Home),
+                ));
             }
-            if let Some(cwd) = &self.env.cwd {
-                if path == cwd {
-                    return Ok(Classification::new(
-                        Class::Protected,
-                        Why::Protected(ProtectedKind::Cwd),
-                    ));
-                }
+            if let Some(cwd) = &self.env.cwd
+                && path == cwd
+            {
+                return Ok(Classification::new(
+                    Class::Protected,
+                    Why::Protected(ProtectedKind::Cwd),
+                ));
             }
         }
 

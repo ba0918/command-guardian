@@ -21,12 +21,14 @@ fn req_006_classification_and_roots_are_decided_from_values() {
         policy.classification_verdict(Class::Vcs, &Why::Vcs),
         Verdict::Allow
     );
-    assert!(policy
-        .apply_roots(&ObservedPath {
-            path: "/work".into(),
-            children: false
-        })
-        .is_none());
+    assert!(
+        policy
+            .apply_roots(&ObservedPath {
+                path: "/work".into(),
+                children: false
+            })
+            .is_none()
+    );
     assert_eq!(
         policy
             .apply_roots(&ObservedPath {
@@ -54,12 +56,14 @@ fn req_006_classification_and_roots_are_decided_from_values() {
 fn req_003_nested_tmpdir_root_is_not_allowed_by_an_outer_temporary_root() {
     for root in ["/tmp/session-temp", "/var/tmp/session-temp"] {
         let policy = Policy::new(Config::builtin(Some(std::path::Path::new(root))), vec![]);
-        assert!(policy
-            .apply_roots(&ObservedPath {
-                path: root.into(),
-                children: false,
-            })
-            .is_none());
+        assert!(
+            policy
+                .apply_roots(&ObservedPath {
+                    path: root.into(),
+                    children: false,
+                })
+                .is_none()
+        );
         for observed in [
             ObservedPath {
                 path: root.into(),
@@ -99,12 +103,14 @@ fn req_005_configured_roots_with_parent_components_match_resolved_targets() {
                 Some(Verdict::Block)
             );
         }
-        assert!(policy
-            .apply_roots(&ObservedPath {
-                path: "/work/valuable-other/file".into(),
-                children: false,
-            })
-            .is_none());
+        assert!(
+            policy
+                .apply_roots(&ObservedPath {
+                    path: "/work/valuable-other/file".into(),
+                    children: false,
+                })
+                .is_none()
+        );
     }
     let mut config = Config::builtin(None);
     config.allowed_roots.push("/work/repo/../scratch".into());
@@ -118,12 +124,14 @@ fn req_005_configured_roots_with_parent_components_match_resolved_targets() {
             .map(|value| value.2),
         Some(Verdict::Allow)
     );
-    assert!(policy
-        .apply_roots(&ObservedPath {
-            path: "/work/scratch".into(),
-            children: false,
-        })
-        .is_none());
+    assert!(
+        policy
+            .apply_roots(&ObservedPath {
+                path: "/work/scratch".into(),
+                children: false,
+            })
+            .is_none()
+    );
 }
 
 // @kotowari[REQ-009, REQ-026, REQ-033, REQ-038, REQ-039]
@@ -187,16 +195,18 @@ fn req_031_guards_match_the_supplied_apparent_words_and_assignment_names() {
             .len(),
         1
     );
-    assert!(policy
-        .rules(
-            &[Invocation {
-                program: "git".into(),
-                words: vec!["$CMD".into()],
-                env_names: vec![]
-            }],
-            None
-        )
-        .is_empty());
+    assert!(
+        policy
+            .rules(
+                &[Invocation {
+                    program: "git".into(),
+                    words: vec!["$CMD".into()],
+                    env_names: vec![]
+                }],
+                None
+            )
+            .is_empty()
+    );
     assert_eq!(
         policy
             .rules(

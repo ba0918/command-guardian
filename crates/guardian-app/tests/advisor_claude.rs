@@ -58,9 +58,11 @@ fn unsupported_version_sidechain_ambiguous_chain_or_prompt_never_establishes_cla
     for field in ["session_id", "prompt_id", "tool_use_id"] {
         let mut value = original.clone();
         value["hook"][field] = "unmatched".into();
-        assert!(claude_context(&value["hook"], &bytes(&value), 65536, 3)
-            .messages
-            .is_empty());
+        assert!(
+            claude_context(&value["hook"], &bytes(&value), 65536, 3)
+                .messages
+                .is_empty()
+        );
     }
     for (field, replacement) in [
         ("version", Value::from("unknown")),
@@ -69,9 +71,11 @@ fn unsupported_version_sidechain_ambiguous_chain_or_prompt_never_establishes_cla
     ] {
         let mut value = original.clone();
         value["records"][18][field] = replacement;
-        assert!(claude_context(&value["hook"], &bytes(&value), 65536, 3)
-            .messages
-            .is_empty());
+        assert!(
+            claude_context(&value["hook"], &bytes(&value), 65536, 3)
+                .messages
+                .is_empty()
+        );
     }
     let mut duplicate = original.clone();
     duplicate["records"][18]["uuid"] = duplicate["records"][0]["uuid"].clone();
@@ -80,16 +84,18 @@ fn unsupported_version_sidechain_ambiguous_chain_or_prompt_never_establishes_cla
             .messages
             .is_empty()
     );
-    assert!(claude_context(&original["hook"], &bytes(&original), 1, 3)
-        .messages
-        .is_empty());
+    assert!(
+        claude_context(&original["hook"], &bytes(&original), 1, 3)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, REQ-advisor-010, EX-advisor-019, EX-advisor-020]
 #[test]
-fn separate_claude_hook_cache_binds_the_pending_prompt_to_verified_source_and_never_restores_an_old_prompt(
-) {
-    use guardian_app::advisor::context::{load_claude_cache, update_claude_cache, CacheLimits};
+fn separate_claude_hook_cache_binds_the_pending_prompt_to_verified_source_and_never_restores_an_old_prompt()
+ {
+    use guardian_app::advisor::context::{CacheLimits, load_claude_cache, update_claude_cache};
     use guardian_app::state::AdvisorState;
     use std::time::{Duration, Instant};
     let root = tempfile::tempdir().unwrap();
@@ -120,24 +126,30 @@ fn separate_claude_hook_cache_binds_the_pending_prompt_to_verified_source_and_ne
     assert!(context.window_may_omit_constraints);
     let mut wrong = fixture["hook"].clone();
     wrong["prompt_id"] = "other-prompt".into();
-    assert!(load_claude_cache(&state, &wrong, limits)
-        .messages
-        .is_empty());
+    assert!(
+        load_claude_cache(&state, &wrong, limits)
+            .messages
+            .is_empty()
+    );
     wrong = fixture["hook"].clone();
     wrong["transcript_path"] = "/fixture/other.jsonl".into();
-    assert!(load_claude_cache(&state, &wrong, limits)
+    assert!(
+        load_claude_cache(&state, &wrong, limits)
+            .messages
+            .is_empty()
+    );
+    assert!(
+        load_claude_cache(
+            &state,
+            &fixture["hook"],
+            CacheLimits {
+                now: 86500,
+                ..limits
+            }
+        )
         .messages
-        .is_empty());
-    assert!(load_claude_cache(
-        &state,
-        &fixture["hook"],
-        CacheLimits {
-            now: 86500,
-            ..limits
-        }
-    )
-    .messages
-    .is_empty());
+        .is_empty()
+    );
     assert!(update_claude_cache(
         &state,
         &submit,
@@ -150,9 +162,11 @@ fn separate_claude_hook_cache_binds_the_pending_prompt_to_verified_source_and_ne
         b"unverifiable source",
         limits
     ));
-    assert!(load_claude_cache(&state, &fixture["hook"], limits)
-        .messages
-        .is_empty());
+    assert!(
+        load_claude_cache(&state, &fixture["hook"], limits)
+            .messages
+            .is_empty()
+    );
     assert!(!update_claude_cache(
         &state,
         &submit,
@@ -168,7 +182,7 @@ fn separate_claude_hook_cache_binds_the_pending_prompt_to_verified_source_and_ne
 #[test]
 fn cached_message_display_is_reference_text_not_user_authorization_and_requires_correspondence() {
     use guardian_advisor::Role;
-    use guardian_app::advisor::context::{load_claude_cache, update_claude_cache, CacheLimits};
+    use guardian_app::advisor::context::{CacheLimits, load_claude_cache, update_claude_cache};
     use guardian_app::state::AdvisorState;
     use std::time::{Duration, Instant};
     let root = tempfile::tempdir().unwrap();
@@ -216,16 +230,18 @@ fn cached_message_display_is_reference_text_not_user_authorization_and_requires_
         &bytes(&fixture),
         limits
     ));
-    assert!(load_claude_cache(&state, &fixture["hook"], limits)
-        .messages
-        .is_empty());
+    assert!(
+        load_claude_cache(&state, &fixture["hook"], limits)
+            .messages
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-advisor-006, REQ-advisor-010, EX-advisor-019, EX-advisor-020]
 #[test]
-fn acquisition_uses_direct_claude_data_without_cache_and_only_uses_verified_cache_when_transcript_is_absent(
-) {
-    use guardian_app::advisor::context::{acquire_claude, process_claude_event, CacheLimits};
+fn acquisition_uses_direct_claude_data_without_cache_and_only_uses_verified_cache_when_transcript_is_absent()
+ {
+    use guardian_app::advisor::context::{CacheLimits, acquire_claude, process_claude_event};
     use guardian_app::state::AdvisorState;
     use std::time::{Duration, Instant};
     let root = tempfile::tempdir().unwrap();
@@ -248,10 +264,12 @@ fn acquisition_uses_direct_claude_data_without_cache_and_only_uses_verified_cach
             .len(),
         3
     );
-    assert!(!root
-        .path()
-        .join("command-guardian/advisor-context")
-        .exists());
+    assert!(
+        !root
+            .path()
+            .join("command-guardian/advisor-context")
+            .exists()
+    );
     std::fs::write(&path, before_submit(&fixture)).unwrap();
     let mut submit = fixture["hook"].clone();
     submit["hook_event_name"] = "UserPromptSubmit".into();
@@ -267,12 +285,16 @@ fn acquisition_uses_direct_claude_data_without_cache_and_only_uses_verified_cach
         "current fixture instruction"
     );
     std::fs::write(&path, b"malformed").unwrap();
-    assert!(acquire_claude(&fixture["hook"], &state, limits)
-        .messages
-        .is_empty());
+    assert!(
+        acquire_claude(&fixture["hook"], &state, limits)
+            .messages
+            .is_empty()
+    );
     assert!(!process_claude_event(&state, &submit, limits));
     std::fs::remove_file(&path).unwrap();
-    assert!(acquire_claude(&fixture["hook"], &state, limits)
-        .messages
-        .is_empty());
+    assert!(
+        acquire_claude(&fixture["hook"], &state, limits)
+            .messages
+            .is_empty()
+    );
 }

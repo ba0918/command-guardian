@@ -161,10 +161,12 @@ fn req_022_claude_ask_returns_permission_decision() {
     let specific = &value["hookSpecificOutput"];
     assert_eq!(specific["hookEventName"], "PreToolUse");
     assert_eq!(specific["permissionDecision"], "ask");
-    assert!(specific["permissionDecisionReason"]
-        .as_str()
-        .unwrap()
-        .contains("untracked"));
+    assert!(
+        specific["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("untracked")
+    );
 }
 
 // @kotowari[REQ-022, EX-020]
@@ -182,10 +184,12 @@ fn req_022_claude_block_returns_deny() {
     let specific = &value["hookSpecificOutput"];
     assert_eq!(specific["hookEventName"], "PreToolUse");
     assert_eq!(specific["permissionDecision"], "deny");
-    assert!(specific["permissionDecisionReason"]
-        .as_str()
-        .unwrap()
-        .contains("system area"));
+    assert!(
+        specific["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("system area")
+    );
 }
 
 // @kotowari[REQ-022]
@@ -298,10 +302,12 @@ fn req_023_codex_block_returns_deny() {
     let specific = &value["hookSpecificOutput"];
     assert_eq!(specific["hookEventName"], "PreToolUse");
     assert_eq!(specific["permissionDecision"], "deny");
-    assert!(!specific["permissionDecisionReason"]
-        .as_str()
-        .unwrap()
-        .is_empty());
+    assert!(
+        !specific["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 // @kotowari[REQ-023]
