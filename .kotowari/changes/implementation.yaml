@@ -283,7 +283,7 @@ entries:
     after: sha256:2f6310a5070fe80191a71030c7618a2cbcdca8e3543fdb5cd03c86af41489176
   - path: CHANGELOG.md
     before: sha256:0127fe7116c542126fbdf069ac8703da7579eb9d1987be6f8be8713ec05f879e
-    after: sha256:95f7e3eb7aa028017f4a47017ffc61950f54cde76e3a691fa836d8ec3064e730
+    after: sha256:70b171ac0db0f9750abee33bc24ad89a2b2ce2a0ebc88ada2f91124a7db3753d
   - path: README.md
     before: sha256:7ba412bfdcfbbfa92606119d53ee796676df1c3c29c19ec761faca3ebecc0cc2
     after: sha256:ad6a3bcd57ecd557163dde629283c08c4af655ff5d1cb4548c3d2b27c500939d
@@ -301,12 +301,13 @@ entries:
     sha256: sha256:2ad3a8626770d143df71c6761014a1080e57c221a14018b8e849d9fdda8b1058
   conclusion: existing
   reason: >-
-    利用者が承認した0.2.0の公開に向け、mainにある既定offの期限付きLLM助言と設定不正の扱いの変更を配布する。
+    利用者が承認した0.2.0の公開に向け、mainにある既定offの期限付きLLM助言を配布する。
     版の正本Cargo.tomlを0.2.0へ上げ、Cargo.lockの本体版も一致させた。ルートのeditionは同じブランチの移行で2024にした。
     UnreleasedをCHANGELOGの日付付き0.2.0見出しへ昇格し、0.1.3から0.2.0への比較リンクを加えた。
-    REQ-015とA60で承認済みの、commands節またはguard一覧の型誤りによる設定ファイル全体の不採用を、
-    既存設定の意味を変える破壊的変更として示し、利用者設定が組込み既定へ戻る影響と更新前の対処を書いた。
-    ソースビルドに必要なRustの下限が上がることも記した。
+    Unreleasedにあったcommands節またはguard一覧の型誤りによる設定ファイル全体の不採用は、
+    REQ-015とA60のとおり0.1.0から実装と試験(req_015_invalid_section_types_reject_the_whole_file)にあり、
+    0.1.3から挙動が変わっていないため、利用者が更新時に対処する変更ではないとして更新履歴から外した。
+    要求と決定の意味は変えていない。
     READMEとOpenCode導入ガイドの版付き例と配布アーカイブ名を0.2.0へ揃え、LLM助言を未リリース扱いから外した。
     利用者設定だけで助言を有効にする条件(REQ-advisor-015)と既定値(REQ-advisor-016)、
     同版プラグインの登録と対応ホスト(REQ-056、REQ-057)、配布物の構成(REQ-025)は変えていない。
