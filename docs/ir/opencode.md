@@ -17,10 +17,13 @@ OpenCode のエージェントが "shell" ツールを呼ぶとき、プラグ�
 ### REQ-048: 共通設定と影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#D1
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#D1, docs/decision/records/2026-10-03-llm-advice-layer.md#A45
 - verification: unit
 
 Rust 本体の "hook --agent opencode" は既存の guardian の設定・影実行・ログを使い、プラグインはこれらの設定を別に読み直さない。本体の応答で "mode.enforce" が false の影実行と確定できた場合だけ、guardian 由来の確認・拒否を出さず、OpenCode 本来の権限判断を維持する。確定済みの影実行では、影ログ保存失敗と対応外shellは警告にとどめる。ログは影実行時だけ記録する。OpenCode 用の応答は判定の無い影実行と判定不能を区別する。影実行か確定できない応答失敗は REQ-051 に従う。JSON の具体的なキーは委譲範囲内で実装担当が契約として記録する。"check" と Claude Code・Codex の既存 hook 契約は変更しない。
+
+ここでのログは影ログを指す。
+助言のメタデータログはadvisor/context.mdに従う別の保存であり、プラグインによる設定の再読込を追加しない。
 
 ### REQ-049: 権限判断を弱めない合成
 
@@ -61,10 +64,12 @@ guardian が `ask` と判定した実行では、その実行の承認要求を 
 ### REQ-053: 承認待ちの寿命
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A14, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A14, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22, docs/decision/records/2026-10-03-llm-advice-layer.md#A16, docs/decision/records/2026-10-03-llm-advice-layer.md#A41
 - verification: unit
 
-プラグイン独自の承認待ち期限と承認履歴の保存は設けない。承認待ち中にセッション中断・プラグイン解除・通信の終了またはエラーを検知した場合は対象コマンドの実行を取りやめ、後の承認・再接続でも再開しない。通信が無応答になっただけの状態の即時検知と、接続の生存監視は保証に含めない。中断と要求作成が競合して確認表示が残った場合も、対象コマンドは再開しない。確認表示の後始末は可能な範囲で行い、必ず消せる保証は付けない。guardian の判定時間上限は変更しない。
+プラグイン独自の承認待ち期限と承認履歴の保存は設けない。承認待ち中にセッション中断・プラグイン解除・通信の終了またはエラーを検知した場合は対象コマンドの実行を取りやめ、後の承認・再接続でも再開しない。通信が無応答になっただけの状態の即時検知と、接続の生存監視は保証に含めない。中断と要求作成が競合して確認表示が残った場合も、対象コマンドは再開しない。確認表示の後始末は可能な範囲で行い、必ず消せる保証は付けない。guardianの機械判定の時間上限は変更しない。
+
+助言有効時の別枠と外側の打切りの整合はadvisor/runtime.mdに従い、助言の期限を承認待ちの期限へ適用しない。
 
 ### REQ-054: 並行実行の承認の分離
 

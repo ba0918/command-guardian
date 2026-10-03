@@ -25,10 +25,13 @@ M1 の成果物は、"command-guardian" という 1 つの実行ファイルで�
 ### REQ-018: 影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-03-llm-advice-layer.md#A45
 - verification: unit
 
 "mode.enforce" が false のとき、command-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
+
+この保存条件は影ログを指す。
+助言のメタデータログはadvisor/context.mdの別契約であり、影ログの本文方針を変更しない。
 
 ログの保存場所がない、または保存できないときは、その記録を省略して標準エラーへ警告する。Claude Code と Codex の hook の標準出力は空で、終了コードは0にする。OpenCode の影実行の応答は REQ-048 が扱い、判定を返さず影実行と判定不能を区別する。
 
@@ -53,11 +56,13 @@ command-guardian は、git のコマンドを、対象のパスが git の作業
 ### REQ-021: 応答時間
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A16
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A16, docs/decision/records/2026-10-03-llm-advice-layer.md#A14, docs/decision/records/2026-10-03-llm-advice-layer.md#A16, docs/decision/records/2026-10-03-llm-advice-layer.md#A58
 - verification: review
-- how_to_verify: 代表的な入力 100 件で判定の時間を計測し、git の起動を含む場合でも 100ms 未満であることを確かめる
+- how_to_verify: 助言オフで代表的な入力100件の応答時間をgitの起動も含めて計測し、測定値と100ms未満の目標の達成または未達を報告する。100ms以上の測定を達成や必須保証へ書き換えていないことをレビューする。助言有効時はモデル待ちを含む別の計測として記録する
 
-判定の応答は、代表的な入力で 100ms 未満にする。
+助言オフ時の判定の応答は、代表的な入力で100ms未満を目標とするが、必須の応答保証ではない。
+測定値と目標の達成または未達を報告し、100ms以上の測定を達成とせず、目標の未達だけを理由とする実行の自動遮断を追加しない。
+助言有効時の待ちは機械判定の5秒予算とadvisor/runtime.mdの設定可能な別枠を区別し、モデル待ちを含む応答時間として別に計測する。
 
 ### REQ-044: ヘルプの表示と判定対象の境界
 
@@ -109,11 +114,18 @@ Scenario: ログの場所と権限
   When ログのファイルを調べる
   Then 所有者だけが読める権限で、時刻、判定、理由、対象パス、コマンド本文が 1 行に入っている
 
-@id=EX-027 @about=REQ-021 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A16
-Scenario: 応答時間の目標
-  Given 代表的な入力 100 件がある
-  When 判定の時間を計測する
-  Then 100ms 未満である
+@id=EX-027 @about=REQ-021 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A16,docs/decision/records/2026-10-03-llm-advice-layer.md#A58
+Scenario: 応答時間の目標達成を測定値とともに報告する
+  Given 助言はoffで代表的な入力100件がある
+  When gitの起動を含む応答時間を計測し各測定値が100ms未満である
+  Then 測定値と目標達成を報告しすべての応答の必須保証とは記さない
+
+@id=EX-111 @about=REQ-021 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A16,docs/decision/records/2026-10-03-llm-advice-layer.md#A58
+Scenario: 応答目標の未達を保証や達成へ書き換えない
+  Given 助言はoffで代表的な入力100件の応答時間に120msの測定がある
+  When 測定報告をレビューする
+  Then 測定値と100ms未満の目標が未達であることを報告する
+  And この測定を達成や必須保証とは記さず未達だけから実行を自動遮断しない
 
 @id=EX-031 @about=REQ-017 @source=docs/decision/records/2026-09-30-hook-guardian-scope.md#A7,docs/decision/records/2026-09-30-hook-guardian-scope.md#A8,docs/decision/records/2026-09-30-hook-guardian-scope.md#A9,docs/decision/records/2026-09-30-hook-guardian-scope.md#A15,docs/decision/records/2026-09-30-hook-guardian-scope.md#A27,docs/decision/records/2026-09-30-hook-guardian-scope.md#A34
 Scenario: ask の終了コード
