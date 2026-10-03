@@ -2,29 +2,29 @@
 
 ## What this is
 
-command-guardian は Bash コマンドの破壊的な効果を取り出し、対象パスと設定から allow、ask、block を返す実行前の見張りである。
-CLI の check とエージェント用の hook を、同じ実行ファイルで提供する。
-利用者が有効にした場合だけ、期限付きのLLM助言で機械判定を厳しくできる。
-助言は既定offで、設定、外部送信、ログの説明は[README](README-ja.md#任意のllm助言)を参照する。
-実行するコマンドを遮断する権限 sandbox ではない。
+command-guardian is a pre-execution watcher that extracts the destructive effects of a Bash command and returns allow, ask, or block based on the target paths and the configuration.
+The same executable provides the CLI `check` and the agent `hook`.
+Only when the user enables it, deadline-bound LLM advice can make the mechanical verdict stricter.
+Advice is off by default; see the [README](README.md#optional-llm-advice) for its configuration, external sending, and logs.
+It is not a permission sandbox that blocks the commands being executed.
 
 ## Stack and layout
 
-Rust 2021 の Cargo workspace。
-現在の実行基盤は Unix のソケットを使い、プロセス隔離の試験は Linux で行う。
-仕様は `docs/ir/`、決定は `docs/decision/records/` に置く。
+A Rust 2024 Cargo workspace.
+The current runtime uses Unix sockets, and process isolation is tested on Linux.
+Specifications live in `docs/ir/` and decisions in `docs/decision/records/`.
 
-| クレート | 責務 | 通常の内部依存 |
+| Crate | Responsibility | Usual internal dependencies |
 |---|---|---|
-| guardian-core | 共通の値と診断 | なし |
-| guardian-advisor | 助言の型、分類、文脈の上限、秘密の検出 | core |
-| guardian-advisor-typesafe | TypeSafe要求の符号化、認証、HTTPS通信 | advisor |
-| guardian-parser | brush-parser の隠蔽、正規化 AST、純粋な構文解析と引用除去 | core |
-| guardian-analysis | Context を保持する意味解析、効果と Invocation の共有走査 | core、parser |
-| guardian-judge | パスの観測、分類、期限付き git 実行 | core |
-| guardian-policy | 設定の解釈とマージ、規則、最悪値の合成、文面 | core、advisor |
-| guardian-app | 設定の探索と読込、worker と session、判定の組立て、助言の期限とローカル状態 | core、parser、analysis、judge、policy、advisor、advisor-typesafe |
-| command-guardian | CLI、hook の写像、環境取得、影ログ | app、core、policy |
+| guardian-core | Shared values and diagnostics | none |
+| guardian-advisor | Advice types, classification, context limits, secret detection | core |
+| guardian-advisor-typesafe | TypeSafe request encoding, authentication, HTTPS transport | advisor |
+| guardian-parser | Hides brush-parser; normalized AST; pure parsing and quote removal | core |
+| guardian-analysis | Context-holding semantic analysis; shared traversal for effects and Invocations | core, parser |
+| guardian-judge | Path observation, classification, deadline-bound git execution | core |
+| guardian-policy | Configuration interpretation and merging, rules, worst-case composition, messages | core, advisor |
+| guardian-app | Configuration discovery and loading, worker and session, verdict assembly, advice deadlines and local state | core, parser, analysis, judge, policy, advisor, advisor-typesafe |
+| command-guardian | CLI, hook mapping, environment acquisition, shadow log | app, core, policy |
 
 ## Commands
 
@@ -36,13 +36,13 @@ scripts/kotowari-check.sh
 cargo build --release --locked
 ```
 
-実バイナリの外部契約を絞って確認する場合:
+To check only the external contract of the real binary:
 
 ```sh
 cargo test -p command-guardian --locked --test cli --test hook --test shadow --test isolation
 ```
 
-通常の利用例:
+Typical usage:
 
 ```sh
 cargo run --locked -- check 'rm -rf /etc/x' --cwd /tmp --format json
@@ -50,9 +50,9 @@ cargo run --locked -- check 'rm -rf /etc/x' --cwd /tmp --format json
 
 ## Conventions specific to this project
 
-### OpenCode V2の検証
+### OpenCode V2 verification
 
-Bun 1.4.2とpackage内の固定依存を使う。試験実行ファイルは公式npmの "@opencode/cli-linux-x64@2.0.21" をlockfileのintegrity付きで取得する。試験冒頭でも版を確認する。個人のサービスを探索せず、モデルを呼ばない。
+Use Bun 1.4.2 and the dependencies pinned in the package. The test executable is the official npm "@opencode/cli-linux-x64@2.0.21", fetched with the lockfile's integrity. The tests also check its version at the start. They do not discover personal services and do not call a model.
 
 ```sh
 bun install --frozen-lockfile --cwd plugins/opencode
@@ -64,76 +64,76 @@ GUARDIAN_TEST_BIN="$PWD/target/debug/command-guardian" \
   bun run --cwd plugins/opencode test:integration
 ```
 
-GNU/muslのrelease binaryでもGUARDIAN_TEST_BINを差し替えて実行する。CIは同じscriptでアーカイブを作り、checkout外へ展開したpluginとbinaryでも試験する。配布用manifestの版はCargo.tomlから組立て時に生成する。
+Also run them against the GNU and musl release binaries by replacing GUARDIAN_TEST_BIN. CI builds the archive with the same script and also tests the plugin and binary extracted outside the checkout. The version in the distributed manifest is generated from Cargo.toml at assembly time.
 
-### 変更とIRの照合
+### Reconciling changes with the IR
 
-kotowari 0.3.0以降の、"changes" コマンドを持つ版を使う。
-これはIRを自動生成する機能ではなく、Gitの変更と判断記録の対応・鮮度を検査する。
-今回の導入より前の変更を、自動で仕様適合とみなすものではない。
+Use kotowari 0.3.0 or later, a version that has the "changes" command.
+It does not generate the IR; it checks that Git changes correspond to judgment records and that the records are current.
+It does not treat changes made before its adoption as conforming to the specification.
 
-1. 呼出元がブランチ全体の比較元と候補先をGitから確定し、完全なコミットIDを記録する。記録ファイルの自己申告から比較元を選ばない。
-2. 実装者が ".kotowari/changes/implementation.yaml" を作る。既存要求内なら要求と関連IR、仕様の穴を埋めるなら根拠・判断者・決定記録と必要なIRを残す。実装をそのまま正しい仕様として取り込まない。
-3. 実装と別のコンテキストのレビュー担当が根拠・意味・承認範囲を確認し、同じ変更と実装者が挙げた全IRを含む ".kotowari/changes/review.yaml" を自分で作る。役割ラベルだけを変えてコピーしない。
-4. 両記録をコミットし、呼出元が最終HEADを再確定する。下記の両検査と既存の製品チェックが成功した場合だけ統合する。未処理の仕様判断をdeferredにしたまま統合しない。
+1. The caller determines the branch-wide comparison base and candidate head from Git and records their full commit IDs. Do not choose the base from what a record file claims.
+2. The implementer writes ".kotowari/changes/implementation.yaml". Within existing requirements, record the requirements and related IR; when filling a specification gap, record the evidence, the decision maker, the decision record, and the necessary IR. Do not adopt the implementation as the correct specification as-is.
+3. A reviewer in a context separate from the implementation checks the evidence, meaning, and approved scope, and writes ".kotowari/changes/review.yaml" themselves, covering the same changes and every IR the implementer listed. Do not copy the implementer's record and change only the role label.
+4. Commit both records, and the caller re-determines the final HEAD. Integrate only when both checks below and the existing product checks succeed. Do not integrate with an unresolved specification judgment left as deferred.
 
 ```sh
-BASE=<呼出元がGitから確定したブランチ全体の比較元の完全なID>
+BASE=<full ID of the branch-wide comparison base that the caller determined from Git>
 HEAD_SHA=$(git rev-parse HEAD)
 kotowari check --format json
 kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
 ```
 
-コード・IR・決定の意味の変更、rebase、cherry-pick、並行統合で最終記録が無効になったら、両記録を除いて該当entry全体を照合し直し、独立レビュー後に作り直す。
-記録は上記2ファイルに現在の比較だけを保持し、過去分はGit履歴で読む。
-中間コミットとpre-commitフックには "changes" を要求しない。
-任意の実装者自己検査には "kotowari changes --base HEAD --staged --phase implementation" を使えるが、独立レビューの代わりにはならない。
-"status" のcompleteだけでは変更照合の完了とは扱わない。
-CIはmainへのpushと全PRで実行する。PRはイベントbaseと実headのmerge-baseを使い、合成mergeコミットを検査しない。pushはイベントbefore/afterを使い、ゼロbeforeと履歴不足は失敗させる。
+When a change in the meaning of code, IR, or decisions, a rebase, a cherry-pick, or a concurrent integration invalidates the final records, set both records aside, reconcile the affected entries in full again, and recreate them after an independent review.
+The two files above hold only the current comparison; read earlier ones from Git history.
+Do not require "changes" for intermediate commits or in the pre-commit hook.
+For an optional implementer self-check, "kotowari changes --base HEAD --staged --phase implementation" can be used, but it does not replace the independent review.
+A "status" of complete alone does not count as completing the change reconciliation.
+CI runs on pushes to main and on every PR. For a PR, it uses the merge-base of the event base and the actual head, and does not check the synthetic merge commit. For a push, it uses the event's before/after, and fails on a zero before or missing history.
 
-### CIとpush前の検査
+### CI and pre-push checks
 
-CIとlefthookのpre-pushでfmt、gnu/muslのclippy・全テスト・release build、kotowari check/changes reviewを実行する。
-ローカルの前提はrustfmt、clippy、両Rustターゲット、musl-tools、kotowari 0.3.0以降。クローンごとに "lefthook install" でフックを有効にする。
-push前に "git fetch origin main" を行う。作業ブランチはorigin/mainとのmerge-base、mainは送出先の旧SHAで照合する。比較元不明、未コミット変更、HEAD以外の送出は停止する。
-CIとフックは開発運用の設定であり、製品IRへ要求を追加しない。
+CI and the lefthook pre-push hook run fmt, clippy, all tests, and the release build for both gnu and musl, plus kotowari check and changes review.
+Local prerequisites are rustfmt, clippy, both Rust targets, musl-tools, and kotowari 0.3.0 or later. Enable the hooks with "lefthook install" in each clone.
+Run "git fetch origin main" before pushing. A work branch is checked against its merge-base with origin/main, and main against the remote's old SHA. An unknown base, uncommitted changes, or pushing anything other than HEAD stops the push.
+CI and hooks are development operations settings and add no requirements to the product IR.
 
-### リリース
+### Releases
 
-版の正本は "Cargo.toml" の "[package].version"。
-CHANGELOGを "## [VERSION] - YYYY-MM-DD" に昇格し、対応する比較リンクを添えてmainへ統合すると、全検査成功後に未公開のvVERSIONを自動公開する。Unreleasedの間は公開しない。
-GitHub ReleasesにはLinux x86_64 muslバイナリとLICENSEのtar.gz、SHA256を置く。タグは検査したcommitへ付け、公開済みタグは移動・再利用しない。
+The canonical version is "[package].version" in "Cargo.toml".
+When CHANGELOG is promoted to "## [VERSION] - YYYY-MM-DD" with the matching comparison link and integrated into main, the unpublished vVERSION is published automatically after all checks pass. Nothing is published while the section is Unreleased.
+GitHub Releases carry a tar.gz of the Linux x86_64 musl binary and LICENSE, with its SHA256. The tag is placed on the checked commit, and a published tag is never moved or reused.
 
-### 紹介ページ
+### Landing page
 
-"site/" の紹介ページは、mainへのpushごとに ".github/workflows/pages.yml" がGitHub Pagesへ公開する。
-版はCargo.toml、更新履歴はCHANGELOG.md、表と導入文はREADME.mdとREADME-ja.mdの見出しから取り、判定例はその場でビルドした実バイナリの出力を載せる。
-READMEの該当見出しを変えるとページのビルドが失敗するため、"site/build.py" の見出しも合わせる。
-判定例の結果が期待と変わってもビルドは警告だけで続き、ページには実際の出力が載る。
-ローカルでは "cargo build --release --locked" の後に "python3 site/build.py" で "_site/" に生成する。
-ページは製品の外部契約ではなく、製品IRへ要求を追加しない。
+The landing page in "site/" is published to GitHub Pages by ".github/workflows/pages.yml" on every push to main.
+The version comes from Cargo.toml, the release notes from CHANGELOG.md, and the tables and introduction from headings in README.md and README-ja.md; the verdict examples show the output of the real binary built on the spot.
+Changing one of those README headings makes the page build fail, so update the headings in "site/build.py" as well.
+When an example's result differs from its expectation, the build only warns and continues, and the page shows the actual output.
+Locally, run "cargo build --release --locked" and then "python3 site/build.py" to generate "_site/".
+The page is not part of the product's external contract and adds no requirements to the product IR.
 
-### 製品の実装と試験
+### Product implementation and tests
 
-- 本番の入力由来の解析は app の session を通す。main の先頭で同一バイナリの子を dispatch する。親での直接解析 fallback は置かない。
-- 純粋な parser と analysis の試験には浅い入力を使う。子の死亡と深い入力は root の実バイナリ試験へ置く。libtest の main を worker として再起動しない。
-- git fixture は `CARGO_TARGET_TMPDIR` に置く。target を `/tmp` へ移すと一時領域の分類に変わるため、検証時に移さない。
-- CLI と hook の試験では fixture の HOME と XDG を使い、実利用者の設定と影ログへ書き込まない。
+- Production analysis of input-derived data goes through the app session. At the top of main, dispatch to a child of the same binary. Do not add a fallback that parses directly in the parent.
+- Use shallow inputs in pure parser and analysis tests. Put child death and deep inputs in the root crate's real-binary tests. Do not re-launch libtest's main as a worker.
+- Put git fixtures in `CARGO_TARGET_TMPDIR`. Moving target under `/tmp` changes their classification to temporary space, so do not move it when verifying.
+- CLI and hook tests use the fixture's HOME and XDG directories and never write to the real user's configuration or shadow log.
 
 ## Constraints
 
-単一バイナリ、CLI の終了コード、設定の三層と信頼条件、JSON、hook、影ログの外部契約を維持する。
-構文のサイズは1 MiB、深さは128段、一判定の構文解析は1000回、判定時間は5秒が上限である。
-助言の期限は機械判定と別枠で、既定2秒に取得、起動、検査、通信を含める。
-モデル呼出しは最大1回で、再試行しない。
-実モデルの精度と現在のTypeSafeサービスとの適合は未検証である。
-設定例の検証には一要求の隔離上限を適用し、設定全体への累積1000回/5秒の受理上限は設けない。
-git の待ちと出力の取得を判定の残時間で切るが、全 fs syscall を5秒で強制中断する保証はない。
-代表的な浅い入力の応答目標は100ms未満で、病的な深い入力とは別に計測する。
+Keep the external contracts: a single binary, the CLI exit codes, the three configuration layers and their trust conditions, JSON, hooks, and the shadow log.
+The limits are 1 MiB of syntax, 128 levels of depth, 1000 parses per verdict, and 5 seconds per verdict.
+The advice deadline is separate from the mechanical verdict's and, at the default of 2 seconds, covers acquisition, startup, checking, and transport.
+The model is called at most once, with no retries.
+Real-model accuracy and compatibility with the current TypeSafe service are unverified.
+Validating configuration examples applies the per-request isolation limits, without a cumulative acceptance limit of 1000 parses / 5 seconds over the whole configuration.
+Waiting on git and collecting its output are cut off by the verdict's remaining time, but there is no guarantee that every fs syscall is forcibly interrupted within 5 seconds.
+The response target for representative shallow inputs is under 100 ms, measured separately from pathological deep inputs.
 
 ## Glossary
 
-- **JudgmentSession**：一判定の間だけ runtime を借用し、解析回数と経過時間を管理する値。
-- **ValidationSession**：設定の読込中だけ例を隔離して解析する値。判定の累積予算は持たない。
-- **CommandFacts**：同じ共有走査で得た効果、見かけの起動情報、診断。
-- **ObservedPath**：一度解決したパス。設定ルートと既定分類で共有し、表示用の元 Target とは分ける。
+- **JudgmentSession**: A value that borrows the runtime only for the duration of one verdict and tracks the number of parses and elapsed time.
+- **ValidationSession**: A value that analyzes examples in isolation only while configuration is loading. It has no cumulative verdict budget.
+- **CommandFacts**: The effects, apparent invocation information, and diagnostics obtained from the same shared traversal.
+- **ObservedPath**: A path resolved once. It is shared by configuration roots and default classification, and kept separate from the original Target used for display.

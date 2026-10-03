@@ -24,10 +24,10 @@ Position: A7とR5の文書改訂は独立レビューを経た。利用者が追
   - why: [log.rs](../../../src/log.rs)にはstate場所とopenatの既存パターンがあるが、appからrootへ参照すると依存が逆転する。[助言キャッシュ](../../ir/advisor/context.md#req-advisor-010-必要な経路だけのセッションキャッシュ)と[助言ログ](../../ir/advisor/context.md#req-advisor-011-助言ログと影ログの分離)は所有者と複数hardlinkも検査するため、[影ログ](../../ir/cli.md#req-019-影実行のログ)とは別の保存境界が必要である
   - decided_by: AI（計画実装担当。承認者ではない）
 - A5 接続と子の試験は制御transport、試験用AdvisorClient、起動境界のfixture子、本物の配布バイナリdispatchを組み合わせて行う。公開試験用フラグやURL指定を追加しない。
-  - why: [接続境界](../../ir/advisor/provider.md#req-advisor-012-現在の利用と試験に必要なモデル境界)には制御試験が明示され、[設定の公開境界](../../ir/advisor/provider.md#req-advisor-015-利用者だけが助言を設定する)は任意URLや実行ファイル指定を禁止する。[PROJECT.md](../../../PROJECT.md#製品の実装と試験)はlibtest再起動を禁止する。制御した失敗は期限と復帰の証拠になるが、[REQ-advisor-005](../../ir/advisor/policy.md#req-advisor-005-モデルの品質を構造試験と区別する)に従いモデル精度や実サービス適合の証拠とはしない
+  - why: [接続境界](../../ir/advisor/provider.md#req-advisor-012-現在の利用と試験に必要なモデル境界)には制御試験が明示され、[設定の公開境界](../../ir/advisor/provider.md#req-advisor-015-利用者だけが助言を設定する)は任意URLや実行ファイル指定を禁止する。[PROJECT.md](../../../PROJECT.md#product-implementation-and-tests)はlibtest再起動を禁止する。制御した失敗は期限と復帰の証拠になるが、[REQ-advisor-005](../../ir/advisor/policy.md#req-advisor-005-モデルの品質を構造試験と区別する)に従いモデル精度や実サービス適合の証拠とはしない
   - decided_by: AI（計画実装担当。承認者ではない）
 - A6 実装の範囲内の試験充足と、統合前の全体検査を別に報告する。比較元と最終候補は呼出元がGitから固定する。
-  - why: [PROJECT.md](../../../PROJECT.md#変更とirの照合)は独立担当による記録とcheck/changes reviewの両exit0を統合条件にしている。一方、計画対象外の問題やstatusのcompleteは対象実装の証明とは別である。仕様の承認コミットと計画承認後の実装branch baseを混同せず、記録コミット後の最終HEADで再検査する
+  - why: [PROJECT.md](../../../PROJECT.md#reconciling-changes-with-the-ir)は独立担当による記録とcheck/changes reviewの両exit0を統合条件にしている。一方、計画対象外の問題やstatusのcompleteは対象実装の証明とは別である。仕様の承認コミットと計画承認後の実装branch baseを混同せず、記録コミット後の最終HEADで再検査する
   - decided_by: AI（計画実装担当。承認者ではない）
 - A7 [利用者が承認した検証分担A63](./2026-10-03-llm-advice-layer.md#agreements)に従い、[計画](https://github.com/ba0918/command-guardian/blob/c2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6d/docs/plans/llm-advisor.md#verification-map)のREQ-advisor-002とEX-advisor-003、004、053をS10の独立質問レビューへ対応付ける。REQ-advisor-004の分離はS2/S5の単体試験のままとし、19助言要求と48助言例に既存EX-112、113を加えた50例を機械試験の充足対象とする。
   - why: 固定質問の文字列一致や偽Assessmentによる合成は質問の意味の証拠ではないため、実際の実装パスと書かれた契約、三例ごとの判断根拠を独立担当の証拠として要求する。現在の部分実装の試験不足件数はこの実装前の対象数とは別に報告する。分類、閾値、送信、実行時の挙動、計画名と比較元は変更しない
