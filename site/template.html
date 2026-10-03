@@ -196,8 +196,8 @@
         </article>
         <article class="agent-card">
           <h3>OpenCode V2</h3>
-          <p class="note"><span class="en">guardian 0.1.2+ · host 2.0.21</span><span class="ja">guardian 0.1.2 以降 · ホスト 2.0.21</span></p>
-          <p><span class="en">Register the plugin matching your binary and explicitly select Bash. From guardian 0.1.3, normal startup connects automatically to its own local background service. Explicit servers still need authenticated connection settings. Use Linux x86_64 or WSL; other host versions are unverified.</span><span class="ja">本体と同じ版のプラグインを登録し、Bashを明示設定してください。0.1.3からは通常起動時に自身のローカルサービスへ自動接続します。明示起動したサーバーには認証付き接続設定が必要です。Linux x86_64 / WSL が対象で、他のホスト版は未検証です。</span></p>
+          <p class="note"><span class="en">host 2.0.21 · Linux x86_64 / WSL</span><span class="ja">ホスト 2.0.21 · Linux x86_64 / WSL</span></p>
+          <p><span class="en">Register the plugin from the same release as your binary and explicitly select Bash. Normal startup connects automatically to its own local background service; explicitly started servers need authenticated connection settings. Other host versions are unverified.</span><span class="ja">本体と同じ版のプラグインを登録し、Bashを明示設定してください。通常の起動では自身のローカルサービスへ自動接続します。明示起動したサーバーには認証付き接続設定が必要です。他のホスト版は未検証です。</span></p>
           <a class="en" href="{{repo_url}}/blob/main/README.md#opencode-v2">Installation steps →</a><a class="ja" href="{{repo_url}}/blob/main/README-ja.md#opencode-v2">導入手順 →</a>
           <a href="{{repo_url}}/blob/main/docs/opencode.md#automatic-connection-to-the-background-service"><span class="en">Connection and verification scope →</span><span class="ja">接続設定と検証範囲（英語）→</span></a>
         </article>
@@ -275,7 +275,37 @@ deny = [["push"]]</pre>
     </div>
   </section>
 
-  <section id="changelog">
+  <section id="advice">
+    <div class="wrap two-col">
+      <div>
+        <h2 class="section-title"><span class="en">Optional LLM advice</span><span class="ja">任意のLLM助言</span></h2>
+        <p class="section-lead">
+          <span class="en">From v0.2.0, a model can take a second look at commands the mechanical check allowed or asked about. It is off by default and can only be enabled in your user configuration.</span>
+          <span class="ja">v0.2.0 から、機械判定が許可または確認としたコマンドを、モデルにもう一度見てもらえます。既定では無効で、有効にできるのは利用者の設定だけです。</span>
+        </p>
+        <ul class="advice-points">
+          <li><span class="en"><strong>Only stricter.</strong> Advice can tighten <code class="chip chip-allow">allow</code> and <code class="chip chip-ask">ask</code>, but never releases <code class="chip chip-block">block</code> or turns <code>ask</code> into <code>allow</code>.</span><span class="ja"><strong>厳しくするだけ。</strong><code class="chip chip-allow">allow</code> と <code class="chip chip-ask">ask</code> を厳しくできますが、<code class="chip chip-block">block</code> を解除したり <code>ask</code> を <code>allow</code> にしたりはしません。</span></li>
+          <li><span class="en"><strong>Bounded.</strong> At most one request per verdict, with no retries and a 2-second default deadline. Timeouts and failures keep the mechanical verdict.</span><span class="ja"><strong>期限つき。</strong>一判定につき要求は最大1回で、再試行せず、既定の期限は2秒です。時間切れや失敗のときは機械判定をそのまま使います。</span></li>
+          <li><span class="en"><strong>Sends data.</strong> The command, working directory, mechanical result and a bounded slice of recent conversation go to TypeSafe over HTTPS. Detected secrets skip sending, but detection is incomplete.</span><span class="ja"><strong>外部へ送信します。</strong>コマンド、作業ディレクトリ、機械判定、直近の会話の一部を HTTPS で TypeSafe へ送ります。秘密を検出した場合は送信しませんが、検出は完全ではありません。</span></li>
+        </ul>
+        <p class="note">
+          <span class="en">Real-model accuracy and compatibility with the current TypeSafe service have not been verified. Start with <code>observe</code>, which only records advice. <a href="{{repo_url}}/blob/main/README.md#optional-llm-advice">Setup, data sent and logs →</a></span>
+          <span class="ja">実モデルの精度と、現在の TypeSafe サービスとの適合は未検証です。まずは助言を記録するだけの <code>observe</code> から始めてください。<a href="{{repo_url}}/blob/main/README-ja.md#任意のllm助言">設定・送信内容・ログ →</a></span>
+        </p>
+      </div>
+      <div>
+<pre class="term"><span class="comment"># ~/.config/command-guardian/config.toml</span>
+[advisor]
+mode = "observe"  <span class="comment"># "off" (default), "observe" or "enforce"</span></pre>
+        <p class="note">
+          <span class="en">Supply <code>TYPESAFE_API_KEY</code> through the guardian process environment, not in TOML or a command that enters shell history. Project configuration cannot enable advice.</span>
+          <span class="ja"><code>TYPESAFE_API_KEY</code> は guardian プロセスの環境変数で渡し、TOML やシェル履歴に残るコマンドには書かないでください。プロジェクトの設定では助言を有効にできません。</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="changelog" class="band">
     <div class="wrap">
       <h2 class="section-title"><span class="en">Recent changes</span><span class="ja">最近の更新</span></h2>
       <p class="note ja">更新履歴は原文（英語）を掲載しています。</p>
