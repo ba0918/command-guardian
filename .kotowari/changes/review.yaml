@@ -1,7 +1,7 @@
 version: 1
 entries:
-- id: llm-advisor-final-review
-  base: 9c5a25884a2d430dfaafd56758f515a66992330e
+- id: llm-advisor-push-review
+  base: 11688d0e3566d4b8d837cee64db87e74e672d094
   role: reviewer
   files:
   - path: Cargo.lock
@@ -121,15 +121,12 @@ entries:
   - path: crates/guardian-policy/src/message.rs
     before: sha256:b172be60a580feb370e23f9a113eea9bf21c9def811d03852d844ecd8c6f4485
     after: sha256:429fc63c2cb713d794399f816f9472d214e64ebe739c4a4a28dc156896c7243f
-  - path: docs/plans/llm-advisor.md
-    before: sha256:2dcdd30f689b04084dfa06365dfd5289e1de1b73e11f418b0bad260d9612034b
-    after: sha256:daf1c141f89b820c2f2b2f7fb977a4b313a35eb77c66fe7c55cccdfdfb3798df
   - path: docs/verification/llm-advisor-context.md
     before: null
     after: sha256:dbd8879efd376a55da6d7b797b14880b621c32defca74b4709746d22e9665bdb
   - path: docs/verification/llm-advisor.md
     before: null
-    after: sha256:41b72cd0f19ee66c2b59938945ca5db81854e76e751109f21336467336cebba9
+    after: sha256:ec5d1033f7575fa2043c6874316bf5787f953340cb49ab328e29a209b2ea56a8
   - path: plugins/opencode/src/advisor-control.ts
     before: null
     after: sha256:d662ab46cbdbc456ad57b99b96c94542c7d72ebc262d6480506d509e3d2aeebe
@@ -184,6 +181,33 @@ entries:
   - path: tests/fixtures/advisor/codex-0.160.0.json
     before: null
     after: sha256:4d87f46a23c1b4a71cc2bd483b0600e43add825391f0c6140f8d119c34d4793a
+  - path: CHANGELOG.md
+    before: sha256:7f1e2fbb6ebafb35b83a6ac13e5b80bfd4ecb1be1151cb5325ab98feee82efd1
+    after: sha256:0127fe7116c542126fbdf069ac8703da7579eb9d1987be6f8be8713ec05f879e
+  - path: PROJECT.md
+    before: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
+    after: sha256:35f26e5faa7c38d1afb262fec038b83b195844580700b1c524ef35bc8b268a0a
+  - path: README-ja.md
+    before: sha256:37748e205eab516f157562d150e04136c7d7be601a94c0eeb347afa1cb15e01c
+    after: sha256:d40f57dfe77707e29f69c2d4b62889d45185807533c2b844efc05411d4e8256d
+  - path: README.md
+    before: sha256:668ce83e73f2150d0457dc1899a58aeb09aba76a64e48c56686fb8a713cc05c7
+    after: sha256:7ba412bfdcfbbfa92606119d53ee796676df1c3c29c19ec761faca3ebecc0cc2
+  - path: TODO.md
+    before: sha256:4f37c61342921ed2fc92a9d077a5117a10c720e05f80cb8a8050f9732ceb668a
+    after: sha256:dbe3b9be2797fb7d1d12764b1114cc0ca627c87bc9f75d20bab144efcf1443d8
+  - path: docs/opencode.md
+    before: sha256:d470644f1aa9ad0b205371cb7608e7c987e67e4798ad3a020ff202c32c66e062
+    after: sha256:5931593359a6b409334ab38ded0e77387210e17a31de3a7e723f3fb6d111c790
+  - path: site/build.py
+    before: sha256:aa166fe2f6503e6ecd16fa61deb8707db9a82ef8e1ba45fa8325428b2beb5197
+    after: sha256:aa166fe2f6503e6ecd16fa61deb8707db9a82ef8e1ba45fa8325428b2beb5197
+  - path: site/style.css
+    before: sha256:ba6c99092d729dfbb26f04899389a37c9ff3d488be85bb11ae22211337567711
+    after: sha256:ba6c99092d729dfbb26f04899389a37c9ff3d488be85bb11ae22211337567711
+  - path: site/template.html
+    before: sha256:bc48df7f046baec311c321867e9b2f6e6802891048a9c801a66b913b9c428413
+    after: sha256:bc48df7f046baec311c321867e9b2f6e6802891048a9c801a66b913b9c428413
   ir:
   - path: docs/ir/CONTEXT.md
     sha256: sha256:3d490a3bce557dddb267b2462d5182bba1860f6ea49bf4957c763f38ec88633c
@@ -223,17 +247,42 @@ entries:
     sha256: sha256:48566c201311d2fa2479dbce9ebb51b9a288de2737a10b724ece43313ab6069e
   conclusion: new
   reason: |-
-    機械判定を弱めずに助言を重ねる承認済み契約へ、固定BASEから候補HEADまでの変更を独立して照合した。実装・修正・配送組立ては担当していない。全65変更ファイル、18 IR、計画と97照会項目のフルレビュー、その後の6ファイル差分レビューを行った。候補HEADをGitで確定し、レビュー済み202ファイルとblob・実行権を比較した結果、配送組立てによる差は検証文書と実装者記録の2件だけであった。以下の判断は同じ製品・試験・IR・決定のbytesに対する独立レビューを引き継ぐ。
+    呼出元が指定した送出先の比較元11688d0e3566d4b8d837cee64db87e74e672d094と統合候補d462072b548ba917d07fd334f913a35844e4b345をGitで確認し、比較全体を独立して照合した。
+    実装、修正、文書組立て、mergeは担当していない。
+    全ファイルのGit modeとblobを既にレビューしたc2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6dと比較し、差が9文書、紹介ページの3ファイル、実装者記録だけであることを確認した。
+    製品、試験、依存、設定と18 IRは同一なので、全65変更ファイルと97照会項目の独立フルレビュー、その後の6ファイル差分レビューと最終照合の根拠を引き継ぐ。
 
-    質問が限定DELETEや対象名から破壊性・承認を創作しないこと、独立有害効果を優先することを、実際の固定質問と分類定義へ照合した。撤回・変更・別操作への切替えと参照不足についても、質問と送信するrole・相対順序・確認状態・窓の限界を反例に照合した。合成fixtureのmatchedや文字列一致を意味の証明にしていない。A63/A64は利用者が承認した検証分担の改訂であり、計画A7/A8とpolicy/context IRに反映されている。この承認済み改訂を含むためconclusionはnewとする。製品の振る舞いから新たな仕様を導いた判断ではない。
+    助言の分類と指示の鮮度の意味は、実際の固定質問、分類定義、送信データを要求と反例へ照合した判断を維持する。
+    限定DELETEや対象名から破壊性と承認を創作せず、独立有害効果を優先し、撤回と別操作への切替え、窓外参照の不足を扱う。
+    偽のmatchedや文字列一致を意味の証明にしていない。
+    利用者が承認したA63/A64と計画A7/A8の検証分担改訂を比較全体が含むためnewとする。
+    policy/context IRの改訂は保存され、計画決定記録の変更は廃止した計画を指す3リンクの固定コミット参照への変更だけであり、選択、理由、判断者を変えていない。
 
-    単体・実IPC・実入口の証拠を分け、分布と合成、文脈の出所と限定窓、秘密・サイズ・符号化による送信見送り、利用者専用設定と既存層の復旧、専用子の枠検査と単一期限、保存の隔離を確認した。CLI JSONと終了コード、ClaudeとCodexのnative出力、OpenCodeのjudged/shadow・承認・中断は既存の外部契約内である。子からの高リスク応答と共有出力関数の組合せは、実モデルや固定ホストでの高リスク応答の実測と区別する。
+    従来の品質と仕様適合の指摘6件の解消根拠は、同一の製品bytesに対して有効である。
+    JSONキーの秘密伏字、既知の機械効果を保った介入文面、設定換算の境界、非UTF-8 cwdの本文なしEncoding記録と保存失敗警告、大きな受理済みTの絶対期限を保つ分割timerを含む。
+    実CLIの基準結果とoff/blockの除外、実judgeのFD通知とack後の200ms遅延allow、取消と回収を独立して確認した既存証拠を用いる。
+    子の合成と共有native出力関数の証拠は、実モデルや固定ホスト内の高リスク回答の実測と区別する。
 
-    品質レビューと仕様適合レビューの元指摘・差分判断を照合し、6件の解消根拠を確認した。JSONキーの秘密伏字、既知の機械効果に基づく介入文面、設定換算の境界はフルレビュー済みで変更されていない。非UTF-8 cwdはモデル境界へ到達せず本文なしEncodingメタデータまたは保存失敗警告を残す。実CLIでallow/askの基準結果とoff/blockの除外を確認した。大きな受理済みTは同じ単調時計の絶対期限へ分割timerを設定する。実judgeのFD交渉で2^31ms超の通知・ack後、200ms遅延のallowを受領し、通常・legacy・遅いack・取消と回収の境界を確認した。設定上限の追加、黙った短縮、期限の延長はない。
+    追加の9文書を全体で読み、READMEの両言語、PROJECT、CHANGELOG、OpenCode導入文書の説明を現行の設定、送信本文、合成、期限、保存と外部契約へ照合した。
+    未リリースのソースビルドと公開済み0.1.3を区別し、既定offと利用者設定のみ、observeからの確認、環境認証、外部送信の範囲、秘密検出の限界、ログとキャッシュと影実行の違いを説明している。
+    2秒の助言期限を機械判定の5秒と分け、OpenCodeの受信時T+1000msと長時間timerを追加モデル予算にしていない。
+    閾値0.9を正答率とせず、現在のTypeSafeサービス適合と実モデル精度は未評価のままである。
+    新たな公開入力、ホスト対応、送信範囲、許可の保証を文書から追加していない。
 
-    配送時の検証文書全体と追加差分を確認した。現在の収束と過去のFAIL・未確定のhost準備失敗を分け、閾値0.9を精度とせず、TypeSafeの現在のサービス適合・モデル品質を未評価と明記している。28件の実ログのSHA-256と結果を照合し、GNU/musl各414試験、Bun30試験、固定2.0.21ホスト5経路各14試験、包装とchecksum、off100件の観測を確認した。浅い入力の中央値3.584ms・最大7.378msと実git20回は観測であり保証ではない。全検査は再実行せず、既に実行した独立の限定試験・oracleと同一bytesの証拠を用いた。
+    TODOのFLAG-001完了は既存の決定と空のFlagsに対応し、未確認の手動導入、個人設定の移行、実モデル評価は残件として区別されている。
+    最大7.378msと実git20回は既存のoff100件の観測であり保証ではない。
+    検証文書の旧候補の53件充足は保存された実check/changesログと一致し、現在の送出比較のゲート成功とは扱わない。
+    完了した235行の計画は削除されてもGitの固定コミットから読め、決定の意味と承認の根拠は維持される。
 
-    実装者記録の全60ファイルの識別値と関連13 IRをGitから再計算し、追加で全18 IRを含めた。要求定義と承認の根拠が一致し、未処理の仕様判断や新たな仕様の穴は認めなかった。両役割の記録をコミットした最終HEADでのcheckとchanges reviewは呼出元が行う。本記録はその未実行ゲートの成功、統合、公開、実モデル精度を承認するものではない。
+    統合候補はローカル57bfabcd7aca58b08bb0ce509758cbe4b091db05から実装者記録とsiteの3ファイルだけが異なる。
+    build.py、style.css、template.htmlは送出先比較元のmodeとblobを完全に保ち、この送出でページ実装を変更していない。
+    既存のsite buildログにはrm -rf distのask警告があり、allow成功に書き換えず、製品修正の範囲にも加えない。
+
+    全68ファイルの前後識別値を比較元と候補のGitから再計算し、実装者の全ファイルと13 IRを含め、関連IRは全18ファイルの生bytesから再計算した。
+    同一の要求定義と承認の範囲であり、新しい仕様の穴や保留判断は認めなかった。
+    本記録だけを未コミットで更新し、製品試験は同一bytesの検証を再利用する。
+    呼出元による記録コミット後の最終HEADの両統合ゲートとpre-push検査は別途必要である。
+    この判断は現在のゲート成功、push成功、リリース承認を主張するものではない。
   requirements:
   - REQ-011
   - REQ-012
