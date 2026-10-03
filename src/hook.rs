@@ -41,14 +41,51 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
     if agent == Some(Agent::OpenCode) {
         return opencode::run(&text);
     }
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+        if value
+            .get("hook_event_name")
+            .is_some_and(|event| event != "PreToolUse")
+        {
+            if agent == Some(Agent::Claude)
+                && matches!(
+                    value["hook_event_name"].as_str(),
+                    Some("UserPromptSubmit" | "MessageDisplay")
+                )
+            {
+                let cwd = value["cwd"]
+                    .as_str()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from("/"));
+                if let Ok(engine) = build_engine(cwd) {
+                    if engine.config().advisor.mode.as_str() != "off" {
+                        if let guardian_app::advisor::worker::Source::Claude(hook) =
+                            guardian_app::advisor::worker::Source::from_hook(true, &text)
+                        {
+                            crate::advisor::cache_event(&engine.config().advisor, hook);
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+    }
     let (Some(agent), Some(input)) = (agent, parse_input(&text)) else {
         return 0;
     };
-    let engine = match build_engine(input.cwd) {
+    let engine = match build_engine(input.cwd.clone()) {
         Ok(engine) => engine,
         Err(_) => return 0,
     };
-    let report = engine.check(&input.command);
+    let mut report = engine.check(&input.command);
+    let finished = std::time::Instant::now();
+    let completion = crate::advisor::run(
+        &engine.config().advisor,
+        &mut report,
+        &input.command,
+        &input.cwd,
+        || guardian_app::advisor::worker::Source::from_hook(agent == Agent::Claude, &text),
+        finished,
+    );
     for w in &report.warnings {
         crate::diagnostic(format_args!("Warning: {w}"));
     }
@@ -57,19 +94,29 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
         if crate::log::write_shadow(&report, &input.command).is_err() {
             crate::diagnostic(format_args!("Warning: Could not write shadow log."));
         }
+        crate::advisor::finish(completion);
         return 0;
     }
-    if let Some(decision) = decision(agent, report.verdict, input.permission_mode.as_deref()) {
-        let output = serde_json::json!({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": decision,
-                "permissionDecisionReason": report.message,
-            }
-        });
+    if let Some(output) = response(agent, &report, input.permission_mode.as_deref()) {
         let _ = crate::output(format_args!("{output}"));
     }
+    crate::advisor::finish(completion);
     0
+}
+
+fn response(
+    agent: Agent,
+    report: &guardian_app::Report,
+    permission_mode: Option<&str>,
+) -> Option<serde_json::Value> {
+    let decision = decision(agent, report.verdict, permission_mode)?;
+    Some(serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision,
+            "permissionDecisionReason": report.message,
+        }
+    }))
 }
 
 const HELP: &str = "Judge a Bash request from an agent hook; read the JSON request from stdin.
@@ -165,5 +212,107 @@ fn decision(agent: Agent, verdict: Verdict, permission_mode: Option<&str>) -> Op
             Verdict::Allow | Verdict::Ask => None,
         },
         Agent::OpenCode => None,
+    }
+}
+
+#[cfg(test)]
+mod advisor_output_tests {
+    use super::*;
+    use guardian_advisor::{combine, Assessment, Mode, RawDistribution, ScopeEvidence};
+
+    // @kotowari[REQ-advisor-021, REQ-011, REQ-023, REQ-022, EX-advisor-041]
+    #[test]
+    fn codex_ask_from_child_ipc_has_no_native_output_but_independent_harm_is_deny() {
+        let ask = crate::advisor::operational_tests::fixture_report(
+            "major_destructive",
+            "0.95",
+            "confirmed",
+            Mode::Enforce,
+        );
+        assert_eq!(ask.verdict, Verdict::Ask);
+        assert!(response(Agent::Codex, &ask, None).is_none());
+        assert!(response(Agent::Claude, &ask, Some("dontAsk")).is_none());
+        assert_eq!(
+            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]
+                ["permissionDecision"],
+            "ask"
+        );
+        assert_eq!(
+            response(Agent::Claude, &ask, None).unwrap()["hookSpecificOutput"]
+                ["permissionDecisionReason"],
+            ask.message
+        );
+        let block = crate::advisor::operational_tests::fixture_report(
+            "harmful_irreversible",
+            "0.95",
+            "confirmed",
+            Mode::Enforce,
+        );
+        assert_eq!(block.verdict, Verdict::Block);
+        assert_eq!(
+            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]
+                ["permissionDecision"],
+            "deny"
+        );
+        assert_eq!(
+            response(Agent::Codex, &block, None).unwrap()["hookSpecificOutput"]
+                ["permissionDecisionReason"],
+            block.message
+        );
+        let known = crate::advisor::operational_tests::fixture_known_deletion_report();
+        for agent in [Agent::Claude, Agent::Codex] {
+            let output = response(agent, &known, None).unwrap();
+            let reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+                .as_str()
+                .unwrap();
+            assert!(reason.contains("/fixture/work/notes.txt"));
+            assert!(reason.to_ascii_lowercase().contains("delete"));
+            assert!((2..=4).contains(&reason.lines().count()));
+            assert_eq!(reason, known.message);
+        }
+    }
+
+    // @kotowari[REQ-advisor-003, REQ-022, REQ-023]
+    #[test]
+    fn validated_major_destructive_matched_advice_becomes_ask_but_codex_still_has_no_output_decision(
+    ) {
+        let answer = Assessment::validate(
+            RawDistribution {
+                selected: "major_destructive".into(),
+                probabilities: vec![
+                    ("harmful_irreversible".into(), 0.01),
+                    ("major_destructive".into(), 0.95),
+                    ("irreversible_only".into(), 0.01),
+                    ("no_harm".into(), 0.01),
+                    ("unknown".into(), 0.02),
+                ],
+            },
+            RawDistribution {
+                selected: "matched".into(),
+                probabilities: vec![
+                    ("matched".into(), 0.98),
+                    ("mismatched".into(), 0.01),
+                    ("unknown".into(), 0.01),
+                ],
+            },
+        )
+        .unwrap();
+        let result = combine(
+            Mode::Enforce,
+            Verdict::Allow,
+            Some(&answer),
+            ScopeEvidence::Confirmed,
+            0.9,
+        );
+        assert_eq!(result.final_verdict, Verdict::Ask);
+        assert_eq!(decision(Agent::Codex, result.final_verdict, None), None);
+        assert_eq!(
+            decision(Agent::Claude, result.final_verdict, Some("dontAsk")),
+            None
+        );
+        assert_eq!(
+            decision(Agent::Claude, result.final_verdict, None),
+            Some("ask")
+        );
     }
 }

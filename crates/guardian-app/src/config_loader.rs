@@ -33,10 +33,15 @@ fn read_layer(
     base: &Path,
     home: Option<&Path>,
     session: &mut ValidationSession,
+    project: bool,
 ) -> Result<Layer, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut layer =
-        layers::parse_layer(&text, base, home).map_err(|e| format!("{}: {e}", path.display()))?;
+    let parse = if project {
+        layers::parse_project_layer
+    } else {
+        layers::parse_layer
+    };
+    let mut layer = parse(&text, base, home).map_err(|e| format!("{}: {e}", path.display()))?;
     validate_examples(&mut layer.guard, &mut layer.warnings, session);
     Ok(layer)
 }
@@ -53,9 +58,13 @@ pub fn load(
         Some(path) => {
             let result = match path.try_exists() {
                 Ok(false) => Ok(Layer::default()),
-                Ok(true) => {
-                    read_layer(path, path.parent().unwrap_or(Path::new("/")), home, session)
-                }
+                Ok(true) => read_layer(
+                    path,
+                    path.parent().unwrap_or(Path::new("/")),
+                    home,
+                    session,
+                    false,
+                ),
                 Err(error) => Err(format!("{}: {error}", path.display())),
             };
             match result {
@@ -78,7 +87,7 @@ pub fn load(
         let file_dir = path.parent().unwrap_or(Path::new("/"));
         let base =
             guardian_judge::find_worktree_root(file_dir).unwrap_or_else(|| file_dir.to_path_buf());
-        match read_layer(path, &base, home, session) {
+        match read_layer(path, &base, home, session, true) {
             Ok(mut layer) => {
                 warnings.extend(layer.warnings.iter().cloned());
                 if trusted

@@ -1,0 +1,12 @@
+{
+  "host_version": "2.1.288",
+  "method": "Isolated released CLI, loopback fixture SSE, harmless printf tool; sequential identifier/path substitution only",
+  "events": [
+    {"session_id":"fixture-session","prompt_id":"fixture-prompt","transcript_path":"/fixture/state/transcript.jsonl","cwd":"/fixture/work","permission_mode":"default","hook_event_name":"UserPromptSubmit","prompt":"Fixture user request: print fixture-safe only."},
+    {"session_id":"fixture-session","prompt_id":"fixture-prompt","transcript_path":"/fixture/state/transcript.jsonl","cwd":"/fixture/work","permission_mode":"default","effort":{"level":"high"},"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"printf fixture-safe","description":"Print harmless fixture text"},"tool_use_id":"fixture-tool"},
+    {"session_id":"fixture-session","prompt_id":"fixture-prompt","transcript_path":"/fixture/state/transcript.jsonl","cwd":"/fixture/work","hook_event_name":"MessageDisplay","turn_id":"fixture-turn","message_id":"fixture-message","index":0,"final":true,"delta":"fixture assistant response"},
+    {"session_id":"fixture-session","prompt_id":"fixture-prompt","transcript_path":"/fixture/state/transcript.jsonl","cwd":"/fixture/work","permission_mode":"default","effort":{"level":"high"},"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"fixture assistant response","background_tasks":[],"session_crons":[]}
+  ],
+  "transcript_present_at_event": [false, false, true, true],
+  "limits": ["role=user is not proof of human origin", "MessageDisplay message IDs are not transcript message IDs", "transcript presence is scheduling-dependent"]
+}

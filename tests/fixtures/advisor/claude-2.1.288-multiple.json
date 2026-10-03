@@ -1,0 +1,25 @@
+{
+  "method": "Released Claude Code 2.1.288, isolated HOME/XDG, two sequential print invocations with --resume, loopback SSE, no real authentication. Snapshot at second PreToolUse; metadata retained, paths/identifiers substituted, attachment bodies and tool input/result bodies omitted.",
+  "hook": {"session_id":"fixture-id-1","transcript_path":"/fixture/transcript.jsonl","prompt_id":"fixture-id-19","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"printf fixture-safe"},"tool_use_id":"fixture-tool"},
+  "records": [
+    {"type":"user","uuid":"fixture-id-0","parentUuid":null,"sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"promptId":"fixture-id-2","message":{"role":"user","content":"Fixture user request: print fixture-safe only."}},
+    {"type":"attachment","uuid":"fixture-id-3","parentUuid":"fixture-id-0","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-4","parentUuid":"fixture-id-3","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-5","parentUuid":"fixture-id-4","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-6","parentUuid":"fixture-id-5","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-7","parentUuid":"fixture-id-6","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-8","parentUuid":"fixture-id-7","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-9","parentUuid":"fixture-id-8","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-10","parentUuid":"fixture-id-9","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-11","parentUuid":"fixture-id-10","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"assistant","uuid":"fixture-id-12","parentUuid":"fixture-id-11","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"message":{"role":"assistant","content":[{"type":"tool_use","id":"fixture-tool"}]}},
+    {"type":"user","uuid":"fixture-id-13","parentUuid":"fixture-id-12","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"promptId":"fixture-id-2","message":{"role":"user","content":[{"type":"tool_result"}]}},
+    {"type":"attachment","uuid":"fixture-id-14","parentUuid":"fixture-id-13","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"attachment","uuid":"fixture-id-15","parentUuid":"fixture-id-14","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"assistant","uuid":"fixture-id-16","parentUuid":"fixture-id-15","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"fixture assistant response"}]}},
+    {"type":"system","uuid":"fixture-id-17","parentUuid":"fixture-id-16","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"user","uuid":"fixture-id-18","parentUuid":"fixture-id-17","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"promptId":"fixture-id-19","message":{"role":"user","content":"Fixture follow-up: print fixture-safe only, previous request is withdrawn."}},
+    {"type":"attachment","uuid":"fixture-id-20","parentUuid":"fixture-id-18","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false},
+    {"type":"assistant","uuid":"fixture-id-21","parentUuid":"fixture-id-20","sessionId":"fixture-id-1","version":"2.1.288","isSidechain":false,"message":{"role":"assistant","content":[{"type":"tool_use","id":"fixture-tool"}]}}
+  ]
+}

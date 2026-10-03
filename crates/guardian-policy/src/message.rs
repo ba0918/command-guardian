@@ -104,15 +104,62 @@ pub fn reason_line(class: Class, why: &Why) -> String {
 /// 非 allow の文面。`block` はエージェント向け、`ask` は利用者向けに書く。
 pub fn non_allow_message(op: Op, target: &Target, class: Class, why: &Why) -> String {
     let lines = [
-        format!(
-            "{}: {}",
-            op_label(op),
-            display_inline(&display_target(target))
-        ),
+        operation_line(op, target),
         format!("Reason: {}", reason_line(class, why)),
         format!("Alternative: {}", alternative_phrase(why)),
     ];
     lines.join("\n")
+}
+
+fn operation_line(op: Op, target: &Target) -> String {
+    format!(
+        "{}: {}",
+        op_label(op),
+        display_inline(&display_target(target))
+    )
+}
+
+pub fn advisor_explanation(
+    risk: guardian_advisor::Risk,
+    verdict: guardian_core::Verdict,
+    mechanical_reason: &str,
+    effects: &[crate::EffectReport],
+) -> (String, String) {
+    use guardian_advisor::Risk;
+    use guardian_core::Verdict;
+    let (detail, alternative) = match (risk, verdict) {
+        (Risk::HarmfulIrreversible, _) => (
+            "independent harmful irreversible effects require blocking, even with matching instructions",
+            "No applicable safe alternative for this command. Revise it to remove the harmful effects.",
+        ),
+        (Risk::MajorDestructive, Verdict::Ask) => (
+            "major destruction matches confirmed instructions but still requires your confirmation of irreversible loss",
+            "Before approving, verify the target, operation and all effects, and that the loss is intended. Otherwise cancel or narrow the operation.",
+        ),
+        (Risk::MajorDestructive, _) => (
+            "major destruction lacks sufficiently confirmed matching instructions",
+            "Obtain concrete user instructions covering the target, operation and all effects, or narrow the operation before checking again.",
+        ),
+        _ => ("destructive effects require intervention", "No applicable alternative."),
+    };
+    let intervention = format!("Advisor classification {}: {detail}", risk.as_str());
+    let reason = if mechanical_reason.is_empty() {
+        intervention.clone()
+    } else {
+        format!("{mechanical_reason}; {intervention}")
+    };
+    let heading = match crate::evaluation::worst_effect(effects).or_else(|| effects.first()) {
+        Some(effect) => operation_line(effect.op, &effect.target),
+        None => format!("Advisor intervention: {}", risk.as_str()),
+    };
+    let mut message = format!("{heading}\nReason: {intervention}\nAlternative: {alternative}");
+    if !mechanical_reason.is_empty() {
+        message.push_str(&format!(
+            "\nMechanical reason: {}",
+            display_inline(mechanical_reason)
+        ));
+    }
+    (reason, message)
 }
 
 /// 操作とパスが無い ask の種類（REQ-011）。

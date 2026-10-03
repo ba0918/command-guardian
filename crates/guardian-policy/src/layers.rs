@@ -5,11 +5,12 @@ use crate::guard::{self, GuardRule};
 use guardian_core::Verdict;
 use std::path::{Path, PathBuf};
 
-use crate::config::{Config, CustomRule};
+use crate::config::{AdvisorConfig, Config, CustomRule};
 
 /// 1 つの層の生の値。
 #[derive(Debug, Clone, Default)]
 pub struct Layer {
+    pub advisor: Option<AdvisorConfig>,
     pub allowed_roots: Vec<PathBuf>,
     pub protected_roots: Vec<PathBuf>,
     pub unknown_verdict: Option<Verdict>,
@@ -24,11 +25,31 @@ pub struct Layer {
 
 /// 層の TOML を読む。読めない場合は Err。
 pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer, String> {
-    let value: toml::Value = toml::from_str(text).map_err(|e| e.to_string())?;
+    parse_layer_kind(text, base, home, false)
+}
+
+pub fn parse_project_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer, String> {
+    parse_layer_kind(text, base, home, true)
+}
+
+fn parse_layer_kind(
+    text: &str,
+    base: &Path,
+    home: Option<&Path>,
+    project: bool,
+) -> Result<Layer, String> {
+    let mut value: toml::Value = toml::from_str(text).map_err(|e| e.to_string())?;
+    let removed_advisor = project
+        && value
+            .as_table_mut()
+            .is_some_and(|table| table.remove("advisor").is_some());
     let mut layer = Layer::default();
     let root = &value;
     if root.as_table().is_none() {
         return Err("Expected a TOML table".into());
+    }
+    if let Some(value) = root.get("advisor") {
+        layer.advisor = Some(AdvisorConfig::parse(value).ok_or("Invalid advisor configuration")?);
     }
     for section in ["paths", "unknown", "rules", "git", "mode", "commands"] {
         if root
@@ -99,6 +120,11 @@ pub fn parse_layer(text: &str, base: &Path, home: Option<&Path>) -> Result<Layer
         return Err(layer.warnings.join("; "));
     }
     layer.guard = guard::parse_guards(root, &mut layer.warnings);
+    if removed_advisor {
+        layer
+            .warnings
+            .push("Ignoring advisor in project configuration".into());
+    }
     Ok(layer)
 }
 
@@ -263,6 +289,9 @@ fn read_custom_rules(root: &toml::Value, out: &mut Vec<CustomRule>, warnings: &m
 
 /// 層をマージする。リストは足し合わせ、スカラーは後勝ち。
 pub fn merge(config: &mut Config, layer: &Layer) {
+    if let Some(advisor) = &layer.advisor {
+        config.advisor = advisor.clone();
+    }
     config
         .allowed_roots
         .extend(layer.allowed_roots.iter().cloned());

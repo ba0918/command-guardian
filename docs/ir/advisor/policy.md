@@ -18,8 +18,9 @@
 ### REQ-advisor-002: 危険性と指示範囲の分類
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-03-llm-advice-layer.md#A17, docs/decision/records/2026-10-03-llm-advice-layer.md#A19, docs/decision/records/2026-10-03-llm-advice-layer.md#A20, docs/decision/records/2026-10-03-llm-advice-layer.md#A26, docs/decision/records/2026-10-03-llm-advice-layer.md#A37, docs/decision/records/2026-10-03-llm-advice-layer.md#A40, docs/decision/records/2026-10-03-llm-advice-layer.md#A44, docs/decision/records/2026-10-03-llm-advice-layer.md#A52, docs/decision/records/2026-10-03-llm-advice-layer.md#A59
-- verification: unit
+- source: docs/decision/records/2026-10-03-llm-advice-layer.md#A17, docs/decision/records/2026-10-03-llm-advice-layer.md#A19, docs/decision/records/2026-10-03-llm-advice-layer.md#A20, docs/decision/records/2026-10-03-llm-advice-layer.md#A26, docs/decision/records/2026-10-03-llm-advice-layer.md#A37, docs/decision/records/2026-10-03-llm-advice-layer.md#A40, docs/decision/records/2026-10-03-llm-advice-layer.md#A44, docs/decision/records/2026-10-03-llm-advice-layer.md#A52, docs/decision/records/2026-10-03-llm-advice-layer.md#A59, docs/decision/records/2026-10-03-llm-advice-layer.md#A63
+- verification: review
+- how_to_verify: 実装と別コンテキストの独立担当が、実際に送る固定質問と危険性5分類・指示範囲3分類の定義を本要求の本文と照合する。EX-advisor-003の限定DELETEを語だけで重大破壊にしないこと、EX-advisor-004のscratchという名前から使い捨てや承認を推測しないこと、EX-advisor-053の重大破壊と独立した有害効果の併存ではharmful_irreversibleを優先することを反例ごとに確認し、読んだ実装のパス、照合した契約、判断根拠を記録する。固定文言の一致や偽Assessmentによる合成成功を意味の妥当性の証拠にせず、このレビューを実モデルの判断精度の証明にしない
 
 guardianはコマンド全体の効果について危険性と指示範囲を別々に質問する。
 危険性の"harmful_irreversible"は重大破壊とは別の独立した有害な不可逆効果であり秘密の外部送信や指示外の破壊を含む操作、"major_destructive"はDB全体の破棄やクラウド資源の一括削除のように具体的な指示一致が確認できれば再確認へ回せる重大破壊、"irreversible_only"は不可逆性だけを確認した操作、"no_harm"は入力内に有害性を認めない操作、"unknown"は判断材料不足を表す。
@@ -86,13 +87,13 @@ Scenario: 機械blockを解除する経路はない
   When 助言がenforceでも当該実行を扱う
   Then 文脈を取得せずモデルを呼ばずblockを維持する
 
-@id=EX-advisor-003 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A21,docs/decision/records/2026-10-03-llm-advice-layer.md#A40
+@id=EX-advisor-003 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A21,docs/decision/records/2026-10-03-llm-advice-layer.md#A40,docs/decision/records/2026-10-03-llm-advice-layer.md#A63
 Scenario: 限定されたSQL削除を全体破棄と区別する
   Given 確認済み指示は特定テーブルの特定ユーザの削除である
   When 対応する限定DELETEについて質問を組み立てる
   Then DELETEという語だけで重大破壊とする質問にはしない
 
-@id=EX-advisor-004 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A19,docs/decision/records/2026-10-03-llm-advice-layer.md#A20
+@id=EX-advisor-004 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A19,docs/decision/records/2026-10-03-llm-advice-layer.md#A20,docs/decision/records/2026-10-03-llm-advice-layer.md#A63
 Scenario: 名前から価値や承認を創作しない
   Given 対象の名はscratchであるが接続先や価値は不明である
   When 危険性と指示範囲の質問を組み立てる
@@ -124,7 +125,7 @@ Scenario: 指示一致だけで危険性の低確率や単なる不可逆性を�
   When 妥当なAssessmentの危険性がharmful_irreversibleの0.89またはirreversible_onlyかno_harmかunknownである
   Then 機械判定のallowを維持し指示一致だけを理由にblockやaskを作らない
 
-@id=EX-advisor-053 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A52,docs/decision/records/2026-10-03-llm-advice-layer.md#A59
+@id=EX-advisor-053 @about=REQ-advisor-002 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A52,docs/decision/records/2026-10-03-llm-advice-layer.md#A59,docs/decision/records/2026-10-03-llm-advice-layer.md#A63
 Scenario: 重大破壊の一致で独立した有害効果を隠さない
   Given 重大破壊とそれとは別の有害な不可逆効果を同じコマンド全体に認める
   When guardianの分類定義を適用する

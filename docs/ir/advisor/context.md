@@ -34,8 +34,9 @@ assistantの文章は参照先の理解にだけ使い、ツール呼び出し�
 ### REQ-advisor-008: 指示の鮮度と参照不足
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-03-llm-advice-layer.md#A25, docs/decision/records/2026-10-03-llm-advice-layer.md#A26, docs/decision/records/2026-10-03-llm-advice-layer.md#A27, docs/decision/records/2026-10-03-llm-advice-layer.md#A37, docs/decision/records/2026-10-03-llm-advice-layer.md#A44
-- verification: unit
+- source: docs/decision/records/2026-10-03-llm-advice-layer.md#A25, docs/decision/records/2026-10-03-llm-advice-layer.md#A26, docs/decision/records/2026-10-03-llm-advice-layer.md#A27, docs/decision/records/2026-10-03-llm-advice-layer.md#A37, docs/decision/records/2026-10-03-llm-advice-layer.md#A44, docs/decision/records/2026-10-03-llm-advice-layer.md#A64
+- verification: review
+- how_to_verify: 実装と別コンテキストの独立担当が、実際に送る固定質問、指示範囲の分類定義、符号化後の文脈データと確認状態・限界の項目を本要求の本文へ照合する。固定質問の実装から送信本文の組立てまで追い、EX-advisor-015では窓内の撤回と後の限定指示を反映し古い全体破棄の指示を流用しないこと、EX-advisor-016では取得窓外の参照先を推測で埋めずmatchedとしないことを、質問と定義と実際に渡るデータの組合せで確認する。矛盾、別操作への切替え、窓外の制約の限界、TTLが許可の有効性を保証しないことも照合し、読んだ実装パス、照合した契約、二例ごとの判断根拠と未解決事項を記録する。文言一致や偽Assessmentによる合成成功を意味の妥当性の証拠にせず、出所・順序・窓・ブロック除外・TTL・合成の単体試験と区別し、このレビューを実モデルの判断精度の証明にしない
 
 確認済み指示は対象と操作範囲が具体的で、当該実行に先行し、取得窓内で撤回、変更、別操作への切替えを確認したらそれを反映する。
 「その案で」の参照先を取得できない場合、矛盾した指示を解消できない場合、別操作への古い許可しかない場合はscopeをmatchedとして使用しない。
@@ -120,13 +121,13 @@ Scenario: ツール結果を会話文脈に混ぜない
   When 送信候補を組み立てる
   Then それらのブロックとローカルの保存パスを送信候補へ含めない
 
-@id=EX-advisor-015 @about=REQ-advisor-008 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A26
+@id=EX-advisor-015 @about=REQ-advisor-008 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A26,docs/decision/records/2026-10-03-llm-advice-layer.md#A64
 Scenario: 撤回後の指示で対象を確認する
   Given 取得窓内でDB全体破棄の指示を撤回し特定ユーザだけの削除へ変更した
   When 当該実行の指示範囲を質問する
   Then 後の限定指示を反映し古い全体破棄の指示を流用しない
 
-@id=EX-advisor-016 @about=REQ-advisor-008 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A27
+@id=EX-advisor-016 @about=REQ-advisor-008 @source=docs/decision/records/2026-10-03-llm-advice-layer.md#A27,docs/decision/records/2026-10-03-llm-advice-layer.md#A64
 Scenario: 窓外の参照を推測で埋めない
   Given 最新のuser発言はそれで進めてだが参照先は取得窓外である
   When 指示との一致を評価する

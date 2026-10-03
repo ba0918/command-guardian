@@ -3,11 +3,12 @@ import { OpenCode } from "@opencode/client";
 import { Service } from "@opencode/client/service";
 import { Permission } from "@opencode/schema/permission";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, symlink, rm, appendFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
+import { stopHost } from "../helpers/host-process";
 
-async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean}={}) {
+async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean;controlPeer?:boolean;advisor?:boolean}={}) {
   const binary=process.env.OPENCODE_TEST_BIN,guardian=process.env.GUARDIAN_TEST_BIN;
   if (!binary || !guardian) throw new Error("Explicit OPENCODE_TEST_BIN and GUARDIAN_TEST_BIN are required");
   const version=Bun.spawnSync([binary,"--version"]);
@@ -15,9 +16,29 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
   const root=await mkdtemp(join(resolve(import.meta.dir,"../../../../target"),"native-guardian-"));
   const home=join(root,"home"),project=join(home,"project"),bin=join(root,"bin");
   await mkdir(project,{recursive:true}); await mkdir(bin);
-  await symlink(guardian,join(bin,"command-guardian"));
+  if(options.controlPeer){
+    await writeFile(join(bin,"command-guardian"),`#!/usr/bin/python3
+import socket,json,time,sys
+sys.stdin.read()
+s=socket.socket(fileno=3)
+n='07070707070707070707070707070707'
+def send(x):s.sendall((json.dumps(x)+'\\n').encode())
+def receive():
+ b=b''
+ while not b.endswith(b'\\n'):b+=s.recv(1)
+ return json.loads(b)
+send({'version':1,'nonce':n,'kind':'budget_probe'})
+r=receive()
+assert r['kind']=='budget_reply' and r['original_remaining_ms']>0
+send({'version':1,'nonce':n,'kind':'advisory_start','timeout_ms':10000})
+r=receive()
+assert r['kind']=='advisory_ack' and r['accepted']
+time.sleep(6.1)
+print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','reason':'fixture control completed'}))
+`,{mode:0o700});
+  }else await symlink(guardian,join(bin,"command-guardian"));
   const config=join(home,"config","command-guardian");await mkdir(config,{recursive:true});
-  await writeFile(join(config,"config.toml"),`[mode]\nenforce = ${options.enforce??true}\n[paths]\nprotected_roots = [${JSON.stringify(join(project,"sentinel"))}]\n`);
+  await writeFile(join(config,"config.toml"),`[mode]\nenforce = ${options.enforce??true}\n[paths]\nprotected_roots = [${JSON.stringify(join(project,"sentinel"))}]\n${options.advisor ? "[advisor]\nmode='enforce'\ntimeout_ms=10000\n" : ""}`);
   const sentinel=join(project,"sentinel");await writeFile(sentinel,"unchanged");
   // Hold a loopback port only long enough to select it; authenticate every subsequent request.
   const listener=Bun.serve({hostname:"127.0.0.1",port:0,fetch:()=>new Response("fixture")});
@@ -25,6 +46,7 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
   const url=`http://127.0.0.1:${port}`;
   const environment:NodeJS.ProcessEnv={};
   for (const [key,value] of Object.entries(process.env)) if(!key.startsWith("OPENCODE")&&!key.startsWith("GIT_")&&!key.startsWith("SAFE_CHAIN_MINIMUM"))environment[key]=value;
+  delete environment.TYPESAFE_API_KEY;
   Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
   let logs="";
   if(options.managedService){
@@ -33,13 +55,35 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
     if(options.incompleteConnection)config.plugins[0].options={serverUrl:url};
     environment.OPENCODE_CONFIG_CONTENT=JSON.stringify(config);
   }
+  const started=performance.now();
+  let spawnError:Error|undefined,readyMs:number|undefined;
   const server=spawn(binary,["serve","--hostname","127.0.0.1","--port",String(port),...(options.managedService?["--service"]:[])],{cwd:project,env:environment,stdio:["ignore","pipe","pipe"]});
+  server.on("error",error=>{spawnError=error;});
   server.stdout.on("data",data=>{logs+=String(data);});server.stderr.on("data",data=>{logs+=String(data);});
+  const close=async(outcome:string)=>{
+    const beforeCleanup={elapsedMs:performance.now()-started,readyMs:readyMs??null,exitCode:server.exitCode,signalCode:server.signalCode,spawnError:spawnError?.message??null};
+    try { await stopHost(server); }
+    finally {
+      try {
+        const diagnostics=await readFile(join(home,"data/opencode/log/opencode.log"),"utf8").catch(()=>"");
+        const selected=diagnostics.split("\n").filter(line=>line.includes("cli starting")||line.includes("database schema bootstrap")||line.includes("plugin")||line.includes("level=WARN")||line.includes("level=ERROR")).join("\n");
+        const safe=JSON.stringify({outcome,beforeCleanup,afterCleanup:{exitCode:server.exitCode,signalCode:server.signalCode},logs,diagnostics:selected})
+          .replaceAll(root,"<fixture>").replaceAll(resolve(import.meta.dir,"../../../.."),"<worktree>")
+          .replaceAll(process.env.HOME??home,"<runner-home>")
+          .replaceAll("guardian-test-password-not-real","<fixture-password>")
+          .replaceAll(Buffer.from("opencode:guardian-test-password-not-real").toString("base64"),"<fixture-auth>");
+        const artifacts="/tmp/opencode/llm-advisor-host-readiness";
+        await mkdir(artifacts,{recursive:true});
+        await appendFile(join(artifacts,"fixtures.jsonl"),safe+"\n");
+      } finally { await rm(root,{recursive:true,force:true}); }
+    }
+  };
   let client=OpenCode.make({baseUrl:url,headers:{authorization:`Basic ${Buffer.from("opencode:guardian-test-password-not-real").toString("base64")}`}});
   try {
     for(let i=0;i<100;i++) {
-      if(server.exitCode!==null)throw new Error("Isolated server exited");
-      if(logs.includes(`server listening on ${url}`))break;
+      if(spawnError)throw new Error("Isolated server spawn failed",{cause:spawnError});
+      if(server.exitCode!==null||server.signalCode!==null)throw new Error("Isolated server exited");
+      if(logs.includes(`server listening on ${url}`)){readyMs=performance.now()-started;break;}
       await new Promise(resolve=>setTimeout(resolve,50));
     }
     if(!logs.includes(`server listening on ${url}`))throw new Error("Own server readiness missing");
@@ -51,19 +95,40 @@ async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;
     const info=await client.server.info();expect(info.version).toBe("2.0.21");
     const session=await client.session.create({title:"model-free guardian fixture",location:{directory:project}});
     return {root,project,sentinel,client,session,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
-      server.kill("SIGTERM");await new Promise<void>(resolve=>server.once("exit",()=>resolve()));
-      try {
-        const diagnostics=await readFile(join(home,"data/opencode/log/opencode.log"),"utf8").catch(()=>"");
-        const safe=(diagnostics.split("\n").filter(line=>line.includes("plugin")||line.includes("level=WARN")||line.includes("level=ERROR")).join("\n")+"\n"+logs).replaceAll(root,"<fixture>").replaceAll(resolve(import.meta.dir,"../../../.."),"<worktree>");
-        const artifacts=resolve(import.meta.dir,"../../../../.agents/artifacts");
-        await mkdir(artifacts,{recursive:true});
-        await writeFile(join(artifacts,"native-fixture-diagnostics.log"),safe);
-      } finally {
-        await rm(root,{recursive:true,force:true});
-      }
+      await close("closed");
     }};
-  }catch(error){server.kill("SIGTERM");throw error;}
+  }catch(error){await close(error instanceof Error?error.message:"setup failed");throw error;}
 }
+
+// @kotowari[REQ-advisor-020, REQ-advisor-021, REQ-advisor-011, EX-advisor-024, EX-advisor-042]
+test("fixed_host_real_guardian_negotiates_then_missing_auth_preserves_safe_execution_and_metadata_privacy",async()=>{
+  for(const enforce of [true,false]){
+    const f=await host({advisor:true,enforce});
+    try{
+      await f.execute("printf fixture-enabled-private");
+      const text=await readFile(join(f.root,"home/state/command-guardian/advisor.jsonl"),"utf8");
+      const log=JSON.parse(text.trim());
+      expect(log.failure).toBe("authentication");expect(log.final).toBe("allow");
+      expect(text).not.toContain("fixture-enabled-private");expect(text).not.toContain(f.session.id);
+      expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+      expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+    }finally{await f.close();}
+  }
+},20000);
+
+// @kotowari[REQ-advisor-020, EX-advisor-039]
+test("fixed_host_passes_duplex_control_fd_and_accepts_result_after_original_six_seconds",async()=>{
+  const f=await host({controlPeer:true});
+  try{
+    const started=performance.now();
+    const result=await f.execute("printf fixture-control > control-output");
+    expect(performance.now()-started).toBeGreaterThan(6000);
+    expect(await readFile(join(f.project,"control-output"),"utf8")).toBe("fixture-control");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    expect(JSON.stringify(result)).not.toContain("timed out");
+    expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+  }finally{await f.close();}
+},20000);
 
 // @kotowari[REQ-047, REQ-051, EX-103]
 test("req_047_host_valid_empty_command_waits_for_fresh_approval_and_honors_reply",async()=>{

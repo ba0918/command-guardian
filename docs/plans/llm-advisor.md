@@ -6,7 +6,7 @@
 
 ## Specification
 
-IRは`docs/ir/`にある。承認済み仕様のコミットは`8ccf11d671a02680b3943c526f5c318d4a32b287`である。呼出元は同コミットの承認確認で、20件の要求の試験不足、53件の例の試験不足、2件の通知だけが残ることを確認した。この計画は未承認であり、独立レビューと利用者の承認後にコミットされて初めて実装へ進める。
+IRは`docs/ir/`にある。当初の承認済み仕様のコミットは`8ccf11d671a02680b3943c526f5c318d4a32b287`であり、その時点の試験不足は20要求と53例、通知は2件だった。実装中に利用者が承認した[検証分担の改訂A63](../decision/records/2026-10-03-llm-advice-layer.md#agreements)と[追加改訂A64](../decision/records/2026-10-03-llm-advice-layer.md#agreements)を本計画へ反映する。改訂後の実装前の試験不足対象は18助言要求と、46助言例に既存EX-112、113を加えた48例であり、現在の部分実装の残件数とは分ける。A63の文書改訂は独立レビューを経たが、A64の追加文書改訂の独立レビューは未実施である。
 
 - [docs/ir/advisor/policy.md#REQ-advisor-001](../ir/advisor/policy.md#req-advisor-001-検査対象と観測モード)、[docs/ir/advisor/policy.md#REQ-advisor-002](../ir/advisor/policy.md#req-advisor-002-危険性と指示範囲の分類)、[docs/ir/advisor/policy.md#REQ-advisor-003](../ir/advisor/policy.md#req-advisor-003-分岐ごとの閾値と候補判定)、[docs/ir/advisor/policy.md#REQ-advisor-004](../ir/advisor/policy.md#req-advisor-004-入力を判定指示にしない)、[docs/ir/advisor/policy.md#REQ-advisor-005](../ir/advisor/policy.md#req-advisor-005-モデルの品質を構造試験と区別する)。定義は[docs/ir/advisor/policy.md#TBL-advisor-001](../ir/advisor/policy.md#tbl-advisor-001-候補判定の優先順)。
 - [docs/ir/advisor/context.md#REQ-advisor-006](../ir/advisor/context.md#req-advisor-006-当該実行への出所の対応付け)、[docs/ir/advisor/context.md#REQ-advisor-007](../ir/advisor/context.md#req-advisor-007-送信範囲と会話の上限)、[docs/ir/advisor/context.md#REQ-advisor-008](../ir/advisor/context.md#req-advisor-008-指示の鮮度と参照不足)、[docs/ir/advisor/context.md#REQ-advisor-009](../ir/advisor/context.md#req-advisor-009-秘密とサイズと符号化による見送り)、[docs/ir/advisor/context.md#REQ-advisor-010](../ir/advisor/context.md#req-advisor-010-必要な経路だけのセッションキャッシュ)、[docs/ir/advisor/context.md#REQ-advisor-011](../ir/advisor/context.md#req-advisor-011-助言ログと影ログの分離)。
@@ -15,7 +15,7 @@ IRは`docs/ir/`にある。承認済み仕様のコミットは`8ccf11d671a02680
 - 変更された既存要求は[docs/ir/config.md#REQ-013](../ir/config.md#req-013-設定のファイルと層)、[docs/ir/config.md#REQ-014](../ir/config.md#req-014-プロジェクト設定の信頼)、[docs/ir/config.md#REQ-015](../ir/config.md#req-015-壊れた設定)、[docs/ir/cli.md#REQ-018](../ir/cli.md#req-018-影実行)、[docs/ir/cli.md#REQ-021](../ir/cli.md#req-021-応答時間)、[docs/ir/parser.md#REQ-039](../ir/parser.md#req-039-入力の上限)、[docs/ir/opencode.md#REQ-048](../ir/opencode.md#req-048-共通設定と影実行)、[docs/ir/opencode.md#REQ-053](../ir/opencode.md#req-053-承認待ちの寿命)。これらと出口の直接依存だけを回帰確認する。
 - 計画上の配置と証拠の選択は[新しい計画決定記録 A1](../decision/records/2026-10-03-llm-advisor-plan.md#agreements)に置く。承認済みの[助言層の決定記録 A59](../decision/records/2026-10-03-llm-advice-layer.md#agreements)は改訂しない。
 
-各要求と例は`kotowari query ID`で読む。定義表と要求の`referenced_by`の`about`も読む。対象にdeferredはない。助言の53例のうちEX-advisor-009とEX-advisor-010はレビュー専用であり、試験必須の51例とは分ける。既存EX-112とEX-113を加えた53例が試験不足の対象である。EX-111も未マークだがレビュー専用なので、機械試験で報告の正しさを捏造しない。
+各要求と例は`kotowari query ID`で読む。定義表と要求の`referenced_by`の`about`も読む。対象にdeferredはない。助言の21要求は18件がunit、REQ-advisor-002、005、008の3件がreviewである。助言の53例のうちEX-advisor-003、004、053、009、010、015、016の7例はレビュー専用であり、試験必須の46例とは分ける。既存EX-112とEX-113を加えた48例が実装前の試験不足対象である。EX-111もレビュー専用なので、機械試験で報告の正しさを捏造しない。
 
 ## Approach and why
 
@@ -60,7 +60,7 @@ OpenCodeはBun 1.4.2と固定依存、公式2.0.21を使う。`bun install --fro
 - 新規`docs/verification/llm-advisor-context.md`と`docs/verification/llm-advisor.md`。前者は対応表と出所証拠、後者は試験、時間測定、未評価事項の記録。仕様の代用品ではない。
 - 最終変更照合の`.kotowari/changes/implementation.yaml`と、独立担当の`review.yaml`。実装中に先回りしてレビュー記録を書かない。
 
-承認済みIR、用語集、問題記録、既存決定記録、CIやhook設定、release版は変更しない。ガイド変更が必要なら既存の指示を読み、承認された範囲を呼出元へ確認する。
+検証分担の文書改訂はA63に基づくREQ-advisor-002の検証方法と三例の出典、A64に基づくREQ-advisor-008の検証方法と二例の出典、関連決定記録と本計画の検証対応だけを変更する。それ以外の承認済みIR、用語集、問題記録、既存決定記録、CIやhook設定、release版は変更しない。取得・保存・期限の実行時の試験不足を免除しない。ガイド変更が必要なら既存の指示を読み、承認された範囲を呼出元へ確認する。
 
 ## Step order and prerequisites
 
@@ -78,10 +78,12 @@ S1に対応版の証拠がないホストが残っても、S4以降でその入�
 |---|---|---|---|
 | S1、S4 | REQ-advisor-006 | EX-advisor-011、012 | 対応表の公開根拠と隔離ホストの生成記録、取得境界の試験 |
 | S2、S9 | REQ-advisor-001 | EX-advisor-001、002 | observeは候補だけ、offとblockは取得ゼロ、影実行を解除しない |
-| S2、S5 | REQ-advisor-002、004 | EX-advisor-003、004、007、008、053 | 質問・分類定義・データを分離し全効果を扱う |
+| S2、S5 | REQ-advisor-004 | EX-advisor-007、008 | 悪意あるコマンド・理由・会話でも固定質問と分類定義を変更せず、assistantの自己承認を構造化入力の確認済み指示へ昇格させない単体試験 |
+| S10 | REQ-advisor-002 | EX-advisor-003、004、053 | 独立担当が実際の固定質問と分類定義を契約と三つの反例へ照合し、実装パスと判断根拠を記録する。試験マークは不要 |
 | S2、S9 | REQ-advisor-003 | EX-advisor-005、006、051、052 | 合成表の分岐と両閾値の境界。文脈なしの高確率重大破壊はenforceの最終出力でblock |
 | S10 | REQ-advisor-005 | EX-advisor-009、010 | how_to_verifyのレビュー。試験マークは不要 |
-| S4 | REQ-advisor-007、008 | EX-advisor-013〜016 | 往復数、参照先、撤回、roleとブロック除外 |
+| S4 | REQ-advisor-007 | EX-advisor-013、014 | 順序、往復数、role、参照材料の保持とツール・ファイルブロック除外の単体試験 |
+| S10 | REQ-advisor-008 | EX-advisor-015、016 | 独立担当が実際の固定質問、分類定義、送信データを要求と二例へ照合し、撤回後の限定指示と参照不足の判断根拠を記録する。試験マークは不要 |
 | S5、S9 | REQ-advisor-009 | EX-advisor-017、018 | 最終HTTP本文の65536/65537境界、秘密、非UTF-8 cwdの送信ゼロ |
 | S4 | REQ-advisor-010 | EX-advisor-019、020 | 実ファイルで所有者・権限・link・TTL・時刻・保存削除失敗を検証 |
 | S7、S9 | REQ-advisor-011 | EX-advisor-021、022 | 通常ログの本文不在、debugの伏字、失敗時の継続 |
@@ -102,7 +104,7 @@ S1に対応版の証拠がないホストが残っても、S4以降でその入�
 | S10 | REQ-021 | EX-027、111 | offの100件の実測報告のレビュー。レビュー専用例に偽の試験は付けない |
 | S9 | REQ-016、022、023、024 | 各要求の既存about例 | 単一バイナリ、Claude封筒、Codex無出力、非対象入力の既存試験 |
 
-S10で表をqueryの実際の`tests`と照合する。試験必須の20助言要求、51助言例、EX-112とEX-113には、対象の振る舞いを検証する非空のマークが必要である。既存about例は現在の試験を読み直して再使用し、意味の変わらない動作に一例一試験を追加しない。REQ-advisor-005とREQ-021、そのレビュー専用例にはレビュー証拠を残す。
+S10で表をqueryの実際の`tests`と照合する。試験必須の18助言要求、46助言例、EX-112とEX-113には、対象の振る舞いを検証する非空のマークが必要である。既存about例は現在の試験を読み直して再使用し、意味の変わらない動作に一例一試験を追加しない。REQ-advisor-002、005、008とREQ-021、そのレビュー専用例にはレビュー証拠を残す。質問数と既知ラベルの構造はREQ-advisor-014と013、固定質問と入力データの分離はREQ-advisor-004、出所と順序・窓・ブロック除外はREQ-advisor-006と007、TTLはREQ-advisor-010、合成はREQ-advisor-003の単体試験として扱う。文字列の固定や偽Assessmentの合成成功を質問の意味や指示の鮮度・参照不足の証拠にしない。
 
 ## Left to the implementer
 
@@ -139,8 +141,8 @@ S10で表をqueryの実際の`tests`と照合する。試験必須の20助言要
 - Specification: [docs/ir/advisor/policy.md#REQ-advisor-001](../ir/advisor/policy.md#req-advisor-001-検査対象と観測モード)、[docs/ir/advisor/policy.md#REQ-advisor-002](../ir/advisor/policy.md#req-advisor-002-危険性と指示範囲の分類)、[docs/ir/advisor/policy.md#REQ-advisor-003](../ir/advisor/policy.md#req-advisor-003-分岐ごとの閾値と候補判定)、[docs/ir/advisor/policy.md#REQ-advisor-004](../ir/advisor/policy.md#req-advisor-004-入力を判定指示にしない)、[docs/ir/advisor/provider.md#REQ-advisor-012](../ir/advisor/provider.md#req-advisor-012-現在の利用と試験に必要なモデル境界)、[docs/ir/advisor/provider.md#REQ-advisor-013](../ir/advisor/provider.md#req-advisor-013-分布の境界検証)。
 - Prerequisites: S1。TBL-advisor-001と承認済みA59をqueryと決定記録で確認する。
 - May change: 新規`crates/guardian-advisor/`、`Cargo.toml`、`Cargo.lock`のworkspace登録と試験依存だけ。
-- Done when: 定義済みラベルの分布と一意最大の選択を共通境界で検証し、固定質問を本文から分離し、全効果・参照・鮮度の不足をmatchedの根拠にしない。表の全分岐、閾値の直下・一致・直上、機械askをallowにしないこと、独立した有害効果の指示一致block、observeの最終維持を検証し、AdvisorClientの入力と分類済み失敗にprovider型がない。
-- Shown by: test RED→GREEN→REFACTORのshell出力。`cargo test -p guardian-advisor --locked`で「指示一致でも独立有害効果はblock」「重大破壊は両閾値と確認済み指示でask」「固定質問を入力文が変更しない」「欠落重複不正数値同率最大を採用しない」を検証し、EX-advisor-001〜008、025、026、051〜053の該当マークを付ける。実モデル精度を検証したとは記さない。
+- Done when: 定義済みラベルの分布と一意最大の選択を共通境界で検証し、固定質問と分類定義を本文から分離し、悪意あるコマンド・理由・会話を与えても固定質問が変わらず、assistantの自己承認が構造化入力の確認済み指示にならない。表の全分岐、閾値の直下・一致・直上、機械askをallowにしないこと、独立した有害効果の指示一致block、observeの最終維持を検証し、AdvisorClientの入力と分類済み失敗にprovider型がない。質問の意味と三つの反例の照合はS10の独立レビューへ渡す。
+- Shown by: test RED→GREEN→REFACTORのshell出力。`cargo test -p guardian-advisor --locked`で「指示一致でも独立有害効果はblock」「重大破壊は両閾値と確認済み指示でask」「固定質問を入力文が変更しない」「欠落重複不正数値同率最大を採用しない」を検証し、EX-advisor-001、002、005〜008、025、026、051、052の該当マークを付ける。偽Assessmentの優先分岐試験は合成の証拠であり、分類定義の意味の証拠ではない。EX-advisor-003、004、053はS10で実際の固定質問と契約へ照合し、機械試験のマークは要求しない。実モデル精度を検証したとは記さない。
 - Left to the implementer: 内部の値・helper・試験の名前だけ。
 - Stop and hand back if: 固定質問に承認されていない判定条件を足す必要がある、または既存guardrailのverdictを共通契約へ入れる必要がある。
 
@@ -162,7 +164,7 @@ S10で表をqueryの実際の`tests`と照合する。試験必須の20助言要
 - Prerequisites: S1〜S3。取得処理をappに置き、S1の対応表で裏付けた版・経路だけを有効にする。
 - May change: `crates/guardian-advisor/`の純粋な文脈値と窓処理、`crates/guardian-app/src/advisor/context/`、`state.rs`、`lib.rs`とmanifest、対応試験と`tests/fixtures/advisor/`、対応表。`Cargo.lock`はこの段階のmanifest変更に対応する更新だけを許す。
 - Done when: 同じセッションの実行前限定窓だけを取得し、返答前のuserと連続roleを正しく数え、撤回・参照先不足・ツールとファイルブロック・既知の合成入力を区別する。ローカル照合情報は送信値と分離し、CLIと未対応は文脈なしになる。直接利用できる経路にキャッシュを作らず、必要な別hook経路だけ承認済み版と枠・照合情報を保存し、raw session名をパス要素にせず、所有者、0700/0600、通常ファイル、symlink、複数hardlink、TTL、未来・不明時刻を検査する。保存・期限切れ削除失敗でも古い指示へ復帰せず、取得量と処理時間を上限内にする。
-- Shown by: test advisorの窓処理とappの取得・state試験のRED→GREEN→REFACTOR。manifest変更時は対応するCargo.lockをこの段階で更新してから`--locked`付きのGREENを実行する。EX-advisor-011〜016、019、020を、S1のホスト生成根拠付き架空データと実Unixファイル操作で検証する。別セッション、実行後、未対応版、壊れた枠、TTL境界、時刻不整合、読取・保存・削除失敗、link攻撃、取得停止を製品境界へ与え、fixture自体の構造検査を証拠にしない。
+- Shown by: test advisorの窓処理とappの取得・state試験のRED→GREEN→REFACTOR。manifest変更時は対応するCargo.lockをこの段階で更新してから`--locked`付きのGREENを実行する。EX-advisor-011〜014、019、020を、S1のホスト生成根拠付き架空データと実Unixファイル操作で検証する。別セッション、実行後、未対応版、壊れた枠、TTL境界、時刻不整合、読取・保存・削除失敗、link攻撃、取得停止を製品境界へ与え、fixture自体の構造検査を証拠にしない。撤回や参照先を判断するための発言と確認状態・限界を送信データへ保持する構造はここで確認し、EX-advisor-015、016の意味の照合はS10の独立レビューへ渡す。TTL内であることや偽Assessmentの合成を許可の鮮度の証拠にしない。
 - Left to the implementer: helperと架空データの内部名だけ。
 - Stop and hand back if: 承認済みの版・枠・照合項目では保存契約を表せない、または対応済みとするために取得範囲を広げる必要がある。欠落と未対応は文脈なしで継続する。
 
@@ -172,8 +174,8 @@ S10で表をqueryの実際の`tests`と照合する。試験必須の20助言要
 - Specification: [docs/ir/advisor/policy.md#REQ-advisor-002](../ir/advisor/policy.md#req-advisor-002-危険性と指示範囲の分類)、[docs/ir/advisor/policy.md#REQ-advisor-004](../ir/advisor/policy.md#req-advisor-004-入力を判定指示にしない)、[docs/ir/advisor/context.md#REQ-advisor-009](../ir/advisor/context.md#req-advisor-009-秘密とサイズと符号化による見送り)、[docs/ir/advisor/provider.md#REQ-advisor-012](../ir/advisor/provider.md#req-advisor-012-現在の利用と試験に必要なモデル境界)、[docs/ir/advisor/provider.md#REQ-advisor-013](../ir/advisor/provider.md#req-advisor-013-分布の境界検証)、[docs/ir/advisor/provider.md#REQ-advisor-014](../ir/advisor/provider.md#req-advisor-014-typesafeへの一要求)。
 - Prerequisites: S2〜S4。ureqのAPI版、依存ライセンス、取得可能性を確認し、A43、A49、A54、A61と参考実装の再利用証拠を読む。実サービスの確認はしない。
 - May change: 新規`crates/guardian-advisor-typesafe/`、advisorの秘密検査と送信許可値、appの接続組立て、関連manifestと`Cargo.lock`、接続・送信境界の試験。
-- Done when: fixed state/model/questionsの最終UTF-8 HTTP JSON本文全体を秘密検査とバイト測定した後にだけ送る。固定HTTPS先へrisk/scopeを一つのPOSTにまとめ、認証はアダプター内のTYPESAFE_API_KEYから別ヘッダーへ付ける。redirect、retry、モデル探索、補助要求、別モデルfallbackがなく、残期限と65536バイト応答上限を守る。重複キーを潰す前に拒否し、不正応答は共通検証へ渡して分類済み失敗にし、生本文・認証・confidenceを呼出元へ漏らさない。
-- Shown by: test 接続クレートとadvisorのRED→GREEN→REFACTOR。EX-advisor-017、018、023〜028を制御transportで検証し、実際に符号化した65536/65537バイト、モデル名・質問・理由・cwd・文脈の秘密、非UTF-8 cwd、認証欠落、429、redirect、停止、応答超過と不正種別を扱う。外部送信ゼロまたは最大1回を境界で観測し、実キー・実モデル・公開URL切替えを使わない。
+- Done when: fixed state/model/questionsの最終UTF-8 HTTP JSON本文全体を秘密検査とバイト測定した後にだけ送る。固定HTTPS先へrisk/scopeを一つのPOSTにまとめ、入力データと固定質問・分類定義の分離を符号化後も維持する。認証はアダプター内のTYPESAFE_API_KEYから別ヘッダーへ付ける。redirect、retry、モデル探索、補助要求、別モデルfallbackがなく、残期限と65536バイト応答上限を守る。重複キーを潰す前に拒否し、不正応答は共通検証へ渡して分類済み失敗にし、生本文・認証・confidenceを呼出元へ漏らさない。
+- Shown by: test 接続クレートとadvisorのRED→GREEN→REFACTOR。EX-advisor-017、018、023〜028を制御transportで検証し、実際に符号化した65536/65537バイト、モデル名・質問・理由・cwd・文脈の秘密、非UTF-8 cwd、認証欠落、429、redirect、停止、応答超過と不正種別を扱う。REQ-advisor-004について悪意ある本文でも符号化した固定質問が変わらず、assistantの自己承認を確認済み指示へ昇格させないことを確認する。二質問と既知ラベルの構造はREQ-advisor-014と013の証拠として扱う。外部送信ゼロまたは最大1回を境界で観測し、実キー・実モデル・公開URL切替えを使わない。
 - Left to the implementer: provider内の変換helperと試験名だけ。
 - Stop and hand back if: 承認済みTypeSafe形式を実装するのに新しい公開型や通信が必要、またはureqの依存事実が満たせない。実サービスとの現在の適合は未検証と報告する。
 
@@ -224,10 +226,10 @@ S10で表をqueryの実際の`tests`と照合する。試験必須の20助言要
 ### S10: 対象の充足と最終候補の検査を引き渡す
 
 - Purpose: 対象の実装証拠、未評価事項、独立変更照合を揃え、呼出元が最終候補を検査できるようにする。
-- Specification: [docs/ir/advisor/policy.md#REQ-advisor-005](../ir/advisor/policy.md#req-advisor-005-モデルの品質を構造試験と区別する)、[docs/ir/cli.md#REQ-021](../ir/cli.md#req-021-応答時間)、SpecificationとVerification mapの全要求・例。
+- Specification: [docs/ir/advisor/policy.md#REQ-advisor-002](../ir/advisor/policy.md#req-advisor-002-危険性と指示範囲の分類)、[docs/ir/advisor/policy.md#REQ-advisor-005](../ir/advisor/policy.md#req-advisor-005-モデルの品質を構造試験と区別する)、[docs/ir/advisor/context.md#REQ-advisor-008](../ir/advisor/context.md#req-advisor-008-指示の鮮度と参照不足)、[docs/ir/cli.md#REQ-021](../ir/cli.md#req-021-応答時間)、SpecificationとVerification mapの全要求・例。
 - Prerequisites: S1〜S9。呼出元がブランチ全体BASEと候補HEADの完全IDをGitから確定し、実装と別コンテキストの独立担当を割り当てる。
 - May change: `docs/verification/llm-advisor.md`、対象試験の意味に合うマークの不足修正、実装者の`.kotowari/changes/implementation.yaml`。`review.yaml`は独立担当だけが著述する。
-- Done when: queryで試験必須の20助言要求、51助言例、EX-112/113と対応する既存例のtestsが非空で、全対象と変更ファイルにcheckのerrorがない。レビュー専用要求はhow_to_verifyで質問と実行条件、実モデル未評価、暫定閾値、latestの非固定を確認する。off代表100入力をgit起動込みで計測し未達もそのまま報告し、有効時は制御接続の待ちを別に記す。製品検査を通し、同一BASE・候補bytes・関連IRについて実装者と独立担当が各自の記録を作る。両記録のコミット後に呼出元が最終HEADを再固定し、その候補の製品検査、checkとchanges reviewが全て0である場合だけ統合可能と報告する。
-- Shown by: check Rustのfmt/clippy/test/release、Bunのtypecheck/unit/integration、既存GNU/muslと配布検査、`scripts/kotowari-check.sh`、各IDの`kotowari query`、レビュー証拠、呼出元の`kotowari check --format json`と`kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json`の出力。範囲の充足とPROJECT.mdの全体統合ゲートを分け、無関係な残存エラーは報告して統合を止める。statusのcompleteは条件にしない。
+- Done when: queryで試験必須の18助言要求、46助言例、EX-112/113と対応する既存例のtestsが非空で、全対象と変更ファイルにcheckのerrorがない。REQ-advisor-002は実装と別コンテキストの独立担当が、実際に送る固定質問と危険性5分類・指示範囲3分類の定義を要求本文へ照合し、限定DELETEを重大破壊と即断しない、scratchから使い捨てや承認を推測しない、重大破壊と独立有害効果の併存ではharmful_irreversibleを優先する、の三例ごとに根拠を記録する。REQ-advisor-008は同じ独立担当が、実際の固定質問、分類定義、符号化後の文脈データと確認状態・限界を本文へ照合し、EX-advisor-015の撤回後の限定指示を反映して古い全体破棄の指示を流用しないこと、EX-advisor-016の窓外の参照を推測で埋めずmatchedとしないことを二例ごとに記録する。矛盾と別操作への切替え、窓外の制約の限界、TTLと許可の鮮度の違いも照合する。著者自身の完了宣言をこのレビューの代わりにしない。REQ-advisor-005のhow_to_verifyでは実行条件、実モデル未評価、暫定閾値、latestの非固定を確認する。off代表100入力をgit起動込みで計測し未達もそのまま報告し、有効時は制御接続の待ちを別に記す。製品検査を通し、同一BASE・候補bytes・関連IRについて実装者と独立担当が各自の記録を作る。両記録のコミット後に呼出元が最終HEADを再固定し、その候補の製品検査、checkとchanges reviewが全て0である場合だけ統合可能と報告する。
+- Shown by: check Rustのfmt/clippy/test/release、Bunのtypecheck/unit/integration、既存GNU/muslと配布検査、`scripts/kotowari-check.sh`、各IDの`kotowari query`、レビュー証拠、呼出元の`kotowari check --format json`と`kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json`の出力。REQ-advisor-002の独立レビュー証拠には、読んだ固定質問と分類定義の実装パス、照合した要求本文、EX-advisor-003、004、053ごとの判断根拠と未解決事項を残す。REQ-advisor-008には、読んだ固定質問、分類定義、送信データの実装パス、照合した要求本文、EX-advisor-015、016ごとの判断根拠と未解決事項を残す。固定質問の`crates/guardian-advisor/src/lib.rs`のQuestions::fixedから、`crates/guardian-advisor/src/context.rs`の文脈値と窓処理、`crates/guardian-advisor-typesafe/src/lib.rs`のprepareが符号化するquestions/stateまで追い、確認状態、除外した参照材料、窓外の制約、人間由来の限界が実際にどう渡るかを確認する。文言一致や偽Assessment試験を意味の証明とせず、モデル精度は未評価と区別する。範囲の充足とPROJECT.mdの全体統合ゲートを分け、無関係な残存エラーは報告して統合を止める。statusのcompleteは条件にしない。
 - Left to the implementer: 検証報告の内部配置と試験名だけ。比較元・最終候補と承認は呼出元が決める。
 - Stop and hand back if: 仕様と証拠が一致しない、未処理の意味判断がある、独立レビューがない、最終HEAD再確認後の検査がない、またはコード・IR・決定の意味変更やrebase等で記録が古い。同じentry全体を独立レビューし直して両記録を再著述するまでは統合しない。

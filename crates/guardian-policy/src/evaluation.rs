@@ -186,7 +186,7 @@ impl Policy {
     }
 }
 
-fn worst_effect(effects: &[EffectReport]) -> Option<&EffectReport> {
+pub(crate) fn worst_effect(effects: &[EffectReport]) -> Option<&EffectReport> {
     let mut worst: Option<&EffectReport> = None;
     for effect in effects {
         if effect.verdict == Verdict::Allow {

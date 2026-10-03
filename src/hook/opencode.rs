@@ -1,5 +1,4 @@
-use guardian_core::Verdict;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 
 struct Input {
@@ -39,7 +38,7 @@ pub(super) fn run(text: &str) -> i32 {
             return 0;
         }
     };
-    let engine = match crate::build_engine(input.cwd) {
+    let engine = match crate::build_engine(input.cwd.clone()) {
         Ok(engine) => engine,
         Err(_) => {
             unavailable("Could not load guardian configuration.", None);
@@ -59,23 +58,97 @@ pub(super) fn run(text: &str) -> i32 {
         }
         return 0;
     }
-    let report = engine.check(&input.command);
+    let mut control = if engine.config().advisor.mode.as_str() != "off" {
+        guardian_app::advisor::control::Control::inherited()
+            .and_then(|mut c| c.probe(engine.config().advisor.mode).then_some(c))
+    } else {
+        None
+    };
+    let mut report = engine.check(&input.command);
+    let finished = std::time::Instant::now();
+    let approved = control.as_mut().and_then(|c| {
+        c.start(
+            engine.config().advisor.mode,
+            report.verdict,
+            finished,
+            engine.config().advisor.timeout_ms,
+        )
+    });
+    let completion = if approved.is_some() {
+        crate::advisor::run(
+            &engine.config().advisor,
+            &mut report,
+            &input.command,
+            &input.cwd,
+            || guardian_app::advisor::worker::Source::OpenCode,
+            finished,
+        )
+    } else {
+        None
+    };
+    drop(control);
     for warning in &report.warnings {
         crate::diagnostic(format_args!("Warning: {warning}"));
     }
-    let response = if enforce {
-        let verdict = match report.verdict {
-            Verdict::Allow => "allow",
-            Verdict::Ask => "ask",
-            Verdict::Block => "block",
-        };
-        json!({"status": "judged", "mode": {"enforce": true}, "verdict": verdict, "reason": report.message})
-    } else {
-        if crate::log::write_shadow(&report, &input.command).is_err() {
-            crate::diagnostic(format_args!("Warning: Could not write shadow log."));
-        }
-        json!({"status": "shadow", "mode": {"enforce": false}, "reason": "Guardian shadow mode."})
-    };
+    if !enforce && crate::log::write_shadow(&report, &input.command).is_err() {
+        crate::diagnostic(format_args!("Warning: Could not write shadow log."));
+    }
+    let response = native_response(&report, enforce);
     let _ = crate::output(format_args!("{response}"));
+    crate::advisor::finish(completion);
     0
+}
+
+fn native_response(report: &guardian_app::Report, enforce: bool) -> Value {
+    if enforce {
+        json!({"status": "judged", "mode": {"enforce": true}, "verdict": report.verdict.as_str(), "reason": report.message})
+    } else {
+        json!({"status": "shadow", "mode": {"enforce": false}, "reason": "Guardian shadow mode."})
+    }
+}
+
+#[cfg(test)]
+mod advisor_output_tests {
+    use super::*;
+    use guardian_advisor::Mode;
+
+    // @kotowari[REQ-advisor-021, REQ-011, REQ-048, EX-advisor-006, EX-advisor-051, EX-advisor-052]
+    #[test]
+    fn child_ipc_high_risk_is_judged_block_not_unavailable_and_shadow_is_not_reenabled() {
+        let report = crate::advisor::operational_tests::fixture_report(
+            "major_destructive",
+            "0.95",
+            "unavailable",
+            Mode::Enforce,
+        );
+        let output = native_response(&report, true);
+        assert_eq!(output["status"], "judged");
+        assert_eq!(output["verdict"], "block");
+        assert_eq!(output["mode"]["enforce"], true);
+        let shadow = native_response(&report, false);
+        assert_eq!(shadow["status"], "shadow");
+        assert_eq!(shadow["mode"]["enforce"], false);
+        assert!(shadow.get("verdict").is_none());
+        let ask = crate::advisor::operational_tests::fixture_report(
+            "major_destructive",
+            "0.95",
+            "confirmed",
+            Mode::Enforce,
+        );
+        assert_eq!(native_response(&ask, true)["verdict"], "ask");
+        let observed = crate::advisor::operational_tests::fixture_report(
+            "harmful_irreversible",
+            "0.95",
+            "confirmed",
+            Mode::Observe,
+        );
+        assert_eq!(native_response(&observed, true)["verdict"], "allow");
+        let known = crate::advisor::operational_tests::fixture_known_deletion_report();
+        let output = native_response(&known, true);
+        let reason = output["reason"].as_str().unwrap();
+        assert!(reason.contains("/fixture/work/notes.txt"));
+        assert!(reason.to_ascii_lowercase().contains("delete"));
+        assert!((2..=4).contains(&reason.lines().count()));
+        assert_eq!(reason, known.message);
+    }
 }

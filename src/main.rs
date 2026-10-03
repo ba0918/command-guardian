@@ -1,5 +1,6 @@
 //! command-guardian の実行ファイル。`check` と `hook` の 2 つのコマンドを持つ。
 
+mod advisor;
 mod hook;
 mod log;
 
@@ -11,6 +12,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
+    guardian_app::advisor::worker::run_if_child();
     // 入力由来の解析の子プロセスとして起動されたときは、何よりも先に解析を務める。
     // 子は stdin を要求のソケットとして使うため、フックの入力より先にここへ来る。
     guardian_app::runtime::run_if_child();
@@ -106,7 +108,16 @@ fn cmd_check(args: &[OsString]) -> i32 {
         Ok(e) => e,
         Err(code) => return code,
     };
-    let report = engine.check(&parsed.command);
+    let mut report = engine.check(&parsed.command);
+    let finished = std::time::Instant::now();
+    let completion = advisor::run(
+        &engine.config().advisor,
+        &mut report,
+        &parsed.command,
+        &parsed.cwd,
+        || guardian_app::advisor::worker::Source::Cli,
+        finished,
+    );
     for w in &report.warnings {
         diagnostic(format_args!("Warning: {w}"));
     }
@@ -117,6 +128,11 @@ fn cmd_check(args: &[OsString]) -> i32 {
     if result.is_err() {
         return 3;
     }
+    advisor::finish(completion);
+    check_exit(&report)
+}
+
+fn check_exit(report: &Report) -> i32 {
     match report.verdict {
         Verdict::Allow => 0,
         Verdict::Ask => 1,
@@ -231,6 +247,11 @@ fn print_text(report: &Report) -> std::io::Result<()> {
 }
 
 fn print_json(report: &Report) -> std::io::Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    print_json_to(report, &mut stdout)
+}
+
+fn print_json_to(report: &Report, output: &mut impl std::io::Write) -> std::io::Result<()> {
     let effects: Vec<serde_json::Value> = report
         .effects
         .iter()
@@ -262,5 +283,6 @@ fn print_json(report: &Report) -> std::io::Result<()> {
         "effects": effects,
         "rules": rules,
     });
-    output(format_args!("{json}"))
+    writeln!(output, "{json}")?;
+    output.flush()
 }

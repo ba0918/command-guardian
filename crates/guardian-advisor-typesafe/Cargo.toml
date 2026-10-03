@@ -1,0 +1,14 @@
+[package]
+name = "guardian-advisor-typesafe"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+guardian-advisor = { path = "../guardian-advisor" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
+
+[dev-dependencies]
+guardian-core = { path = "../guardian-core" }
