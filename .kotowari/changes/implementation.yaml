@@ -1,303 +1,35 @@
 version: 1
 entries:
-- id: llm-advisor-remote-main-implementation
-  base: 11688d0e3566d4b8d837cee64db87e74e672d094
+- id: ci-package-prerequisites-implementation
+  base: ab0522ed99175e1e6e90d65f792afdf4745d6397
   role: implementer
   files:
-  - path: CHANGELOG.md
-    before: sha256:7f1e2fbb6ebafb35b83a6ac13e5b80bfd4ecb1be1151cb5325ab98feee82efd1
-    after: sha256:0127fe7116c542126fbdf069ac8703da7579eb9d1987be6f8be8713ec05f879e
-  - path: Cargo.lock
-    before: sha256:27d9770dfc32f1b3ac7decd5ef381ea3f37d1868756c7834b93397516796bd12
-    after: sha256:88bef24fdc7de82c7bf45b4732d79a17407386e28a2da7207506fc60ce3d495e
-  - path: Cargo.toml
-    before: sha256:abd11bfddd1a355ec4794d00eb2050b373c625b6f74c5b63830b1dda12f3e848
-    after: sha256:156e1cbc58e8dec86dcbc4f5d46855af06f6cc9d60c36781c764710fc5c739cd
-  - path: PROJECT.md
-    before: sha256:555e6defc73389e188aa58380c2787f5720206d9801891508325cdfe9d3d72a3
-    after: sha256:35f26e5faa7c38d1afb262fec038b83b195844580700b1c524ef35bc8b268a0a
-  - path: README-ja.md
-    before: sha256:37748e205eab516f157562d150e04136c7d7be601a94c0eeb347afa1cb15e01c
-    after: sha256:d40f57dfe77707e29f69c2d4b62889d45185807533c2b844efc05411d4e8256d
-  - path: README.md
-    before: sha256:668ce83e73f2150d0457dc1899a58aeb09aba76a64e48c56686fb8a713cc05c7
-    after: sha256:7ba412bfdcfbbfa92606119d53ee796676df1c3c29c19ec761faca3ebecc0cc2
-  - path: TODO.md
-    before: sha256:4f37c61342921ed2fc92a9d077a5117a10c720e05f80cb8a8050f9732ceb668a
-    after: sha256:dbe3b9be2797fb7d1d12764b1114cc0ca627c87bc9f75d20bab144efcf1443d8
-  - path: crates/guardian-advisor-typesafe/Cargo.toml
-    before: null
-    after: sha256:586d0a7d7347fdd94e7fbbb1dea455129d4e1bcf88cab68a8c5ed48047faa245
-  - path: crates/guardian-advisor-typesafe/src/lib.rs
-    before: null
-    after: sha256:33b6d31f4c706fbc6cbb2472a4452b6e96b6965f385d4166fd58b726a44c4cd6
-  - path: crates/guardian-advisor-typesafe/src/tests.rs
-    before: null
-    after: sha256:51772e1caf4396906830617f1b38f5daae044f2ce1dd11b0ba166090bc51beab
-  - path: crates/guardian-advisor-typesafe/tests/request.rs
-    before: null
-    after: sha256:ed2c6fd78d87cf6b5c6294ad82c50c52449e1628c779f82c4f2528c84191e7cb
-  - path: crates/guardian-advisor/Cargo.toml
-    before: null
-    after: sha256:df94c3f860a65c6c8d9a0777f8167a78f637f62f6a8b7fcf0bf34b136b005f3b
-  - path: crates/guardian-advisor/src/client.rs
-    before: null
-    after: sha256:ed80b355f1eb6e661b28489139e86eac9889923411e7f2e4096e91bfdd80eab4
-  - path: crates/guardian-advisor/src/context.rs
-    before: null
-    after: sha256:c909260562be482f2bcc9573c89b3ce8c25a1053cf36eb41a1a72c747fd350e3
-  - path: crates/guardian-advisor/src/json.rs
-    before: null
-    after: sha256:d2107821cb2c22565bd63542aa9a122d3d4dad02337121ce825e68a1bd8f6673
-  - path: crates/guardian-advisor/src/lib.rs
-    before: null
-    after: sha256:476cb1af704d1cdf6b962a68362be83e36c63d37543ee8c1f1208037870ea696
-  - path: crates/guardian-advisor/src/secrets.rs
-    before: null
-    after: sha256:9be14429f3358db08dfd7db88baca86b6a26d84e80aaecb6d454432529a83de1
-  - path: crates/guardian-advisor/tests/context.rs
-    before: null
-    after: sha256:5f20c42316d30f56cd9bfcf2ba7658792c0c98c3263703b2b8d00e8e4089d193
-  - path: crates/guardian-advisor/tests/policy.rs
-    before: null
-    after: sha256:8244c6397ffcd109f0081c9e3653e9b8ddb0062f3f6fd4fa44a51c942b1fc9fc
-  - path: crates/guardian-advisor/tests/send.rs
-    before: null
-    after: sha256:5c6755bf4df1460641821c6ae9a038d9129d0a906cf15daddf0d715a9f22e1d2
-  - path: crates/guardian-app/Cargo.toml
-    before: sha256:4528765cedbd9753d9da807399a50ed3508f622678733994fa6fa81f5f5ccdae
-    after: sha256:d33bcfa76f69c30815b926d89ebea71d43b688a04ee2b720554d4bb489a6a2c0
-  - path: crates/guardian-app/src/advisor/context/claude.rs
-    before: null
-    after: sha256:3c4a496e3ec3a29cf3754d2dad6d7c8c70940f97e71792cac6a15bfae8d773e4
-  - path: crates/guardian-app/src/advisor/context/mod.rs
-    before: null
-    after: sha256:c40a09f28fd88a274e3a60598e202dda42fb6f1897bc5a61dbb0958c4871cd24
-  - path: crates/guardian-app/src/advisor/control.rs
-    before: null
-    after: sha256:87f8de36522d6811a1fea46baebf1c5ff42d900d3a51429219c92310432dce43
-  - path: crates/guardian-app/src/advisor/json.rs
-    before: null
-    after: sha256:874c270a30fde4088ed450c008c4d2950d766706ce797621588ee408e7945f40
-  - path: crates/guardian-app/src/advisor/log.rs
-    before: null
-    after: sha256:95ea256a1f2deb20f179551bb36c40bb594a37685bd603ed3a3f3a447c32cbf4
-  - path: crates/guardian-app/src/advisor/mod.rs
-    before: null
-    after: sha256:8aa543a07dddd9dbb24fea3a43e082ea42ebcc2a04cbe2d02ccb69811b57b96a
-  - path: crates/guardian-app/src/advisor/service.rs
-    before: null
-    after: sha256:253bc090ee962016be40fa9a7d372b9f29cec3f4bd0e8396e94781fa84da6dbb
-  - path: crates/guardian-app/src/advisor/wire.rs
-    before: null
-    after: sha256:e1d7d5fbb0bf2e968f61d85e15f77d880c78bff75bb0fc2b47d6ca94ab24c569
-  - path: crates/guardian-app/src/advisor/worker.rs
-    before: null
-    after: sha256:b966fd65e70631346c53341b26abbc4a6b21d61f9da786e6d381622aa39c6533
-  - path: crates/guardian-app/src/config_loader.rs
-    before: sha256:cd0156853ac3e832bdbafb2c7721ea334c1980a82765444f2fb423c22ad078cb
-    after: sha256:3cf61a30a41de4cb2af908ba1df7ca1042478b88f24cf58236ed6987d289b478
-  - path: crates/guardian-app/src/lib.rs
-    before: sha256:abcd4eaf3e7a58213aad9e33b2bf30615671c2496547f05cb060a307b93bf3c0
-    after: sha256:93aed41ed40ba72fbae3ee7d9eae541a5a009b66c080f828994f71457a1c7b21
-  - path: crates/guardian-app/src/state.rs
-    before: null
-    after: sha256:44a155141ee955acd1315412f1d0a2e81b61839db209580405fc11a3706d0a9f
-  - path: crates/guardian-app/tests/advisor_claude.rs
-    before: null
-    after: sha256:d188b1c83e9900fa201a1cd30c82be016c10f78ce2ec9865faf41fe703609168
-  - path: crates/guardian-app/tests/advisor_context.rs
-    before: null
-    after: sha256:71e9c2f7e17a12359dda757bee5e1296e152bb78b893e556d48705022af11f6e
-  - path: crates/guardian-app/tests/advisor_control.rs
-    before: null
-    after: sha256:dc88df3abc79e09b3a6a1c6882a089c0d2d8004ba1e8d68bb7398fa05f3793ac
-  - path: crates/guardian-app/tests/advisor_log.rs
-    before: null
-    after: sha256:c0a5c871e54c92ddee57172e16e86554598327e8947b7412afb3783217754a21
-  - path: crates/guardian-app/tests/advisor_state.rs
-    before: null
-    after: sha256:cac7ed07c1d62a5e289b4aed570a5cb15969e9119b3f76bae7d320b81b23572c
-  - path: crates/guardian-app/tests/advisor_wire.rs
-    before: null
-    after: sha256:2f57354822cc23c9efd2efcfb3a94c32af296bd1b88e9a0da63313d946b65507
-  - path: crates/guardian-policy/Cargo.toml
-    before: sha256:98313547dec0849754a39dfa03ec944156d20ceeb7ce16bb4783d53dfaddaf0e
-    after: sha256:7f2d2bb206157f12e82a46ad58c9f3e12f427e00fbd70ad7a7650554ec9e43f3
-  - path: crates/guardian-policy/src/config.rs
-    before: sha256:3ee39a6591145835afa580feb45a50bff48f326ba794bd2c629525775d8a8b36
-    after: sha256:db1bce755f2d997144279c3abece669c2b4c6e87901eafc318d48b55fdddcbc0
-  - path: crates/guardian-policy/src/evaluation.rs
-    before: sha256:9da61888e7a83a1a9dbbd34e81ad7b20312f3c84918cb650f18d7812807de993
-    after: sha256:daa0e2923cc374f4a1e081466de74b7f5b24914e0a672d448f410622329cf356
-  - path: crates/guardian-policy/src/layers.rs
-    before: sha256:e655fe8fc434d0c74e6ceb81927cced869ec4e13cab9d11bb9259b6f9d325f22
-    after: sha256:7cf09074da42278e970123be7bf5bd7b4450ec0283bdba77b3aa9be3254fa66d
-  - path: crates/guardian-policy/src/message.rs
-    before: sha256:b172be60a580feb370e23f9a113eea9bf21c9def811d03852d844ecd8c6f4485
-    after: sha256:429fc63c2cb713d794399f816f9472d214e64ebe739c4a4a28dc156896c7243f
-  - path: docs/opencode.md
-    before: sha256:d470644f1aa9ad0b205371cb7608e7c987e67e4798ad3a020ff202c32c66e062
-    after: sha256:5931593359a6b409334ab38ded0e77387210e17a31de3a7e723f3fb6d111c790
-  - path: docs/verification/llm-advisor-context.md
-    before: null
-    after: sha256:dbd8879efd376a55da6d7b797b14880b621c32defca74b4709746d22e9665bdb
-  - path: docs/verification/llm-advisor.md
-    before: null
-    after: sha256:ec5d1033f7575fa2043c6874316bf5787f953340cb49ab328e29a209b2ea56a8
-  - path: plugins/opencode/src/advisor-control.ts
-    before: null
-    after: sha256:d662ab46cbdbc456ad57b99b96c94542c7d72ebc262d6480506d509e3d2aeebe
-  - path: plugins/opencode/src/guardian.ts
-    before: sha256:5c5b0edf23534b7ec6395ce68e8043ef3609daf7f6927d4d5cca8f77b87c089e
-    after: sha256:88539549e75c5aaec2d5a9e4683aece713366600e991ce6f60d9819e05a1724b
-  - path: plugins/opencode/tests/helpers/host-process.ts
-    before: null
-    after: sha256:1a602f1a17ff30e323e9062cb3ef2a68f1e8e2fc8e44d90ca72f93fd58e99ecb
-  - path: plugins/opencode/tests/integration/host.test.ts
-    before: sha256:539cfd69a09a8109f95465305a9efe4066ef5ce92bba790b0b0512e364950770
-    after: sha256:58b947a4d89c9d37de8b515d96e7f86be0c3f97c862d2555f5b9d781e1c3a87a
-  - path: plugins/opencode/tests/unit/advisor-control.test.ts
-    before: null
-    after: sha256:16c5cdf4c9056ee8b18906f454224b47a77efd320a99bf3cda33e727d31bbf71
-  - path: plugins/opencode/tests/unit/guardian.test.ts
-    before: sha256:3bb2faaa7e575fa34d65c6b2aef694a7a487915f57103b94d2646d87bf5e7207
-    after: sha256:a3d1abb522a06f4503f68bbce29473479e1920408fb243315af83a67c6ff1e13
-  - path: scripts/package-release.sh
-    before: sha256:1a8315271d9f736c3d0e272c6a000db0cfa12ad57f94714f714f0528dc3b4da1
-    after: sha256:11ae24ca419ef62ac5efbaf41b48f18271f3271962a22c3c70ed456848664cc5
-  - path: site/build.py
-    before: sha256:aa166fe2f6503e6ecd16fa61deb8707db9a82ef8e1ba45fa8325428b2beb5197
-    after: sha256:aa166fe2f6503e6ecd16fa61deb8707db9a82ef8e1ba45fa8325428b2beb5197
-  - path: site/style.css
-    before: sha256:ba6c99092d729dfbb26f04899389a37c9ff3d488be85bb11ae22211337567711
-    after: sha256:ba6c99092d729dfbb26f04899389a37c9ff3d488be85bb11ae22211337567711
-  - path: site/template.html
-    before: sha256:bc48df7f046baec311c321867e9b2f6e6802891048a9c801a66b913b9c428413
-    after: sha256:bc48df7f046baec311c321867e9b2f6e6802891048a9c801a66b913b9c428413
-  - path: src/advisor.rs
-    before: null
-    after: sha256:a5ba0898632ff5ed4ec84333adf94690dd83fdd51bd98c76365a88a3adde9138
-  - path: src/hook.rs
-    before: sha256:a435de13e72f6d1883995653be081752dcbe0ed7419149540a2dfb143c8ff112
-    after: sha256:7c1a60e535b0c642861a031441b51d25404fcb58482e8940287ed923da3da746
-  - path: src/hook/opencode.rs
-    before: sha256:92da82470ac157954395af611512b51c5010b8f82f2132b75bc6a134ca31c0e3
-    after: sha256:9d5c7d631811ef27ac8e531b7aa755d1a1314bc5a10f663822893ed3ec6565c7
-  - path: src/main.rs
-    before: sha256:0a262aae0f08c2afd6843e193b23916b23065ac49072878c86f634e72b7ae35a
-    after: sha256:6d432392e051332d94106116196015545bcdc6437d47bc0497392376bea48867
-  - path: tests/advisor_entry.rs
-    before: null
-    after: sha256:de0cebea42182a01c97ecca7366de950156650ccf92753b26ffe63e9a4a8a350
+  - path: .github/workflows/ci.yml
+    before: sha256:bb910de370653a9ff6a943228e9c2329f0be2b8ac31d6738fab2f5633ad2262b
+    after: sha256:4dc752c5ce368b7a8617029aeb4ce2820c30d5b4781e9d17a56e1a97b643f561
   - path: tests/advisor_package.rs
-    before: null
-    after: sha256:9d827670d1dade933865af474b913a235022fca2366f72fddd42cd5d4a768af4
-  - path: tests/advisor_worker.rs
-    before: null
-    after: sha256:9376a80769227146ffd6fceaf6b7abe01f93d736f816f833a21d445f7404e580
-  - path: tests/app_config.rs
-    before: sha256:7a95cf25b95a27121aa1939a49f2160130ad52adb9be356e4df3266f9bb7efdb
-    after: sha256:0ca5e5ab5a257e0faa76309aa6e6c8972ff9382432cd96c242110096ec114336
-  - path: tests/fixtures/advisor/claude-2.1.288-multiple.json
-    before: null
-    after: sha256:d20c499291e37aea131b740ac2285400d103145c036ec57d2b43e39e131b9d7a
-  - path: tests/fixtures/advisor/claude-2.1.288.json
-    before: null
-    after: sha256:7f0121be59a4e34c5dabe8258aae86edbd67c126f64259b17178313dac8f2abc
-  - path: tests/fixtures/advisor/codex-0.160.0.json
-    before: null
-    after: sha256:4d87f46a23c1b4a71cc2bd483b0600e43add825391f0c6140f8d119c34d4793a
+    before: sha256:9d827670d1dade933865af474b913a235022fca2366f72fddd42cd5d4a768af4
+    after: sha256:b4135cd554471d89eca65df1889fa3d1666f14fee548a8c350f80aa0d6f8b693
   ir:
-  - path: docs/ir/advisor/policy.md
-    sha256: sha256:c884781ba853ea6fd499aa0731a31e2c59e06f92a0781da71f152e7bd6bbd65a
-  - path: docs/ir/advisor/provider.md
-    sha256: sha256:2ad3a8626770d143df71c6761014a1080e57c221a14018b8e849d9fdda8b1058
-  - path: docs/ir/config.md
-    sha256: sha256:c4d289c8324db70853ee0f8987d461663aa1d744e123f87421b2f421f355ec33
-  - path: docs/ir/guards.md
-    sha256: sha256:2be5d9f6408f4303ebe430eaaf0d3fa3e9c3a6a8f66785048d048ca98dacb9b2
-  - path: docs/ir/advisor/context.md
-    sha256: sha256:0f840d0b784ecdb5edc5cf534db0b9e2bc84033de18a87c761ef1ab923f0c162
-  - path: docs/ir/advisor/runtime.md
-    sha256: sha256:ae77b8d77657fc6b2bda4191db32cb2cbf84d728db21e94b7bf3faab81d9c65c
   - path: docs/ir/cli.md
     sha256: sha256:f0e0f675f4b9b5a37f7df0989fab0cc5d6e379c75817f9d25b7cb736bed7548e
-  - path: docs/ir/parser.md
-    sha256: sha256:6af72ae748532923b796b7c5d6367ef0445f1a53420eac743da97f76479dade5
-  - path: docs/ir/opencode.md
-    sha256: sha256:a8bf8398e54bc85f20a71ff9afcb49727fdd6006aa5654c77ec400d606bc314f
-  - path: docs/ir/agents.md
-    sha256: sha256:238a974a95e47daa9d052329e5b5295de64b51ed27a6e32e7cb2ffffc0eb0793
-  - path: docs/ir/messages.md
-    sha256: sha256:ea822a1801dfee83d9a7730ba71c1c5d7202fff34fb0cb8f5fbd6f5e5c451a0f
-  - path: docs/ir/release.md
-    sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
-  - path: docs/ir/opencode-delivery.md
-    sha256: sha256:6cf5704d4363ee5cf9a7049d334df353e39834a9a88e8b4b53c4bb3f7a8cfb88
-  conclusion: new
+  - path: docs/ir/advisor/provider.md
+    sha256: sha256:2ad3a8626770d143df71c6761014a1080e57c221a14018b8e849d9fdda8b1058
+  conclusion: existing
   reason: >-
-    呼出元が固定したorigin/mainの比較元から統合候補全体を照合し、変更ファイルのGit modeとblob、関連IRの全bytesを再取得した。
-    助言層の実装と試験はREQ-advisor-001から021と列挙した既存要求を対象とする。
-    offと機械blockでは追加取得とモデル実行を行わず、observeでは機械結果を維持し、enforceでも機械blockを解除しない。
-    危険性と指示範囲の分布検証、候補合成、利用者だけの設定、送信本文検査、限定文脈と安全保存、単一期限と専用子、既存CLIと三ホストの出口の契約を維持する。
-    質問の分類と指示の鮮度の意味の検証分担は利用者が承認したA63/A64と計画A7/A8による改訂を含むためnewとする。
-    構造試験の成功を質問の意味、実モデル精度、現在のTypeSafeサービスとの適合の証明とは扱わない。
-    検証文書とfixtureは対応版と取得境界、実測値と未評価の範囲を記録し、公開APIや対応ホストの保証を拡張しない。
-    README、CHANGELOG、PROJECT、OpenCode導入文書とTODOは既存要求と実装済み範囲、外部送信とログの注意、未評価事項を説明する変更であり、新たな製品の意味を採用するものではない。
-    完了した実装計画はGit履歴へ委ね、決定記録の参照は固定コミットの計画へ向ける。承認済み要求と決定の意味は変更しない。
-    並行した紹介ページのbuild.py、style.css、template.htmlは比較元のblobをそのまま保ち、製品コード、IR、決定、文書の内容は統合前のローカル候補から変更していない。
-    この記録は統合後の実装者照合だけを示す。保存した旧review.yamlは比較元が異なる暫定記録であり、独立担当による再照合と最終HEADのreview検査、製品チェック、pushの成功は主張しない。
+    GNUとmuslの配布試験が呼ぶpackage-release.shはBunによるOpenCode依存の解決を必要とするため、
+    既存のBun 1.4.2準備とfrozen-lockfileによる依存取得を各matrixのRust試験より前へ移す。
+    移動したsetup-bunのv2参照だけを解決済みcommitへ固定し、固定依存、試験とjobの構成は維持する。
+    CIの実行順はPROJECT.mdの開発運用設定であり、製品要求を追加する変更ではない。
+    配布試験の失敗表示に対象、fixture、終了状態、捕捉済み標準出力と標準エラーを加えるが、
+    成功条件、checkout外での実行、Rust依存ライセンスの確認と要求マーカーは変更しない。
+    REQ-016の単一実行ファイルとREQ-advisor-012の静的組込みの意味を維持し、製品コード、IR、決定には変更がない。
+    Bunがあるがnode_modulesのない隔離sourceでは両targetの組立てが依存解決で失敗し、
+    同じfrozen-lockfile準備後には成功した。既存GitHub失敗の最初の標準エラーは未確認であり、
+    この再現を既存runの厳密な原因特定や独立レビューの完了とは扱わない。
   requirements:
-  - REQ-advisor-001
-  - REQ-advisor-002
-  - REQ-advisor-003
-  - REQ-advisor-004
-  - REQ-advisor-005
-  - REQ-advisor-006
-  - REQ-advisor-007
-  - REQ-advisor-008
-  - REQ-advisor-009
-  - REQ-advisor-010
-  - REQ-advisor-011
-  - REQ-advisor-012
-  - REQ-advisor-013
-  - REQ-advisor-014
-  - REQ-advisor-015
-  - REQ-advisor-016
-  - REQ-advisor-017
-  - REQ-advisor-018
-  - REQ-advisor-019
-  - REQ-advisor-020
-  - REQ-advisor-021
-  - REQ-011
-  - REQ-012
-  - REQ-042
-  - REQ-018
-  - REQ-019
-  - REQ-021
-  - REQ-022
-  - REQ-023
-  - REQ-024
-  - REQ-013
-  - REQ-014
-  - REQ-015
   - REQ-016
-  - REQ-025
-  - REQ-034
-  - REQ-039
-  - REQ-048
-  - REQ-049
-  - REQ-050
-  - REQ-051
-  - REQ-053
-  - REQ-056
-  - REQ-057
-  - REQ-058
-  decisions:
-  - docs/decision/records/2026-10-03-llm-advice-layer.md#A63
-  - docs/decision/records/2026-10-03-llm-advice-layer.md#A64
-  - docs/decision/records/2026-10-03-llm-advisor-plan.md#A7
-  - docs/decision/records/2026-10-03-llm-advisor-plan.md#A8
+  - REQ-advisor-012
+  decisions: []
   handoff: null
   gaps: []

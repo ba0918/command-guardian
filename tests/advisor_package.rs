@@ -24,7 +24,11 @@ fn distributed_single_binary_runs_outside_checkout_and_carries_rust_dependency_l
         .unwrap();
     assert!(
         result.status.success(),
-        "Dependency notice packaging failed"
+        "Release archive packaging failed for target {target} in fixture {}: {}\nstdout:\n{}\nstderr:\n{}",
+        fixture.path().display(),
+        result.status,
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
     );
     let archive = fs::read_dir(&package)
         .unwrap()
