@@ -8,6 +8,19 @@ Use Linux x86_64 or WSL with OpenCode V2 2.0.21, explicitly configured Bash, and
 
 This is accident prevention, not a security sandbox. `allow` is not proof of safety. Changes to files during approval and changes by other hooks are outside the input-consistency guarantee.
 
+## Optional LLM advice on main
+
+LLM advice is unreleased. Use a source-built binary and the plugin from the same checkout; the published `0.1.3` commands below do not include it.
+Configure advice in the guardian user's configuration, not in `opencode.json` or project TOML. Start with `observe` and supply `TYPESAFE_API_KEY` to the guardian process environment. Read the [advice setup and data-transfer notice](../README.md#optional-llm-advice) before enabling it.
+
+The plugin keeps its normal six-second outer deadline unless guardian sends a valid advice notification and receives acknowledgment through the inherited control channel.
+On acceptance, the outer deadline becomes the notification reception time plus `advisor.timeout_ms` plus 1,000ms. Long durations use bounded timer intervals without shortening that deadline.
+Without acknowledgment, guardian skips advice and keeps the mechanical verdict. The plugin does not grant a longer deadline to an old binary or an invalid notification.
+The guardian parent still enforces its own advice deadline, including context acquisition and communication; the extra second is for the outer protocol, not extra model time.
+
+`advisor.mode = "observe"` does not change native approval or mechanical judgments. With `enforce`, guardian may tighten a verdict, but `ask` still requires native approval.
+The separate `[mode] enforce = false` setting is shadow mode. Its log still includes command text; the advice log excludes request text by default.
+
 ## Automatic connection to the background service
 
 From guardian 0.1.3, normal `opencode` startup needs no connection options. This feature is not present in 0.1.2. Keep Bash explicitly selected and register the matching plugin, for example from a mise-managed release bundle:

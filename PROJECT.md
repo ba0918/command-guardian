@@ -4,6 +4,8 @@
 
 command-guardian は Bash コマンドの破壊的な効果を取り出し、対象パスと設定から allow、ask、block を返す実行前の見張りである。
 CLI の check とエージェント用の hook を、同じ実行ファイルで提供する。
+利用者が有効にした場合だけ、期限付きのLLM助言で機械判定を厳しくできる。
+助言は既定offで、設定、外部送信、ログの説明は[README](README-ja.md#任意のllm助言)を参照する。
 実行するコマンドを遮断する権限 sandbox ではない。
 
 ## Stack and layout
@@ -15,11 +17,13 @@ Rust 2021 の Cargo workspace。
 | クレート | 責務 | 通常の内部依存 |
 |---|---|---|
 | guardian-core | 共通の値と診断 | なし |
+| guardian-advisor | 助言の型、分類、文脈の上限、秘密の検出 | core |
+| guardian-advisor-typesafe | TypeSafe要求の符号化、認証、HTTPS通信 | advisor |
 | guardian-parser | brush-parser の隠蔽、正規化 AST、純粋な構文解析と引用除去 | core |
 | guardian-analysis | Context を保持する意味解析、効果と Invocation の共有走査 | core、parser |
 | guardian-judge | パスの観測、分類、期限付き git 実行 | core |
-| guardian-policy | 設定の解釈とマージ、規則、最悪値の合成、文面 | core |
-| guardian-app | 設定の探索と読込、worker と session、判定の組立て | 上記5クレート |
+| guardian-policy | 設定の解釈とマージ、規則、最悪値の合成、文面 | core、advisor |
+| guardian-app | 設定の探索と読込、worker と session、判定の組立て、助言の期限とローカル状態 | core、parser、analysis、judge、policy、advisor、advisor-typesafe |
 | command-guardian | CLI、hook の写像、環境取得、影ログ | app、core、policy |
 
 ## Commands
@@ -120,6 +124,9 @@ READMEの該当見出しを変えるとページのビルドが失敗するた�
 
 単一バイナリ、CLI の終了コード、設定の三層と信頼条件、JSON、hook、影ログの外部契約を維持する。
 構文のサイズは1 MiB、深さは128段、一判定の構文解析は1000回、判定時間は5秒が上限である。
+助言の期限は機械判定と別枠で、既定2秒に取得、起動、検査、通信を含める。
+モデル呼出しは最大1回で、再試行しない。
+実モデルの精度と現在のTypeSafeサービスとの適合は未検証である。
 設定例の検証には一要求の隔離上限を適用し、設定全体への累積1000回/5秒の受理上限は設けない。
 git の待ちと出力の取得を判定の残時間で切るが、全 fs syscall を5秒で強制中断する保証はない。
 代表的な浅い入力の応答目標は100ms未満で、病的な深い入力とは別に計測する。

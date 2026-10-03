@@ -8,8 +8,11 @@ CLIと三ホストの接続、修正後候補の機械検査、品質・仕様�
 CLI、Claude、Codexへ専用子を接続し、OpenCodeのguardian入口では実FDの交渉成功時だけ助言を開始する。
 ログ保存は専用子で最終回答の送信後に行い、親は結果を出力してから残期限で回収する。
 独立レビューの指摘6件は修正後の差分レビューで解消を確認した。機械検査成功だけで合格としたものではない。
-製品候補のレビューは収束したが、この検証記録と実装者の変更照合記録の更新は、別途独立担当が確認する対象である。
-実装のコミット、独立担当のreview.yamlの更新・コミット、最終HEADでのPROJECT.mdの両統合ゲートは、この記録の作成時点では未完了である。統合済み・リリース承認済みとは扱わない。
+検証記録と実装者の変更照合記録の更新を独立担当が確認し、review.yamlを作成した。
+実装を`f7f3b83de4c4bf34c3d42511508b828dbb84125b`、独立担当の記録を`c2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6d`にコミットした。
+後者のHEADでPROJECT.mdの両統合ゲートが成功し、変更照合は53件中53件を充足した。
+同じHEADをmainへfast-forwardで統合した。
+リリースの公開は行っていない。
 実モデルの呼出し、現在のTypeSafe APIとの適合確認、モデル精度の評価は行っていない。
 閾値0.9は正答率90%の証拠ではなく、jev-latestの将来のモデルも固定されない。
 
@@ -33,6 +36,8 @@ CLI、Claude、Codexへ専用子を接続し、OpenCodeのguardian入口では�
 機械検査の証拠一覧は`.agents/artifacts/llm-advisor-final-check-round3.json`、レビューの集約は`.agents/artifacts/reviews/llm-advisor.json`にある。
 品質・仕様適合それぞれの`llm-advisor-*-full2.json`と後続の`llm-advisor-*-diff3.json`、質問の`llm-advisor-question-semantics.json`に判断根拠を残した。
 これらはローカルの検証成果物であり、配布物には含めない。
+作業ツリーの削除前に、成果物を`.agents/artifacts/llm-advisor-archive-c2a7b5f/`へ退避した。
+最終コミットと独立照合の証拠は、その中の`llm-advisor-delivery-final.json`と`llm-advisor-delivery-review.json`にある。
 ホストの出所と対応範囲、既知の限界は[文脈取得の検証記録](llm-advisor-context.md)の通りで、新しいホスト対応や人間由来の完全証明を追加していない。
 以前のhost準備失敗の原因は未確定であり、今回の5経路成功から不安定さの解消を推定しない。
 

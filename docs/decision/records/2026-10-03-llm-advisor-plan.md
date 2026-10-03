@@ -29,11 +29,11 @@ Position: A7とR5の文書改訂は独立レビューを経た。利用者が追
 - A6 実装の範囲内の試験充足と、統合前の全体検査を別に報告する。比較元と最終候補は呼出元がGitから固定する。
   - why: [PROJECT.md](../../../PROJECT.md#変更とirの照合)は独立担当による記録とcheck/changes reviewの両exit0を統合条件にしている。一方、計画対象外の問題やstatusのcompleteは対象実装の証明とは別である。仕様の承認コミットと計画承認後の実装branch baseを混同せず、記録コミット後の最終HEADで再検査する
   - decided_by: AI（計画実装担当。承認者ではない）
-- A7 [利用者が承認した検証分担A63](./2026-10-03-llm-advice-layer.md#agreements)に従い、[計画](../../plans/llm-advisor.md#verification-map)のREQ-advisor-002とEX-advisor-003、004、053をS10の独立質問レビューへ対応付ける。REQ-advisor-004の分離はS2/S5の単体試験のままとし、19助言要求と48助言例に既存EX-112、113を加えた50例を機械試験の充足対象とする。
+- A7 [利用者が承認した検証分担A63](./2026-10-03-llm-advice-layer.md#agreements)に従い、[計画](https://github.com/ba0918/command-guardian/blob/c2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6d/docs/plans/llm-advisor.md#verification-map)のREQ-advisor-002とEX-advisor-003、004、053をS10の独立質問レビューへ対応付ける。REQ-advisor-004の分離はS2/S5の単体試験のままとし、19助言要求と48助言例に既存EX-112、113を加えた50例を機械試験の充足対象とする。
   - why: 固定質問の文字列一致や偽Assessmentによる合成は質問の意味の証拠ではないため、実際の実装パスと書かれた契約、三例ごとの判断根拠を独立担当の証拠として要求する。現在の部分実装の試験不足件数はこの実装前の対象数とは別に報告する。分類、閾値、送信、実行時の挙動、計画名と比較元は変更しない
   - decided_by: 利用者（実装中の検証分担改訂に「OK」。計画への反映は文書実装担当）
 
-- A8 [利用者が追加承認した検証分担A64](./2026-10-03-llm-advice-layer.md#agreements)に従い、[計画](../../plans/llm-advisor.md#verification-map)のREQ-advisor-008とEX-advisor-015、016をS10の独立レビューへ対応付ける。REQ-advisor-007とEX-advisor-013、014はS4の構造試験に分け、REQ-advisor-006、010、003の単体試験を維持する。充足対象は18助言要求・46助言例の単体試験と3助言要求・7助言例のレビューとし、既存EX-112、113を加えた48例を機械試験の対象とする。
+- A8 [利用者が追加承認した検証分担A64](./2026-10-03-llm-advice-layer.md#agreements)に従い、[計画](https://github.com/ba0918/command-guardian/blob/c2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6d/docs/plans/llm-advisor.md#verification-map)のREQ-advisor-008とEX-advisor-015、016をS10の独立レビューへ対応付ける。REQ-advisor-007とEX-advisor-013、014はS4の構造試験に分け、REQ-advisor-006、010、003の単体試験を維持する。充足対象は18助言要求・46助言例の単体試験と3助言要求・7助言例のレビューとし、既存EX-112、113を加えた48例を機械試験の対象とする。
   - why: [A7](./2026-10-03-llm-advisor-plan.md#agreements)の質問の意味と構造の分担を、追加承認された要求だけへ広げるため。固定質問、分類定義、符号化後の実際の文脈データの照合と二例ごとの独立した判断根拠を求め、偽Assessmentの合成や文字列一致を意味の検証にしない。S4の取得・窓・保存の振る舞いは変えず、実装前の対象数を現在の残件数や実モデルの精度と混同しない。実行時の試験不足の免除、計画名と比較元の変更は行わない
   - decided_by: 利用者（REQ-advisor-008の検証分担の追加改訂を明示承認。計画への反映は文書実装担当）
 
@@ -69,5 +69,5 @@ Position: A7とR5の文書改訂は独立レビューを経た。利用者が追
 ## Delegated
 
 - D1 内部の関数・helper・試験名と、依存方向を保つ小さな抽出だけを実装担当へ残す。
-  - why: [計画](../../plans/llm-advisor.md#left-to-the-implementer)は新入力、受理境界、保存形式、期限、送信範囲、失敗の意味を未指定の実装選択にしない
+  - why: [計画](https://github.com/ba0918/command-guardian/blob/c2a7b5f265bc3b2cdbbab278bedccd9cb6eadc6d/docs/plans/llm-advisor.md#left-to-the-implementer)は新入力、受理境界、保存形式、期限、送信範囲、失敗の意味を未指定の実装選択にしない
   - decided_by: AI（計画実装担当。承認者ではない）

@@ -15,7 +15,7 @@ mise use -g github:ba0918/command-guardian
 command-guardian --help
 ```
 
-This installs the Linux x86_64 binary from GitHub Releases. It requires a published release with a matching executable asset. Before the first release is published, use the source build below.
+This installs the Linux x86_64 binary from GitHub Releases. To use changes listed under Unreleased, build from source below; published releases do not contain them yet.
 
 ### Build from source
 
@@ -106,7 +106,7 @@ deny = ["git push origin main"]
 allow = ["git status"]
 ```
 
-Guard examples are checked when configuration loads. A malformed guard or a failing example disables that guard and produces a warning. General configuration errors discard the entire affected file, with a warning; other valid layers still apply.
+Guard examples are checked when configuration loads. A malformed individual guard or a failing example disables that guard and produces a warning. An invalid `commands` section or guard list discards the entire affected file, as do general configuration errors. Other valid layers still apply, and the checker warns about the rejected file.
 
 Project configuration is untrusted by default. It can add protected roots and restrictive rules, but cannot add allowed roots, disable built-in rules, or otherwise relax protection. To allow a project's settings to relax protection, add its path to `trusted_projects` in your user configuration. Do this only for projects whose configuration you trust. Custom `allow` rules are accepted only from user configuration.
 
@@ -121,8 +121,51 @@ Project configuration is untrusted by default. It can add protected roots and re
 | `git.enabled` | `true` | Enable Git-based classification |
 | `mode.enforce` | `true` | Return hook decisions instead of only logging them |
 | `trusted_projects` | Empty | Allow listed projects to use otherwise restricted settings |
+| `advisor.mode` | `"off"` | Unreleased; source builds only. Disable advice, observe it, or enforce tighter verdicts; user configuration only |
 
 Disabling an effect means the checker no longer extracts it. It is not just a way to hide its warning. See [configuration](docs/ir/config.md) and [command guards](docs/ir/guards.md) for the full contracts.
+
+## Optional LLM advice
+
+LLM advice is an unreleased feature on `main`. Build from source to use it; the `0.1.3` installation commands below do not include it.
+Advice is off by default. Start with `observe`, which records advice without changing the mechanical verdict. Switch to `enforce` only after reviewing the results and accepting the external data transfer.
+
+Add this section to `$XDG_CONFIG_HOME/command-guardian/config.toml`, or `$HOME/.config/command-guardian/config.toml` when XDG is unset:
+
+```toml
+[advisor]
+mode = "observe"
+model = "jev-latest"
+timeout_ms = 2000
+max_request_bytes = 65536
+intervention_threshold = 0.9
+context_exchanges = 3
+context_ttl_hours = 24
+debug_text = false
+```
+
+These are the default values except for `mode`, whose default is `"off"`.
+`max_request_bytes` limits the encoded outgoing request. `context_exchanges = 0` disables conversation context, not advice. `context_ttl_hours` limits cache lifetime; `debug_text` controls request-text logging.
+Only user configuration can enable or configure advice. Project `[advisor]` settings are ignored with a warning, even for trusted projects. Invalid user advisor settings discard that entire user configuration file; other valid layers still apply.
+Provide authentication through `TYPESAFE_API_KEY` in the guardian process environment. Do not put the key in TOML or a command that will enter shell history.
+
+When enabled, the TypeSafe adapter sends at most one HTTPS request to `https://api.typesafe.ai/v1/systemone` per eligible judgment, with no retries.
+The request includes the command, working directory, mechanical result and available bounded conversation context. Context defaults to the last three exchanges; assistant replies help resolve references but do not establish user approval.
+It excludes tool results, file contents, the full conversation and environment-variable listings. Detected secrets, encoding failures and requests above the byte limit skip sending rather than truncate the request. Secret detection is incomplete; do not enable advice for inputs you cannot send to the provider.
+
+`enforce` can tighten mechanical `allow` and `ask` verdicts, but cannot release `block` or turn `ask` into `allow`.
+Harmful irreversible effects at or above the threshold are blocked. For major destruction at or above the threshold, `ask` also requires a confirmed instruction covering the target and all effects, with instruction-match probability meeting the threshold; otherwise it is blocked.
+Missing context does not by itself skip model evaluation. Timeout, invalid responses, communication failures and uncertain assessments preserve the mechanical verdict rather than add a new confirmation.
+
+`timeout_ms` covers context acquisition, child startup, validation and communication, separately from the five-second mechanical budget. The parent enforces the advice deadline.
+`intervention_threshold` is a model-probability threshold, not an accuracy guarantee. `jev-latest` can change upstream. Real-model accuracy and compatibility with the current TypeSafe service have not been verified.
+
+Advice logs go to `$XDG_STATE_HOME/command-guardian/advisor.jsonl`, falling back to `$HOME/.local/state/command-guardian/advisor.jsonl`.
+By default they contain metadata, including verdicts, model, elapsed time and failure or skip classification, without command or conversation text. `debug_text = true` adds request text with detected secrets masked; treat it as sensitive data.
+Context caching, where a separate hook is needed, stores a bounded window with owner-only access. The default lifetime is 24 hours; expired entries are not used and are removed on access. Logs and cache are separate: disabling debug text does not disable context caching.
+The existing shadow log still contains command text and target paths. `advisor.mode = "observe"` and `[mode] enforce = false` are different settings.
+
+See the [advisor requirements](docs/ir/advisor/policy.md), [context verification](docs/verification/llm-advisor-context.md) and [verification results](docs/verification/llm-advisor.md) for supported context routes and verification limits.
 
 ## Agent hooks
 
@@ -198,11 +241,13 @@ Do not use the checker as an access-control boundary or as the sole protection a
 |---|---|
 | `src/` | CLI, environment input, hook protocol, and shadow logging |
 | `crates/guardian-core/` | Shared values and diagnostics |
+| `crates/guardian-advisor/` | Advice types, classification, context bounds, and secret detection |
+| `crates/guardian-advisor-typesafe/` | TypeSafe request encoding, authentication, and HTTPS transport |
 | `crates/guardian-parser/` | Shell parsing and normalized syntax trees |
 | `crates/guardian-analysis/` | Effects, program invocations, and path-state analysis |
 | `crates/guardian-judge/` | Filesystem observation and path classification |
 | `crates/guardian-policy/` | Configuration, guards, verdict composition, and messages |
-| `crates/guardian-app/` | Engine, configuration loading, and isolated parser workers |
+| `crates/guardian-app/` | Engine, configuration loading, isolated workers, advice deadlines, and local state |
 | `tests/` | CLI, hook, configuration, and isolation integration tests |
 | `docs/ir/` | Requirements and examples checked by kotowari |
 | `docs/decision/records/` | Reasons and approvals behind specification decisions |

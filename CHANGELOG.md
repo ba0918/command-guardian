@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add opt-in, deadline-bound LLM advice through TypeSafe for CLI and agent hooks. Advice is off by default, accepts user configuration only, and can tighten mechanical verdicts without releasing a block. Observe mode records advice without changing the verdict.
+- Bound conversation context, skip external sending on detected secrets or oversized requests, and keep request text out of advice logs unless debug logging is enabled. Secret detection is incomplete; real-model accuracy and current TypeSafe service compatibility remain unverified.
+- Negotiate the advice deadline with the OpenCode plugin, including long timeouts, without shortening the accepted duration. Advice failures preserve the mechanical verdict.
+- Reject an invalid `commands` section or guard list as a whole-file configuration error; malformed individual guards remain disabled one rule at a time.
+
 ## [0.1.3] - 2026-10-03
 
 - Automatically connect the OpenCode V2 plugin to its own authenticated local background service when connection options are omitted. Explicit servers still use `serverUrl` and `passwordEnv`; missing or mismatched service registration does not permit execution.
