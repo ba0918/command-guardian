@@ -121,13 +121,13 @@ Project configuration is untrusted by default. It can add protected roots and re
 | `git.enabled` | `true` | Enable Git-based classification |
 | `mode.enforce` | `true` | Return hook decisions instead of only logging them |
 | `trusted_projects` | Empty | Allow listed projects to use otherwise restricted settings |
-| `advisor.mode` | `"off"` | Unreleased; source builds only. Disable advice, observe it, or enforce tighter verdicts; user configuration only |
+| `advisor.mode` | `"off"` | Available from 0.2.0. Disable advice, observe it, or enforce tighter verdicts; user configuration only |
 
 Disabling an effect means the checker no longer extracts it. It is not just a way to hide its warning. See [configuration](docs/ir/config.md) and [command guards](docs/ir/guards.md) for the full contracts.
 
 ## Optional LLM advice
 
-LLM advice is an unreleased feature on `main`. Build from source to use it; the `0.1.3` installation commands below do not include it.
+LLM advice is available from guardian 0.2.0.
 Advice is off by default. Start with `observe`, which records advice without changing the mechanical verdict. Switch to `enforce` only after reviewing the results and accepting the external data transfer.
 
 Add this section to `$XDG_CONFIG_HOME/command-guardian/config.toml`, or `$HOME/.config/command-guardian/config.toml` when XDG is unset:
@@ -197,11 +197,11 @@ The `hook` subcommand always exits with `0`. Hosts must read its JSON decision, 
 The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag with OpenCode V2 2.0.21:
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.1.3
-opencode plugin add 'github:ba0918/command-guardian#v0.1.3::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.2.0
+opencode plugin add 'github:ba0918/command-guardian#v0.2.0::path:plugins/opencode'
 ```
 
-For another release, replace `0.1.3` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
+For another release, replace `0.2.0` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
 From 0.1.3, the plugin automatically connects to its own local background service when connection options are omitted. Explicit servers and 0.1.2 still need connection settings. See the [installation guide](docs/opencode.md#automatic-connection-to-the-background-service).
 
 Use Linux x86_64 or WSL with explicitly configured Bash and no other hooks that change the command, working directory, or shell.

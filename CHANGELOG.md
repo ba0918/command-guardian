@@ -2,10 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
 - Add opt-in, deadline-bound LLM advice through TypeSafe for CLI and agent hooks. Advice is off by default, accepts user configuration only, and can tighten mechanical verdicts without releasing a block. Observe mode records advice without changing the verdict.
 - Bound conversation context, skip external sending on detected secrets or oversized requests, and keep request text out of advice logs unless debug logging is enabled. Secret detection is incomplete; real-model accuracy and current TypeSafe service compatibility remain unverified.
 - Negotiate the advice deadline with the OpenCode plugin, including long timeouts, without shortening the accepted duration. Advice failures preserve the mechanical verdict.
-- Reject an invalid `commands` section or guard list as a whole-file configuration error; malformed individual guards remain disabled one rule at a time.
 
 ## [0.1.3] - 2026-10-03
 
@@ -26,6 +27,7 @@
 - Provide a CLI and agent hook that inspect Bash commands for destructive effects and return `allow`, `ask`, or `block` based on target paths and configuration.
 - Distribute a single Linux x86_64 binary through GitHub Releases.
 
+[0.2.0]: https://github.com/ba0918/command-guardian/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/ba0918/command-guardian/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ba0918/command-guardian/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ba0918/command-guardian/compare/v0.1.0...v0.1.1

@@ -126,15 +126,13 @@ allow = ["git status"]
 | `git.enabled` | `true` | Gitによる分類を有効にする |
 | `mode.enforce` | `true` | ログだけを残すのではなく、フックの判定を返す |
 | `trusted_projects` | 空 | 指定したプロジェクトで、通常は制限する設定も許可する |
-| `advisor.mode` | `"off"` | 未リリースで、ソースビルドのみ。助言の無効化、観測、厳しい判定の適用を選ぶ。利用者設定のみ |
+| `advisor.mode` | `"off"` | 0.2.0から利用可能。助言の無効化、観測、厳しい判定の適用を選ぶ。利用者設定のみ |
 
 効果を無効にすると、その効果は抽出しなくなります。警告の表示だけを隠す設定ではありません。詳しい契約は[設定](docs/ir/config.md)と[コマンドの見張り](docs/ir/guards.md)を参照してください。
 
 ## 任意のLLM助言
 
-LLM助言は、`main`にある未リリースの機能です。
-利用するにはソースからビルドしてください。
-下の`0.1.3`の導入コマンドでは、この機能は入りません。
+LLM助言はguardian 0.2.0から利用できます。
 既定では無効です。
 まず機械判定を変えずに助言を記録する`observe`で確認し、結果と外部送信の範囲を確認してから、明示的に`enforce`へ切り替えてください。
 
@@ -232,11 +230,11 @@ Codex用の出力には`--agent codex`を使います。現在は、どちらの
 miseで本体を入れ、OpenCode V2 2.0.21に同じリリースタグのプラグインを登録してください。
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.1.3
-opencode plugin add 'github:ba0918/command-guardian#v0.1.3::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.2.0
+opencode plugin add 'github:ba0918/command-guardian#v0.2.0::path:plugins/opencode'
 ```
 
-別の版を使う場合は、両方のコマンドの`0.1.3`をその版に置き換えてください。
+別の版を使う場合は、両方のコマンドの`0.2.0`をその版に置き換えてください。
 同じ版のタグにあるプラグインのサブディレクトリを指定するため、別のnpmパッケージは不要です。
 0.1.2では登録後、プラグインに同じOpenCodeサーバーへの認証付き接続を設定してください。
 0.1.3からは、接続オプションを省略すると自身のローカルバックグラウンドサービスへ自動接続します。
