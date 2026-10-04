@@ -1,50 +1,169 @@
 version: 1
 entries:
-- id: release-0.3.0-implementation
-  base: 020a473332d7676477e17015c59f60670a199857
+- id: version-display-implementation
+  base: e4695e8f9e257303adca961bd1c51f2d1f5ee8cf
+  role: implementer
+  files:
+  - path: src/main.rs
+    before: sha256:6d432392e051332d94106116196015545bcdc6437d47bc0497392376bea48867
+    after: sha256:d410268899de10aed9510e64769614828bcdad8462acb02578fd1ac6c7c58ac1
+  - path: tests/language_help.rs
+    before: sha256:bb623f92a18ce97d16178fab235e9cc43a4b33515bdd329154592dbbe679f482
+    after: sha256:876db65d33aa73dfd1da4338a7d9308566347ce0332ea767fa88e119bca089fd
+  ir:
+  - path: docs/ir/cli.md
+    sha256: sha256:08e0a91764e937241e01001ca9188f2ed43510a67259f85ff87ade64cdaf2e88
+  conclusion: new
+  reason: >-
+    比較元のIRには版を表示する入口が無く、トップレベルのヘルプも--versionを案内していなかった。
+    利用者の決定A1とA2に従い、トップレベルの--versionと-Vで標準出力へ"command-guardian <版>"の1行を出し終了コード0で終える処理をsrc/main.rsに加えた。
+    版はCARGO_PKG_VERSIONでCargo.tomlの[package].versionをそのまま使い、設定読込と標準入力の読取の前に分岐する。
+    checkやhookの後ろの--versionは各入口へ渡るままにした。
+    A3に従いトップレベルのヘルプのOptionsとExit codesに版の表示を加え、REQ-045の文に版の案内を足した。
+    これらはREQ-071とEX-154、EX-155としてdocs/ir/cli.mdに加えた。
+    tests/language_help.rsでは、ヘルプが版の案内を含むことの確認、壊れた設定と開いたままの標準入力でも版を出して終わること(EX-154)、
+    hookとcheckの後ろの--versionが版の表示にならないこと(EX-155、REQ-071)の試験を加え、標準入力を待たないことの確認を補助関数へまとめた。
+    既存の試験の期待は弱めていない。
+  requirements: [REQ-045, REQ-071]
+  decisions:
+  - docs/decision/records/2026-10-04-version-and-followups.md#A1
+  - docs/decision/records/2026-10-04-version-and-followups.md#A2
+  - docs/decision/records/2026-10-04-version-and-followups.md#A3
+  handoff: null
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A1
+    - docs/decision/records/2026-10-04-version-and-followups.md#A2
+    - docs/decision/records/2026-10-04-version-and-followups.md#A3
+- id: opencode-explicit-recheck-implementation
+  base: e4695e8f9e257303adca961bd1c51f2d1f5ee8cf
+  role: implementer
+  files:
+  - path: plugins/opencode/src/index.ts
+    before: sha256:83bf0ee5dfdc1e65c05d48942d48e994167395dd7a57361b47cdac251efd353b
+    after: sha256:be4290a3ac078de92c6ce14a89a67d2b21f4653ac157b214878863101c1eaed7
+  - path: plugins/opencode/tests/integration/host.test.ts
+    before: sha256:b19432517aec7125d9ee289307bbf2345b67c212ce13cac9307d44cbe7369fe0
+    after: sha256:991a63f592fdb79289879274cadb7c8313e14b8dc1a7064341a1445e7e10e20f
+  - path: plugins/opencode/tests/unit/setup.test.ts
+    before: sha256:56d901dc556c7e20504ef50a9a3133b961d1fd4219e94f108a748df259d163fd
+    after: sha256:806a367805340223a3cbeb2bb29f100e98751ffc6e147848e417fe56326079ee
+  ir:
+  - path: docs/ir/opencode-standalone.md
+    sha256: sha256:f851d4a039bf4038f90243fce5035eac6640879cb81c0e62772208f8088ff1cb
+  - path: docs/ir/opencode.md
+    sha256: sha256:fb2bddcc63ba9e84ff80e9ec6aca3a7c2043aff7b377b4dfc094fcd014ada66e
+  conclusion: new
+  reason: >-
+    比較元のREQ-065は、明示した接続が失敗したとき警告して接続が無いときの判定に従うことだけを定め、その後に接続を確かめ直すかを定めていなかった。
+    実装は読み込み時に1回だけ接続し、失敗するとそのセッションの間ずっとguardianの承認を使えなかった。
+    利用者の決定A5に従い、接続が失敗した状態では実行のたびにconnectで確かめ直し(打ち切りの1秒は既存のconnectの値)、
+    つながればその実行から承認の経路(opencode.mdのREQ-050からREQ-052)を使い、つながらなければ従来どおり警告して委ねるようにした。
+    同時の実行は1回の確かめ直しを共有し、つながった接続のイベントの通信が1本になるようにした。
+    確かめ直しを待つ間に解除や取り消しがあれば、従来の解除と取り消しの確認(proceed)で起動しないようにし、block判定のコマンドが起動しないことをsetup.test.tsで確かめた。
+    REQ-065の文とEX-156をdocs/ir/opencode-standalone.mdに加え、host.test.tsに読み込み時に失敗した接続先があとからつながると承認待ちになる実ホストの試験(EX-156)を加えた。
+    setup.test.tsの擬似ホストは、shellフックの解除でハンドラを外すように実ホストへ合わせた。既存の試験の期待は弱めていない。
+  requirements: [REQ-050, REQ-051, REQ-052, REQ-065]
+  decisions:
+  - docs/decision/records/2026-10-04-version-and-followups.md#A5
+  handoff: null
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A5
+- id: opencode-no-reject-reply-implementation
+  base: e4695e8f9e257303adca961bd1c51f2d1f5ee8cf
+  role: implementer
+  files:
+  - path: plugins/opencode/src/approval.ts
+    before: sha256:8efc2ab3e28f23b91db73e70b14fdf6b30b7befa790b219fde033cd2f660aac3
+    after: sha256:b46c47a9ab482f245236b1e239dbfa6b05b751edda8dfb6c0d6948ac13a1704a
+  - path: plugins/opencode/tests/unit/approval.test.ts
+    before: sha256:ae1a00f6f6a52b9bbcddc3fa612ccd6aab8666863f8dfc1e1c7c7947eff6f51b
+    after: sha256:346f2435690375ab0dd3e479a0272d5bb1c4e8fb6b6ae367cec6382591d1e923
+  ir:
+  - path: docs/ir/opencode-standalone.md
+    sha256: sha256:f851d4a039bf4038f90243fce5035eac6640879cb81c0e62772208f8088ff1cb
+  conclusion: new
+  reason: >-
+    比較元のREQ-067は、承認要求を作れなかったものとして扱いOpenCodeに委ねるときに、その要求へ拒否の返答を送るかを定めていなかった。
+    実装は送っており、作成が実は成功していた場合に同じセッションの他の承認待ちまで拒否しうる。
+    利用者の決定A6とA9に従い、approval.tsで作れなかったものとして扱い委ねる経路の拒否の返答だけをやめた。
+    作成の応答より前に利用者の拒否が届いていた要求と、作成中に取り消された要求の拒否の返答は従来どおり残している(その手前の分岐で例外として扱われ、この変更の経路に入らない)。
+    REQ-067の文とEX-157をdocs/ir/opencode-standalone.mdに加え、approval.test.tsに拒否の返答が送られず他の承認待ちが返答を待ち続ける試験(EX-157)を加えた。
+    EX-153の試験はつなぎ直しの回数を2回に固定していたが、REQ-067は回数を定めておらず、A7に従い「つなぎ直しを試みた」(1回より多い)へ緩めた。
+    これは仕様に無い値を試験が固定していたことの是正で、要求の意味は変えていない。
+  requirements: [REQ-067]
+  decisions:
+  - docs/decision/records/2026-10-04-version-and-followups.md#A6
+  - docs/decision/records/2026-10-04-version-and-followups.md#A7
+  - docs/decision/records/2026-10-04-version-and-followups.md#A9
+  handoff: null
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A6
+    - docs/decision/records/2026-10-04-version-and-followups.md#A9
+  - category: premise_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A7
+- id: release-0.3.1-implementation
+  base: e4695e8f9e257303adca961bd1c51f2d1f5ee8cf
   role: implementer
   files:
   - path: Cargo.toml
-    before: sha256:2f6310a5070fe80191a71030c7618a2cbcdca8e3543fdb5cd03c86af41489176
-    after: sha256:9e83c7df3f83c7ed57139b286c08a66c99b802c9b7d736e1784fb096a1299057
+    before: sha256:9e83c7df3f83c7ed57139b286c08a66c99b802c9b7d736e1784fb096a1299057
+    after: sha256:cb547d21025fdf0fca9246248776f92a45b3915e3700780633adcd46a9dd9d53
   - path: CHANGELOG.md
-    before: sha256:7e9e66bee52072cfebd09adbf50bd803639c666136588dfdf7b3397388ca3418
-    after: sha256:6eff958cbf7165de20b2d9df7e363fd35105606fd6f8497d00d3353939ba85d9
+    before: sha256:6eff958cbf7165de20b2d9df7e363fd35105606fd6f8497d00d3353939ba85d9
+    after: sha256:4bbb26f42f0b1c49f9327bb12731209617a00880551b7cea9b82d8b93867e132
   - path: README.md
-    before: sha256:74780bf44146cf072c2f643b2f20cc76316bef75618f230875895235023d1804
-    after: sha256:34d314421d84bd6e5c7dafff5b98365c93e13d85f863d4e5ded30eab20d7ab9c
+    before: sha256:34d314421d84bd6e5c7dafff5b98365c93e13d85f863d4e5ded30eab20d7ab9c
+    after: sha256:8849915fdb470371db788a681aa993f0e5d8ca121c84d9d3869f762db1ceef5a
   - path: docs/opencode.md
-    before: sha256:ebf8c6ca9790fbea8294821dad6bf8f97e019a21edd90cff76409bdb2635b5e2
-    after: sha256:dc6f2cc06f91ad06a9487f43fac83d565deba6f813c1deeb792049645b82f3ee
+    before: sha256:dc6f2cc06f91ad06a9487f43fac83d565deba6f813c1deeb792049645b82f3ee
+    after: sha256:9622ff63adbac84fd683acb6b5f78e491ffda7953af06fb4965f428b9ebb9aa8
   ir:
   - path: docs/ir/release.md
     sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
-  - path: docs/ir/opencode-delivery.md
-    sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
+  - path: docs/ir/cli.md
+    sha256: sha256:08e0a91764e937241e01001ca9188f2ed43510a67259f85ff87ade64cdaf2e88
   - path: docs/ir/opencode-standalone.md
-    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
+    sha256: sha256:f851d4a039bf4038f90243fce5035eac6640879cb81c0e62772208f8088ff1cb
+  - path: docs/ir/opencode-delivery.md
+    sha256: sha256:32e7f147f2b17ea1e2e55b4df968169583141fedb6c246314a6ce628f9d94dbe
   - path: docs/ir/opencode.md
-    sha256: sha256:060da667b1b297e2aabb5cc1fc68f8a0d7cb78d95d3163527490b5b99e8089f8
-  - path: docs/ir/defer-ask.md
-    sha256: sha256:84f99b2f0bd9c48dba5e8f05b600c98112d67bcc6c01c04813476f4af60fc010
-  conclusion: existing
+    sha256: sha256:fb2bddcc63ba9e84ff80e9ec6aca3a7c2043aff7b377b4dfc094fcd014ada66e
+  conclusion: new
   reason: >-
-    mainで照合済みのOpenCodeのstandalone対応とaskの委任を0.3.0として配布する準備で、製品の挙動は変えていない。
-    版の正本Cargo.tomlを0.2.0から0.3.0へ上げ、Cargo.lockの本体版も一致させた。
-    UnreleasedをCHANGELOGの日付付き0.3.0見出しへ昇格し、0.2.0から0.3.0への比較リンクを加えた。
-    各項目は承認済み要求のとおりで、接続が無いときの判定と承認が要る実行の委任はREQ-065からREQ-069、
-    版の確認をやめ頼るAPIを読み込み時に確かめることはREQ-070、mode.defer_askはREQ-059からREQ-064に対応する。
-    BREAKINGの印は2項目に付けた。一つは接続設定なしで動く項目で、0.2.0では接続できないとき実行を止めていた(当時のREQ-052)が、
-    0.3.0では接続が無いときblock以外をOpenCode自身の権限判断に委ねて実行が進む(REQ-065、REQ-066)ため。
-    もう一つは明示の接続設定の失敗や承認要求を作れないときに実行を止めず警告して委ねる項目で、従来の停止から変わる(REQ-067)ため。
-    どちらも承認済みの意味を利用者へ知らせるだけで要求を加えない。
-    READMEとOpenCode導入ガイドのmiseとplugin addの版付き例、明示サーバーの登録例を0.3.0へ揃え、
-    standaloneの説明をREQ-068の内容のまま「0.2.0より後」から「0.3.0から」へ言い換えた。
-    docs/opencode.mdの同梱物で導入する節は、アーカイブ名、リリースへのリンク(releases/tag/v0.3.0)、
-    他の版では0.3.0を置き換えるという案内をすべて0.3.0に揃え、手順の内容は変えていない。
-    同版プラグインの登録と対応条件(REQ-056、REQ-057)、配布物の構成(REQ-025)は変えていない。
-    タグは先行作成せず、既存CIが全検査後に公開する。
-  requirements: [REQ-025, REQ-052, REQ-056, REQ-057, REQ-059, REQ-060, REQ-061, REQ-062, REQ-063, REQ-064, REQ-065, REQ-066, REQ-067, REQ-068, REQ-069, REQ-070]
-  decisions: []
+    利用者の決定A4に従い、版の表示と0.3.0の残件の対応をまとめて0.3.1として配布する準備をした。
+    版の正本Cargo.tomlを0.3.0から0.3.1へ上げ(Cargo.lockの本体版も一致させた。Cargo.lockは照合の対象外)、
+    CHANGELOGに日付付きの0.3.1見出しと0.3.0から0.3.1への比較リンクを加えた。
+    各項目は今回加えた要求のとおりで、版の表示はREQ-071、明示した接続の確かめ直しはREQ-065(A5)、
+    作れなかった承認要求に拒否の返答を送らないことはREQ-067(A6、A9)に対応する。いずれも挙動の追加か、利用者を巻き込みうる拒否をやめる修正で、BREAKINGの印は付けない。
+    READMEとdocs/opencode.mdのmiseとplugin addの版付き例、明示サーバーの登録例、同梱物のアーカイブ名とリリースへのリンクを0.3.1へ揃えた。
+    docs/opencode.mdの接続なしの節には、明示した接続が失敗している間は実行ごとに1秒で打ち切って確かめ直し、つながればその実行から承認を使うことをREQ-065のとおりに書いた。
+    導入手順が自動接続と明示の接続・認証設定を示すこと(REQ-057)、自動接続でも明示設定と同じく働くこと(EX-106)、明示設定でその接続で承認要求を作ること(EX-088)は、
+    FLAG-002で出典が置き換えられた決定にしか無かったため、利用者の決定A8で現行の決まりとして確認し、REQ-057、EX-106、EX-088の出典に加えてFLAG-002を閉じた。意味と文書の内容は変えていない。
+    配布物の構成(REQ-025)と同版プラグインの登録(REQ-056)は変えていない。タグは先行作成せず、既存CIが全検査後に公開する。
+  requirements: [REQ-025, REQ-052, REQ-056, REQ-057, REQ-065, REQ-067, REQ-071]
+  decisions:
+  - docs/decision/records/2026-10-04-version-and-followups.md#A4
+  - docs/decision/records/2026-10-04-version-and-followups.md#A5
+  - docs/decision/records/2026-10-04-version-and-followups.md#A8
   handoff: null
-  gaps: []
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A4
+    - docs/decision/records/2026-10-04-version-and-followups.md#A5
+  - category: premise_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-version-and-followups.md#A8
