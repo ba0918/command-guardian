@@ -8,7 +8,16 @@ import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { stopHost } from "../helpers/host-process";
 
-async function host(options:{enforce?:boolean;shell?:string;nativeDeny?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean;controlPeer?:boolean;advisor?:boolean}={}) {
+type HostOptions={enforce?:boolean;shell?:string;nativeDeny?:boolean;nativeAsk?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean;controlPeer?:boolean;advisor?:boolean;
+  // Launch as "opencode run --standalone" does: "serve --stdio" with no connection options.
+  stdio?:boolean;
+  // Record every judgment input before handing it to the real guardian.
+  recordJudgments?:boolean;
+  // A guardian that never answers within the judgment deadline.
+  slowGuardian?:boolean;
+  // A managed-service registration written before launch.
+  registration?:Record<string,unknown>};
+async function host(options:HostOptions={}) {
   const binary=process.env.OPENCODE_TEST_BIN,guardian=process.env.GUARDIAN_TEST_BIN;
   if (!binary || !guardian) throw new Error("Explicit OPENCODE_TEST_BIN and GUARDIAN_TEST_BIN are required");
   const version=Bun.spawnSync([binary,"--version"]);
@@ -36,6 +45,10 @@ assert r['kind']=='advisory_ack' and r['accepted']
 time.sleep(6.1)
 print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','reason':'fixture control completed'}))
 `,{mode:0o700});
+  }else if(options.slowGuardian){
+    await writeFile(join(bin,"command-guardian"),"#!/bin/sh\ncat >/dev/null\nexec sleep 30\n",{mode:0o700});
+  }else if(options.recordJudgments){
+    await writeFile(join(bin,"command-guardian"),`#!/bin/sh\ninput=$(cat)\nprintf '%s\\n' "$input" >> ${JSON.stringify(join(root,"judgments.jsonl"))}\nprintf '%s' "$input" | exec ${JSON.stringify(guardian)} "$@"\n`,{mode:0o700});
   }else await symlink(guardian,join(bin,"command-guardian"));
   const config=join(home,"config","command-guardian");await mkdir(config,{recursive:true});
   await writeFile(join(config,"config.toml"),`[mode]\nenforce = ${options.enforce??true}\n[paths]\nprotected_roots = [${JSON.stringify(join(project,"sentinel"))}]\n${options.advisor ? "[advisor]\nmode='enforce'\ntimeout_ms=10000\n" : ""}`);
@@ -47,8 +60,17 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
   const environment:NodeJS.ProcessEnv={};
   for (const [key,value] of Object.entries(process.env)) if(!key.startsWith("OPENCODE")&&!key.startsWith("GIT_")&&!key.startsWith("SAFE_CHAIN_MINIMUM"))environment[key]=value;
   delete environment.TYPESAFE_API_KEY;
-  Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
+  Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":options.nativeAsk?"ask":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
   let logs="";
+  if(options.stdio){
+    const config=JSON.parse(environment.OPENCODE_CONFIG_CONTENT!);
+    delete config.plugins[0].options;
+    environment.OPENCODE_CONFIG_CONTENT=JSON.stringify(config);
+  }
+  if(options.registration){
+    await mkdir(join(home,"state/opencode"),{recursive:true});
+    await writeFile(join(home,"state/opencode/service.json"),JSON.stringify(options.registration));
+  }
   if(options.managedService){
     const config=JSON.parse(environment.OPENCODE_CONFIG_CONTENT!);
     if(!options.wrongAuth)delete config.plugins[0].options;
@@ -57,7 +79,10 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
   }
   const started=performance.now();
   let spawnError:Error|undefined,readyMs:number|undefined;
-  const server=spawn(binary,["serve","--hostname","127.0.0.1","--port",String(port),...(options.managedService?["--service"]:[])],{cwd:project,env:environment,stdio:["ignore","pipe","pipe"]});
+  // In stdio mode the server ends when its standard input closes, so keep it open until cleanup.
+  const server=options.stdio
+    ?spawn(binary,["serve","--stdio","--port","0"],{cwd:project,env:environment,stdio:["pipe","pipe","pipe"]})
+    :spawn(binary,["serve","--hostname","127.0.0.1","--port",String(port),...(options.managedService?["--service"]:[])],{cwd:project,env:environment,stdio:["ignore","pipe","pipe"]});
   server.on("error",error=>{spawnError=error;});
   server.stdout.on("data",data=>{logs+=String(data);});server.stderr.on("data",data=>{logs+=String(data);});
   const close=async(outcome:string)=>{
@@ -78,15 +103,25 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
       } finally { await rm(root,{recursive:true,force:true}); }
     }
   };
+  // The stdio server announces its own port as a JSON line on standard output.
+  let listening:string|undefined;
+  const announced=()=>{
+    if(!options.stdio)return logs.includes(`server listening on ${url}`)?url:undefined;
+    const line=logs.split("\n").find(line=>line.startsWith("{")&&line.includes('"url"'));
+    const value:unknown=line?JSON.parse(line):undefined;
+    return typeof value==="object"&&value!==null&&"url" in value&&typeof value.url==="string"?value.url:undefined;
+  };
   let client=OpenCode.make({baseUrl:url,headers:{authorization:`Basic ${Buffer.from("opencode:guardian-test-password-not-real").toString("base64")}`}});
   try {
     for(let i=0;i<100;i++) {
       if(spawnError)throw new Error("Isolated server spawn failed",{cause:spawnError});
       if(server.exitCode!==null||server.signalCode!==null)throw new Error("Isolated server exited");
-      if(logs.includes(`server listening on ${url}`)){readyMs=performance.now()-started;break;}
+      listening=announced();
+      if(listening){readyMs=performance.now()-started;break;}
       await new Promise(resolve=>setTimeout(resolve,50));
     }
-    if(!logs.includes(`server listening on ${url}`))throw new Error("Own server readiness missing");
+    if(!listening)throw new Error("Own server readiness missing");
+    if(options.stdio)client=OpenCode.make({baseUrl:listening,headers:{authorization:`Basic ${Buffer.from("opencode:guardian-test-password-not-real").toString("base64")}`}});
     if(options.managedService){
       const endpoint=await Service.discover({file:join(home,"state/opencode/service.json"),version:"2.0.21"});
       if(!endpoint||endpoint.url!==url)throw new Error("Own managed service registration missing");
@@ -94,7 +129,7 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
     }
     const info=await client.server.info();expect(info.version).toBe("2.0.21");
     const session=await client.session.create({title:"model-free guardian fixture",location:{directory:project}});
-    return {root,project,sentinel,client,session,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
+    return {root,project,sentinel,client,session,logs:()=>logs,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
       await close("closed");
     }};
   }catch(error){await close(error instanceof Error?error.message:"setup failed");throw error;}
@@ -201,12 +236,13 @@ test("req_055_native_nonbash_waits_for_approval_instead_of_becoming_allow",async
 },20000);
 
 // @kotowari[REQ-052, EX-089]
-test("req_052_native_authentication_failure_does_not_start_the_command",async()=>{
+test("ex_089_failed_explicit_authentication_warns_and_leaves_approval_to_opencode",async()=>{
   const f=await host({wrongAuth:true});
   try{
-    const result=await f.execute('printf ran > auth-failure; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
-    await expect(readFile(join(f.project,"auth-failure"),"utf8")).rejects.toThrow();
-    expect(JSON.stringify(result)).toContain("connection");
+    await f.execute('printf ran > auth-failure; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    expect(await readFile(join(f.project,"auth-failure"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    expect(connectionWarnings(f)).toBe(2);
   }finally{await f.close();}
 },20000);
 
@@ -248,6 +284,10 @@ test("req_050_native_allow_and_saved_permission_do_not_skip_guardian_request",as
   }finally{await f.close();}
 },20000);
 
+function connectionWarnings(f:Awaited<ReturnType<typeof host>>){
+  return f.logs().split("\n").filter(line=>line.includes("command-guardian:")&&line.includes("serverUrl")).length;
+}
+
 async function pending(f:Awaited<ReturnType<typeof host>>,count:number){
   for(let i=0;i<100;i++){
     const requests=await f.client.permission.list({sessionID:f.session.id});
@@ -257,7 +297,7 @@ async function pending(f:Awaited<ReturnType<typeof host>>,count:number){
   throw new Error("Native approval request count did not arrive");
 }
 
-// @kotowari[REQ-052, EX-106]
+// @kotowari[REQ-052, EX-106, EX-138]
 test("managed_service_without_connection_options_preserves_allow_block_and_native_approval",async()=>{
   const f=await host({managedService:true});
   try{
@@ -280,22 +320,27 @@ test("managed_service_without_connection_options_preserves_allow_block_and_nativ
 },20000);
 
 // @kotowari[REQ-052, EX-109]
-test("managed_service_does_not_replace_incomplete_explicit_connection_options",async()=>{
+test("ex_109_incomplete_explicit_options_warn_instead_of_using_the_managed_service",async()=>{
   const f=await host({managedService:true,incompleteConnection:true});
   try{
-    const result=await f.execute("printf ran > connection-failure");
-    expect(JSON.stringify(result)).toContain("connect");
-    await expect(readFile(join(f.project,"connection-failure"),"utf8")).rejects.toThrow();
+    await f.execute('printf ran > connection-failure; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    expect(await readFile(join(f.project,"connection-failure"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    expect(connectionWarnings(f)).toBe(2);
   }finally{await f.close();}
 },20000);
 
-// @kotowari[REQ-052, EX-109]
-test("managed_service_does_not_replace_failed_explicit_authentication",async()=>{
+// @kotowari[REQ-065, EX-135]
+test("ex_135_failed_explicit_authentication_beside_a_managed_service_warns_and_runs_allow",async()=>{
   const f=await host({managedService:true,wrongAuth:true});
   try{
-    const result=await f.execute("printf ran > connection-failure");
-    expect(JSON.stringify(result)).toContain("connection");
-    await expect(readFile(join(f.project,"connection-failure"),"utf8")).rejects.toThrow();
+    const allowed=await f.execute("printf guardian-explicit-failure");
+    expect(JSON.stringify(allowed)).toContain("guardian-explicit-failure");
+    // Through the managed service this would wait for a guardian approval.
+    await f.execute('printf ran > connection-failure; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    expect(await readFile(join(f.project,"connection-failure"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    expect(connectionWarnings(f)).toBe(3);
   }finally{await f.close();}
 },20000);
 
@@ -337,5 +382,101 @@ test("req_053_cancelled_native_executor_does_not_run_on_late_reply",async()=>{
     if(retained.some(request=>request.id===requests[0]?.id))await f.client.permission.reply({sessionID:f.session.id,requestID:requests[0].id,decision:"once"});
     await new Promise(resolve=>setTimeout(resolve,50));
     await expect(readFile(join(f.project,"cancelled"),"utf8")).rejects.toThrow();
+  }finally{await f.close();}
+},20000);
+
+const ask='printf ran > ask-output; eval "$GUARDIAN_FIXTURE_UNKNOWN"';
+
+// @kotowari[REQ-065, EX-133]
+test("ex_133_standalone_judges_the_configured_bash_and_runs_allow",async()=>{
+  const f=await host({stdio:true,recordJudgments:true});
+  try{
+    await f.execute("printf allowed > allow-output");
+    expect(await readFile(join(f.project,"allow-output"),"utf8")).toBe("allowed");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    const judged=(await readFile(join(f.root,"judgments.jsonl"),"utf8")).trim().split("\n").map(line=>JSON.parse(line));
+    expect(judged).toEqual([{command:"printf allowed > allow-output",cwd:f.project,shell:"/bin/bash"}]);
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-065, EX-134]
+test("ex_134_standalone_refuses_block",async()=>{
+  const f=await host({stdio:true});
+  try{
+    const result=await f.execute("> sentinel");
+    expect(JSON.stringify(result)).toContain("protected");
+    expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-065, REQ-047]
+test("req_065_standalone_refuses_block_in_background_and_code_mode",async()=>{
+  const f=await host({stdio:true});
+  try{
+    for(const route of [{background:true},{codeMode:true}]){
+      const result=await f.execute("> sentinel",route);
+      expect(JSON.stringify(result)).toContain("protected");
+      expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+    }
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-066, EX-136]
+test("ex_136_standalone_ask_runs_when_opencode_allows",async()=>{
+  const f=await host({stdio:true});
+  try{
+    await f.execute(ask);
+    expect(await readFile(join(f.project,"ask-output"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-066, EX-137]
+test("ex_137_standalone_ask_becomes_the_opencode_shell_confirmation",async()=>{
+  const f=await host({stdio:true,nativeAsk:true});
+  try{
+    const run=f.execute(ask);
+    const requests=await pending(f,1);
+    const request=requests[0];if(!request)throw new Error("Missing OpenCode shell confirmation");
+    expect(request.action).not.toBe("command-guardian");
+    expect(request.resources).toContain("printf ran > ask-output");
+    await f.client.permission.reply({sessionID:f.session.id,requestID:request.id,decision:"reject"});
+    await run;
+    await expect(readFile(join(f.project,"ask-output"),"utf8")).rejects.toThrow();
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-065, EX-140]
+test("ex_140_standalone_never_contacts_a_registration_of_another_process",async()=>{
+  const contacts:string[]=[];
+  const recorder=Bun.serve({hostname:"127.0.0.1",port:0,fetch:request=>{contacts.push(request.url);return new Response("fixture");}});
+  try{
+    const f=await host({stdio:true,registration:{pid:1,version:"2.0.21",url:`http://127.0.0.1:${recorder.port}`,password:"fixture-registration-password"}});
+    try{
+      await f.execute("printf allowed > allow-output");
+      expect(await readFile(join(f.project,"allow-output"),"utf8")).toBe("allowed");
+      expect(contacts).toEqual([]);
+    }finally{await f.close();}
+  }finally{recorder.stop(true);}
+},20000);
+
+// @kotowari[REQ-066, EX-141]
+test("ex_141_standalone_judgment_timeout_is_left_to_opencode",async()=>{
+  const f=await host({stdio:true,slowGuardian:true});
+  try{
+    await f.execute("printf ran > timeout-output");
+    expect(await readFile(join(f.project,"timeout-output"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-066, EX-146]
+test("ex_146_standalone_commandless_truncation_is_left_to_opencode",async()=>{
+  const f=await host({stdio:true});
+  try{
+    await writeFile(join(f.project,"notes"),"content");
+    await f.execute("> notes");
+    expect(await readFile(join(f.project,"notes"),"utf8")).toBe("");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
   }finally{await f.close();}
 },20000);

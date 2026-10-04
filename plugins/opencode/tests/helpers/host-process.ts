@@ -2,6 +2,8 @@ import type { ChildProcess } from "node:child_process";
 
 export async function stopHost(server: ChildProcess, graceMs = 1000): Promise<void> {
   if (server.pid === undefined || server.exitCode !== null || server.signalCode !== null) return;
+  // A stdio-mode server also ends when its standard input closes.
+  server.stdin?.end();
   const wait = (signal: NodeJS.Signals) => new Promise<boolean>(resolve => {
     const finish = (exited: boolean) => {
       clearTimeout(timer);

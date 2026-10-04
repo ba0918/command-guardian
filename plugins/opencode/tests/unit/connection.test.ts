@@ -22,7 +22,7 @@ test("automatic_connection_rejects_untrusted_registration_before_sending_credent
       {...registration,pid:process.pid,password:undefined},
     ]){
       await writeFile(join(root,"opencode/service.json"),JSON.stringify(value));
-      expect(await connect({})).toBeUndefined();
+      expect(await connect({})).toEqual({kind:"absent"});
     }
     expect(transport.mock.calls.length).toBe(0);
   }finally{
@@ -48,7 +48,7 @@ test("automatic_connection_keeps_the_validated_endpoint_and_does_not_follow_redi
     process.env.XDG_STATE_HOME=root;
     await mkdir(join(root,"opencode"));
     await writeFile(file,JSON.stringify({...registration,pid:process.pid}));
-    expect(await connect({})).toBeDefined();
+    expect((await connect({})).kind).toBe("connected");
     expect(requests).toEqual([{url:registration.url+"/api/info",redirect:"error"}]);
   }finally{
     transport.mockRestore();
@@ -67,7 +67,7 @@ test("ex_106_automatic_connection_accepts_its_own_service_whatever_version_it_re
     process.env.XDG_STATE_HOME=root;
     await mkdir(join(root,"opencode"));
     await writeFile(join(root,"opencode/service.json"),JSON.stringify({...registration,version:"9.9.9",pid:process.pid}));
-    expect(await connect({})).toBeDefined();
+    expect((await connect({})).kind).toBe("connected");
   }finally{
     transport.mockRestore();
     if(previous===undefined)delete process.env.XDG_STATE_HOME;else process.env.XDG_STATE_HOME=previous;
@@ -93,4 +93,28 @@ test("automatic_connection_rejects_remote_or_unauthenticated_endpoints_and_malfo
   expect(sameHostEndpoint(registration,{url:registration.url},42)).toBeUndefined();
   const remote={...registration,url:"http://example.com:4097"};
   expect(sameHostEndpoint(remote,{...endpoint,url:remote.url},42)).toBeUndefined();
+});
+
+// @kotowari[REQ-052, REQ-065]
+test("req_052_incomplete_or_rejected_explicit_options_fail_without_automatic_connection",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"guardian-connection-"));
+  const previous=process.env.XDG_STATE_HOME;
+  const requests:string[]=[];
+  // The explicit server rejects the credentials; a valid own registration must not be used instead.
+  const transport=spyOn(globalThis,"fetch").mockImplementation(Object.assign(async(input:string|URL|Request)=>{requests.push(String(input));return new Response("unauthorized",{status:401});},fetch));
+  process.env.GUARDIAN_CONNECTION_TEST_PASSWORD="fixture-password-not-real";
+  try{
+    process.env.XDG_STATE_HOME=root;
+    await mkdir(join(root,"opencode"));
+    await writeFile(join(root,"opencode/service.json"),JSON.stringify({...registration,pid:process.pid}));
+    expect((await connect({serverUrl:"http://127.0.0.1:4098"})).kind).toBe("failed");
+    expect(requests).toEqual([]);
+    expect((await connect({serverUrl:"http://127.0.0.1:4098",passwordEnv:"GUARDIAN_CONNECTION_TEST_PASSWORD"})).kind).toBe("failed");
+    expect(requests).toEqual(["http://127.0.0.1:4098/api/info"]);
+  }finally{
+    delete process.env.GUARDIAN_CONNECTION_TEST_PASSWORD;
+    transport.mockRestore();
+    if(previous===undefined)delete process.env.XDG_STATE_HOME;else process.env.XDG_STATE_HOME=previous;
+    await rm(root,{recursive:true,force:true});
+  }
 });

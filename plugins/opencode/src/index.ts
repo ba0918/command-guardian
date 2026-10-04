@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin";
+import type { OpenCodeClient } from "@opencode/client";
 import { Error as ToolError } from "@opencode/plugin/promise/tool";
 import type { ToolContext } from "@opencode/plugin/promise/tool";
 import { Permission } from "@opencode/schema/permission";
@@ -23,12 +24,29 @@ function missingApis(ctx:Plugin.Context):string[] {
   return requiredApis.filter(([,read,type])=>typeof read(ctx)!==type).map(([name])=>name);
 }
 
+async function configuredShell(client:OpenCodeClient,directory:string,signal:AbortSignal):Promise<string> {
+  try{
+    let shell="/unknown-shell";
+    for(const entry of await client.config.get({location:{directory}},{signal})){
+      if(entry.type==="document"&&typeof entry.info?.shell==="string")shell=entry.info.shell;
+    }
+    return isAbsolute(shell)&&(await stat(shell)).isFile()?shell:"/unknown-shell";
+  }catch{return "/unknown-shell";}
+}
+
 export default Plugin.define({
   id: "command-guardian",
   async setup(ctx) {
     const missing=missingApis(ctx);
     if(missing.length)throw new Error(`command-guardian: missing OpenCode plugin API: ${missing.join(", ")}`);
     const connection=await connect(ctx.options);
+    const client=connection.kind==="connected"?connection.client:undefined;
+    // Without a connection there is no guardian approval: block is refused in the shell hook and
+    // everything else is left to OpenCode's own permissions instead of stopping the command.
+    const misconfigured=()=>{
+      if(connection.kind==="failed")console.warn(`command-guardian: could not connect with the configured serverUrl and passwordEnv (${connection.reason}); commands that need approval are left to OpenCode's own permissions.`);
+    };
+    misconfigured();
     let active=true;
     const local=new AsyncLocalStorage<{readonly context:ToolContext;readonly expected:Invocation|undefined}>();
     const fail=()=>{if(!active)throw new Error("Guardian plugin unloaded.");};
@@ -37,24 +55,23 @@ export default Plugin.define({
       event.effect="ask";
       if(typeof event.metadata?.guardianReason==="string")event.message=event.metadata.guardianReason;
     });
-    const approval=connection?new Approval({
+    const approval=client?new Approval({
       newID:()=>Permission.ID.create(),
       events:async function*(signal):AsyncIterable<ApprovalEvent>{
-        for await(const event of connection.event.subscribe({signal})){
+        for await(const event of client.event.subscribe({signal})){
           if(event.type==="server.connected")yield {type:"connected"};
           else if(event.type==="permission.replied")yield {type:"reply",id:event.data.requestID,session:event.data.sessionID,reply:event.data.reply};
         }
       },
       create:async(request,signal)=>{
-        const result=await connection.permission.create({sessionID:request.session,id:request.id,action:"command-guardian",resources:[request.input.command],save:[],metadata:{guardianReason:request.reason,cwd:request.input.cwd,shell:request.input.shell}}, {signal});
+        const result=await client.permission.create({sessionID:request.session,id:request.id,action:"command-guardian",resources:[request.input.command],save:[],metadata:{guardianReason:request.reason,cwd:request.input.cwd,shell:request.input.shell}}, {signal});
         if(result.id!==request.id)throw new Error("Guardian approval request identity mismatch.");
         return result.effect;
       },
       reject:async(id,session)=>{await ctx.permission.reply({sessionID:session,requestID:id,decision:"reject"});},
     }):undefined;
-    const approve=(context:ToolContext)=>(input:Invocation,reason:string)=>{
-      if(!approval)throw new Error("Guardian could not connect to its own managed service. For an explicit server, set serverUrl and passwordEnv.");
-      return approval.request(context.sessionID,input,reason,context.signal);
+    const approve=(context:ToolContext)=>async(input:Invocation,reason:string)=>{
+      if(approval)await approval.request(context.sessionID,input,reason,context.signal);
     };
     const check=async(input:Invocation,context:ToolContext)=>{
       fail();
@@ -68,7 +85,10 @@ export default Plugin.define({
       const current=local.getStore();if(!current)return;
       fail();
       const actual=executionInput({command:invocation.command,workdir:invocation.cwd},ctx.location.directory,invocation.shell);
-      if(!actual)throw new Error("Could not establish host shell input.");
+      if(!actual){
+        if(!approval)return;
+        throw new Error("Could not establish host shell input.");
+      }
       const expected=current.expected;
       if(!expected||actual.command!==expected.command||actual.cwd!==expected.cwd||actual.shell!==expected.shell)await check(actual,current.context);
       fail();
@@ -80,16 +100,11 @@ export default Plugin.define({
         try{
           fail();
           const snapshot:unknown=structuredClone(input);
-          let shell="/unknown-shell";
-          if(connection){
-            try{
-              const entries=await connection.config.get({location:{directory:ctx.location.directory}},{signal:context.signal});
-              for(const entry of entries){
-                if(entry.type==="document"&&typeof entry.info?.shell==="string")shell=entry.info.shell;
-              }
-              if(!isAbsolute(shell)||!(await stat(shell)).isFile())shell="/unknown-shell";
-            }catch{shell="/unknown-shell";}
+          if(!client){
+            misconfigured();
+            return await local.run({context,expected:undefined},()=>original(snapshot,context));
           }
+          const shell=await configuredShell(client,ctx.location.directory,context.signal);
           const expected=executionInput(snapshot,ctx.location.directory,shell);
           if(!expected)throw new Error("Could not establish guardian execution input.");
           await check(expected,context);
