@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make the OpenCode V2 plugin work with `opencode run --standalone` and with the managed service disabled, without connection settings. Without a connection it judges the actual shell input, refuses `block`, and leaves commands that would need a guardian approval to OpenCode's own permissions instead of stopping them.
+- Warn on standard error instead of stopping commands when explicit connection options are incomplete or fail, or when a guardian approval request cannot be created; those commands are left to OpenCode's own permissions. Failed explicit options never fall back to automatic connection.
+- Stop requiring OpenCode 2.0.21. The plugin no longer checks the host version; it checks at load time that the plugin API it relies on exists and names any missing member.
+
 ## [0.2.0] - 2026-10-04
 
 - Add opt-in, deadline-bound LLM advice through TypeSafe for CLI and agent hooks. Advice is off by default, accepts user configuration only, and can tighten mechanical verdicts without releasing a block. Observe mode records advice without changing the verdict.
