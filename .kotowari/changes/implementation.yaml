@@ -51,7 +51,7 @@ entries:
     after: sha256:6b243e754e4762ced6cae64b31ad3023761acf762ef83b0b75d9e11e36d9251c
   - path: tests/opencode_hook.rs
     before: sha256:1e6456174bcb63d57387b707931c49921c72325263bb637a557cda3c46ce1c9f
-    after: sha256:385547750bf7fd3b2f4327a936afb5c9b648d9e408dd0d2f2dbc8c239337616c
+    after: sha256:22879e179e2688cc5174d86c8aa30a01ea4bb2706ca9c5dedeb472b5b9c273e4
   - path: tests/shadow.rs
     before: sha256:883db416085e1c6db617f0690aebe85d25f774610a33efc6141b9aeaa8d71512
     after: sha256:bee852717b6162ac2dc6918cf74098706b4b47abec2464cc078cfc2a2c299e9e
@@ -75,6 +75,7 @@ entries:
     Claude CodeとCodexのフックは影実行の分岐の後で、最終判定がaskのものだけを何も出力せず終了コード0で委ね、blockと助言のblockは拒否し、checkと判定に至らない入力の扱いは変えない（REQ-060、REQ-063、REQ-018、REQ-022、REQ-023）。
     委任の記録は影ログと同じ保存先と検査を使い、保存失敗は警告にとどめる（REQ-062、REQ-019）。
     REQ-061とREQ-062が実装担当に委ねた具体的な形として、記録行の6番目の欄deferred（A18）と、OpenCodeのstatus deferredの応答とwarningの載せ方（A19）を新しく決めたためnewとする。既存のjudged・shadow・unavailableの応答と影実行の行の形は変えていない。
+    mode.enforceがfalseのときはdefer_askに関係なく影実行として応答し委任の記録を書かないことを、Claude Codeのフックの経路（EX-130）に加えOpenCodeのフックでも実バイナリのテストで確かめた（REQ-063、REQ-048）。
     プラグインは設定を読まず、委任の応答だけでguardian由来の承認要求を省き、判定を取得できない場合は従来どおり承認を求める（REQ-048からREQ-051）。
     README、CHANGELOG、OpenCode導入文書は、推奨しない理由と危険、記録の印、委任時の承認の扱いを説明する変更で、承認済み要求の意味は変えない。
     承認済みの要求と既存の決定は変更していない。この記録は実装者の照合だけを示し、独立したレビューと最終HEADでのreview検査は主張しない。
