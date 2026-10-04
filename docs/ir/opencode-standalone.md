@@ -27,10 +27,10 @@ REQ-065 の状態で、判定が ask の実行、判定結果を取得できな�
 ### REQ-067: 承認要求を作れないとき
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25
+- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-04-opencode-standalone.md#A27, docs/decision/records/2026-10-04-opencode-standalone.md#A28, docs/decision/records/2026-10-04-opencode-standalone.md#A29
 - verification: unit
 
-接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
+接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。ただし、作成の応答より前に利用者の拒否の返答が届いていた場合は、作成が失敗しても実行しない。作成中にイベントの通信が切れ、その後に作成の応答が ask で届いた場合は、その実行を取りやめ、OpenCode に委ねない。イベントの通信が終わった後に承認要求が要る実行が来たときは、通信をつなぎ直してから承認要求を作り、つなぎ直せなければ承認要求を作れなかったものとして扱う。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
 
 ### REQ-068: 接続が無いときの対応条件の説明
 
@@ -130,6 +130,34 @@ Scenario: 承認待ちの途中で通信が切れた実行は取りやめる
 Scenario: 作成の応答を受け取れなければ作れなかったものとして扱う
   Given プラグインが自身の管理サービスへ接続している
   And 承認要求の作成の要求を送った後、応答を受け取る前に通信が切れる
+  When エージェントが ask になるコマンドを実行する
+  Then ホストの標準エラーに警告が出て、OpenCode 自身の権限判断で実行の可否が決まる
+
+@id=EX-150 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A27
+Scenario: 作成中に通信が切れた後に ask の応答が届けば取りやめる
+  Given プラグインが自身の管理サービスへ接続している
+  And 承認要求の作成中にイベントの通信が切れ、その後に作成の応答が ask で届く
+  When エージェントが ask になるコマンドを実行する
+  Then その実行は起動せず、OpenCode に委ねられない
+
+@id=EX-151 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A28
+Scenario: 先に届いた拒否は作成が失敗しても守る
+  Given プラグインが自身の管理サービスへ接続している
+  And 作成の応答より前にその承認要求への拒否の返答が届き、その後に作成が失敗する
+  When エージェントが ask になるコマンドを実行する
+  Then その実行は起動しない
+
+@id=EX-152 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A29
+Scenario: 通信が終わった後の ask では通信をつなぎ直して承認を求める
+  Given プラグインが自身の管理サービスへ接続し、イベントの通信が一度終わっている
+  And 通信をつなぎ直せる
+  When エージェントが ask になるコマンドを実行する
+  Then 通信をつなぎ直し、guardian の承認要求が出て、返答があるまで起動しない
+
+@id=EX-153 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A29,docs/decision/records/2026-10-04-opencode-standalone.md#A25
+Scenario: 通信をつなぎ直せなければ警告して OpenCode に委ねる
+  Given プラグインが自身の管理サービスへ接続し、イベントの通信が一度終わっている
+  And 通信をつなぎ直せない
   When エージェントが ask になるコマンドを実行する
   Then ホストの標準エラーに警告が出て、OpenCode 自身の権限判断で実行の可否が決まる
 ```
