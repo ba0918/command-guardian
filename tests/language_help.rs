@@ -120,7 +120,9 @@ fn help_at_each_entry_exits_without_reading_open_stdin_or_broken_config() {
                 _ => {
                     assert!(help.contains("check"));
                     assert!(help.contains("hook"));
-                    assert!(help.contains("--version, -V"), "{help}");
+                    for label in ["--version", "-V"] {
+                        assert!(help.contains(label), "{help}");
+                    }
                 }
             }
         }
