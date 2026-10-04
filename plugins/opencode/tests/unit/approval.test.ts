@@ -40,17 +40,18 @@ function fixture(create?: (request: ApprovalRequest) => Promise<"ask" | "allow" 
   const streams: Events[] = [];
   const requests: ApprovalRequest[] = [];
   const removed: string[] = [];
-  let next=0;
+  let next=0, connections=0;
   const approval = new Approval({
     newID:()=>String(++next),
     events: () => {
+      connections++;
       if (streams.length > 0 && !reconnect) throw new TypeError("fetch failed");
       const events = new Events(); streams.push(events); return events.stream();
     },
     create: async request => { requests.push(request); return create ? create(request) : "ask"; },
     reject: async id => { removed.push(id); },
   });
-  return { get events() { const latest = streams.at(-1); if (!latest) throw new Error("no event stream"); return latest; }, streams, requests, removed, approval };
+  return { get events() { const latest = streams.at(-1); if (!latest) throw new Error("no event stream"); return latest; }, get connections() { return connections; }, streams, requests, removed, approval };
 }
 async function waitFor(check: () => boolean) {
   for (let i = 0; i < 100; i++) { if (check()) return; await Promise.resolve(); }
@@ -107,14 +108,52 @@ test("ex_151_reject_reply_before_a_failed_creation_is_kept", async () => {
   f.approval.close(); f.events.end();
 });
 
-// @kotowari[REQ-067]
-test("req_067_creation_after_the_event_connection_ended_is_left_to_opencode", async () => {
+// @kotowari[REQ-067, EX-152]
+test("ex_152_approval_after_the_event_connection_ended_reconnects_and_waits", async () => {
   const f = fixture();
   f.events.end();
   await new Promise(resolve => setTimeout(resolve, 0));
+  let done = false;
+  const run = f.approval.request("session", input, "reason", new AbortController().signal).then(result => { done = true; return result; });
+  await waitFor(() => f.requests.length === 1);
+  expect(f.streams).toHaveLength(2);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(done).toBe(false);
+  const request = f.requests[0]; if (!request) throw new Error("missing request");
+  f.events.emit({ type: "reply", id: request.id, session: "session", reply: "once" });
+  expect(await run).toBe("approved");
+  f.approval.close(); f.events.end();
+});
+
+// @kotowari[REQ-067, EX-153]
+test("ex_153_approval_after_the_event_connection_ended_without_reconnection_is_left_to_opencode", async () => {
+  const f = fixture(undefined, false);
+  const events = f.events;
+  f.events.end();
+  await new Promise(resolve => setTimeout(resolve, 0));
   expect(await f.approval.request("session", input, "reason", new AbortController().signal)).toBe("unavailable");
+  expect(f.connections).toBe(2);
   expect(f.requests).toHaveLength(0);
-  f.approval.close();
+  f.approval.close(); events.end();
+});
+
+// @kotowari[REQ-067, EX-150]
+test("ex_150_creation_answered_after_its_connection_ended_is_cancelled_even_after_reconnection", async () => {
+  let answer: (value: "ask") => void = () => {};
+  let first = true;
+  const f = fixture(() => first ? (first = false, new Promise(resolve => { answer = resolve; })) : Promise.resolve("ask"));
+  const run = f.approval.request("session", input, "reason", new AbortController().signal).then(() => null, error => error);
+  await waitFor(() => f.requests.length === 1);
+  f.events.end();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const second = f.approval.request("session", input, "reason", new AbortController().signal);
+  await waitFor(() => f.requests.length === 2);
+  answer("ask");
+  expect(await run).toBeInstanceOf(Error);
+  const later = f.requests[1]; if (!later) throw new Error("missing request");
+  f.events.emit({ type: "reply", id: later.id, session: "session", reply: "once" });
+  expect(await second).toBe("approved");
+  f.approval.close(); f.events.end();
 });
 
 // @kotowari[REQ-067, REQ-053, EX-150]

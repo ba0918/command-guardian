@@ -7,32 +7,46 @@ export interface ApprovalPort {
   create(request:ApprovalRequest,signal:AbortSignal):Promise<"ask"|"allow"|"deny">;
   reject(id:string,session:string):Promise<void>;
 }
+/** One event stream. `ready` settles once it reports connected or ends, whichever comes first. */
+class Connection {
+  readonly controller = new AbortController();
+  readonly ready: Promise<void>;
+  connected: () => void = () => {};
+  ended: Error | undefined;
+  constructor() { this.ready = new Promise(resolve => { this.connected = resolve; }); }
+}
 export class Approval {
-  private readonly controller = new AbortController();
   // Waiting starts when the creation response arrives; until then a lost connection does not cancel.
-  private readonly pending = new Map<string, {session:string; waiting:boolean; reply:(error:Error|null)=>void; cancel:(error:Error)=>void}>();
-  private readonly ready: Promise<void>;
-  private connected: (()=>void) = () => {};
-  private stopped: Error | undefined;
-  private unloaded = false;
+  private readonly pending = new Map<string, {session:string; connection:Connection; waiting:boolean; reply:(error:Error|null)=>void; cancel:(error:Error)=>void}>();
+  private connection: Connection;
+  private unloaded: Error | undefined;
   constructor(private readonly port:ApprovalPort) {
-    this.ready = new Promise(resolve => { this.connected = resolve; });
-    void this.listen();
+    this.connection = this.connect();
   }
-  private async listen() {
+  private connect() {
+    const connection = new Connection();
+    void this.listen(connection);
+    return connection;
+  }
+  private async listen(connection:Connection) {
     try {
-      for await (const event of this.port.events(this.controller.signal)) {
-        if (this.stopped) break;
-        if (event.type === "connected") this.connected();
+      for await (const event of this.port.events(connection.controller.signal)) {
+        if (connection.ended) break;
+        if (event.type === "connected") connection.connected();
         else {
           const pending = this.pending.get(event.id);
           if (pending?.session === event.session) pending.reply(event.reply === "reject" ? new Error("Guardian approval rejected.") : null);
         }
       }
-      this.stop(new Error("Guardian approval connection ended."),false);
+      this.end(connection,new Error("Guardian approval connection ended."));
     } catch {
-      this.stop(new Error("Guardian approval connection failed."),false);
+      this.end(connection,new Error("Guardian approval connection failed."));
     }
+  }
+  /** The live event stream, reconnected once the previous one has ended. */
+  private current() {
+    if (this.connection.ended && !this.unloaded) this.connection = this.connect();
+    return this.connection;
   }
   private reject(id:string,session:string) {
     void this.port.reject(id,session).catch(() => {});
@@ -40,17 +54,19 @@ export class Approval {
   /** Resolves "approved" after an approval, or "unavailable" when no approval request could be made. */
   async request(session:string,input:Invocation,reason:string,signal:AbortSignal):Promise<"approved"|"unavailable"> {
     if (signal.aborted) throw new Error("Guardian execution cancelled.");
+    if (this.unloaded) throw this.unloaded;
+    const connection = this.current();
     let rejectReady: (error:Error)=>void = () => {};
     const cancelledReady=new Promise<never>((_resolve,reject)=>{rejectReady=reject;});
     const abortReady=()=>rejectReady(new Error("Guardian execution cancelled."));
     signal.addEventListener("abort",abortReady,{once:true});
     try{
       if(signal.aborted)abortReady();
-      await Promise.race([this.ready,cancelledReady]);
+      await Promise.race([connection.ready,cancelledReady]);
     }finally{signal.removeEventListener("abort",abortReady);}
-    if (this.unloaded && this.stopped) throw this.stopped;
+    if (this.unloaded) throw this.unloaded;
     if (signal.aborted) throw new Error("Guardian execution cancelled.");
-    if (this.stopped) return "unavailable";
+    if (connection.ended) return "unavailable";
     const id = this.port.newID();
     const controller = new AbortController();
     let settle: (error:Error|null)=>void = () => {};
@@ -68,7 +84,7 @@ export class Approval {
       this.reject(id,session);
     };
     const abort = () => cancel(new Error("Guardian execution cancelled."));
-    const entry = {session,waiting:false,reply:settle,cancel};
+    const entry = {session,connection,waiting:false,reply:settle,cancel};
     this.pending.set(id,entry);
     signal.addEventListener("abort",abort,{once:true});
     try {
@@ -88,11 +104,12 @@ export class Approval {
       const effect = created.effect;
       if (effect !== "ask") throw new Error(`Guardian approval was not requested (${effect}).`);
       entry.waiting = true;
-      if (this.stopped) throw this.stopped;
+      // The stream that would carry the reply ended during creation, so the reply may be lost.
+      if (connection.ended) throw connection.ended;
       const rejected = await outcome;
       if (rejected) throw rejected;
       if (cancellationError) throw cancellationError;
-      if (this.stopped) throw this.stopped;
+      if (connection.ended) throw connection.ended;
       if (signal.aborted) throw new Error("Guardian execution cancelled.");
       return "approved";
     } catch (error) {
@@ -103,11 +120,14 @@ export class Approval {
       this.pending.delete(id);
     }
   }
-  close() { this.stop(new Error("Guardian plugin unloaded."),true); }
-  private stop(error:Error,unloaded:boolean) {
-    if (unloaded) this.unloaded = true;
-    this.stopped ??= error;
-    this.controller.abort(); this.connected();
-    for (const pending of this.pending.values()) if (unloaded || pending.waiting) pending.cancel(this.stopped);
+  close() {
+    this.unloaded ??= new Error("Guardian plugin unloaded.");
+    this.end(this.connection,this.unloaded);
+    for (const pending of this.pending.values()) pending.cancel(this.unloaded);
+  }
+  private end(connection:Connection,error:Error) {
+    connection.ended ??= error;
+    connection.controller.abort(); connection.connected();
+    for (const pending of this.pending.values()) if (pending.connection === connection && pending.waiting) pending.cancel(connection.ended);
   }
 }
