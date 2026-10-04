@@ -246,25 +246,30 @@ def fixture(base: Path) -> tuple[Path, Path]:
         (project / directory).mkdir(parents=True)
         (project / directory / "file.txt").write_text(f"{directory}\n")
     git = ["git", "-c", "user.name=demo", "-c", "user.email=demo@example.invalid"]
+    # The developer's own Git settings, such as a global ignore of dist/, must not shape the demo.
+    env = {**isolated_env(home), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
     for args in (["init", "-q"], ["add", "."], ["commit", "-q", "-m", "init"]):
-        subprocess.run(git + args, cwd=project, check=True)
+        subprocess.run(git + args, cwd=project, env=env, check=True)
     (project / "src" / "file.txt").write_text("src\nchanged\n")
     (project / ".command-guardian.toml").write_text(PROJECT_CONFIG)
     return home, project
 
 
-def run(binary: Path, home: Path, project: Path, args: list[str], stdin: str | None = None):
-    env = {
+def isolated_env(home: Path) -> dict[str, str]:
+    return {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home / ".config"),
         "XDG_STATE_HOME": str(home / ".local/state"),
         "LANG": "C.UTF-8",
     }
+
+
+def run(binary: Path, home: Path, project: Path, args: list[str], stdin: str | None = None):
     proc = subprocess.run(
         [str(binary), *args],
         cwd=project,
-        env=env,
+        env=isolated_env(home),
         input=stdin,
         capture_output=True,
         text=True,
