@@ -56,10 +56,12 @@ guardian が `ask` と判定した実行では、その実行の承認要求を 
 ### REQ-052: 承認経路を利用できない場合
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15
+- source: docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15, docs/decision/records/2026-10-04-opencode-standalone.md#A3, docs/decision/records/2026-10-04-opencode-standalone.md#A13, docs/decision/records/2026-10-04-opencode-standalone.md#A17
 - verification: unit
 
-プラグインは自身をホストする同一 OpenCode HTTP サーバーで承認要求を作る。接続オプションが未指定なら管理サービスの登録情報を一度だけ読み、通信前に登録PIDが自身の実行プロセスと一致し、URLと非空の認証情報が文字列であり、URLがloopback HTTPであることを確認する。検証済みのURLと認証情報を固定したSDK接続でサーバー情報を取得し、応答PIDが自身と一致し版が"2.0.21"の場合だけ採用する。自動接続ではHTTPリダイレクトを拒否し、別サービスを起動しない。接続オプションを一つでも指定した場合は明示設定を使い、不完全な設定や認証失敗から自動探索へ切り替えない。接続・認証の失敗や自身のサーバーを確認できない場合は対象コマンドを実行せず、失敗の理由を返す。これは guardian が危険と判定した `block` と区別し、警告だけで実行を継続しない。
+プラグインは自身をホストする同一 OpenCode HTTP サーバーで承認要求を作る。接続オプションが未指定なら管理サービスの登録情報を一度だけ読み、通信前に登録PIDが自身の実行プロセスと一致し、URLと非空の認証情報が文字列であり、URLがloopback HTTPであることを確認する。検証済みのURLと認証情報を固定したSDK接続でサーバー情報を取得し、応答PIDが自身と一致する場合だけ採用し、相手の版は照合しない。自動接続ではHTTPリダイレクトを拒否し、別サービスを起動しない。接続オプションを一つでも指定した場合は明示設定を使い、不完全な設定や認証失敗から自動探索へ切り替えない。接続オプションを指定した場合の接続・認証の失敗では対象コマンドを実行せず、失敗の理由を返す。これは guardian が危険と判定した `block` と区別し、警告だけで実行を継続しない。
+
+接続オプションが未指定で、登録が無いか登録の検証に失敗して自身の管理サービスへ接続できない場合は、opencode-standalone.md の REQ-065 から REQ-067 に従い、登録に書かれた宛先へは通信しない。
 
 ### REQ-053: 承認待ちの寿命
 
@@ -90,21 +92,21 @@ Bash 以外の shell では安全に判定できたと見なさず、対象外�
 ## Examples
 
 ```gherkin
-@id=EX-106 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+@id=EX-106 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-04-opencode-standalone.md#A17
 Scenario: 接続設定なしで自身の管理サービスを使う
   Given プラグインが認証付きloopbackの管理サービス内で動いている
   And 接続オプションが未指定である
   When shellツールを実行する
-  Then 通信前に登録を検証し固定した接続先の応答PIDと版をSDKで照合して接続する
+  Then 通信前に登録を検証し固定した接続先の応答PIDをSDKで照合して接続する
   And allowとblockと承認待ちが明示設定時と同じように働く
 
-@id=EX-107 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+@id=EX-107 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-03-opencode-managed-service.md#A2,docs/decision/records/2026-10-04-opencode-standalone.md#A13
 Scenario: 別サーバーや不整合な登録へ承認を送らない
-  Given 登録PIDが自身と異なるか接続先の応答PIDまたは版が一致しない
+  Given 登録PIDが自身と異なるか接続先の応答PIDが一致しない
   When 自動接続先を確定する
-  Then その接続を採用しない
+  Then その接続を採用せず登録に書かれた宛先へ承認要求を送らない
 
-@id=EX-108 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3
+@id=EX-108 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-04-opencode-standalone.md#A13
 Scenario: 未認証やリモートの登録情報を採用しない
   Given 登録情報が未認証かloopback HTTP以外である
   When 自動接続先を確定する
@@ -195,9 +197,9 @@ Scenario: 明示した同一サーバーで承認要求を作る
   When 承認要求を作る
   Then その接続と認証を使う
 
-@id=EX-089 @about=REQ-052 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A15
+@id=EX-089 @about=REQ-052 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A15,docs/decision/records/2026-10-04-opencode-standalone.md#A13
 Scenario: 承認要求を作れなければ実行しない
-  Given HTTPサーバーへの認証に失敗する
+  Given 明示した接続設定でHTTPサーバーへの認証に失敗する
   When 承認要求を作ろうとする
   Then 対象コマンドを実行せず認証失敗の理由を返す
 
