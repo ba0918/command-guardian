@@ -173,3 +173,20 @@ fn ex_131_opencode_record_failure_keeps_the_deferral_with_a_warning() {
     assert!(stderr.contains("shadow log"), "{stderr}");
     assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "unchanged");
 }
+
+// @kotowari[REQ-063, REQ-048]
+#[test]
+fn req_063_opencode_shadow_mode_takes_precedence_over_defer_ask() {
+    let f = Fixture::with_config("[mode]\nenforce = false\ndefer_ask = true\n");
+    let (response, _) = f.run(&f.input("rm /mnt/fixture/x", "/bin/bash"));
+    assert_eq!(response["status"], "shadow", "{response}");
+    assert_eq!(response["mode"]["enforce"], false);
+    assert!(response.get("verdict").is_none(), "{response}");
+    assert!(response.get("warning").is_none(), "{response}");
+    let log = f.log().unwrap();
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines.len(), 1, "{log}");
+    let fields: Vec<&str> = lines[0].split('\t').collect();
+    assert_eq!(fields.len(), 5, "{log}");
+    assert_eq!(fields[1], "ask");
+}
