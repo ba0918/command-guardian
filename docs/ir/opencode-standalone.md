@@ -27,10 +27,10 @@ REQ-065 の状態で、判定が ask の実行、判定結果を取得できな�
 ### REQ-067: 承認要求を作れないとき
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-04-opencode-standalone.md#A27, docs/decision/records/2026-10-04-opencode-standalone.md#A28, docs/decision/records/2026-10-04-opencode-standalone.md#A29, docs/decision/records/2026-10-04-version-and-followups.md#A6
+- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-04-opencode-standalone.md#A27, docs/decision/records/2026-10-04-opencode-standalone.md#A28, docs/decision/records/2026-10-04-opencode-standalone.md#A29, docs/decision/records/2026-10-04-version-and-followups.md#A6, docs/decision/records/2026-10-04-version-and-followups.md#A9
 - verification: unit
 
-接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。作れなかったものとして扱う要求には、拒否の返答を送らない。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。ただし、作成の応答より前に利用者の拒否の返答が届いていた場合は、作成が失敗しても実行しない。作成中にイベントの通信が切れ、その後に作成の応答が ask で届いた場合は、その実行を取りやめ、OpenCode に委ねない。イベントの通信が終わった後に承認要求が要る実行が来たときは、通信をつなぎ直してから承認要求を作り、つなぎ直せなければ承認要求を作れなかったものとして扱う。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
+接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。作れなかったものとして扱い OpenCode に委ねる要求には、拒否の返答を送らない。作成の応答より前に利用者の拒否が届いていた要求と、作成中に実行が取り消された要求には、拒否の返答を送る。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。ただし、作成の応答より前に利用者の拒否の返答が届いていた場合は、作成が失敗しても実行しない。作成中にイベントの通信が切れ、その後に作成の応答が ask で届いた場合は、その実行を取りやめ、OpenCode に委ねない。イベントの通信が終わった後に承認要求が要る実行が来たときは、通信をつなぎ直してから承認要求を作り、つなぎ直せなければ承認要求を作れなかったものとして扱う。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
 
 ### REQ-068: 接続が無いときの対応条件の説明
 
