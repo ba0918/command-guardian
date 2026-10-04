@@ -9,7 +9,7 @@ import { isAbsolute } from "node:path";
 import { Approval, type ApprovalEvent } from "./approval.js";
 import { authorize, type Invocation } from "./gate.js";
 import { executionInput, judge } from "./guardian.js";
-import { connect } from "./connection.js";
+import { connect, type Connection } from "./connection.js";
 
 // The plugin API the plugin calls; its presence, not the OpenCode version, decides support.
 const requiredApis:readonly (readonly [string,(ctx:Plugin.Context)=>unknown,"function"|"string"])[]=[
@@ -39,8 +39,7 @@ export default Plugin.define({
   async setup(ctx) {
     const missing=missingApis(ctx);
     if(missing.length)throw new Error(`command-guardian: missing OpenCode plugin API: ${missing.join(", ")}`);
-    const connection=await connect(ctx.options);
-    const client=connection.kind==="connected"?connection.client:undefined;
+    let connection:Connection=await connect(ctx.options);
     // Without a connection there is no guardian approval: block is refused in the shell hook and
     // everything else is left to OpenCode's own permissions instead of stopping the command.
     const misconfigured=()=>{
@@ -55,7 +54,7 @@ export default Plugin.define({
       event.effect="ask";
       if(typeof event.metadata?.guardianReason==="string")event.message=event.metadata.guardianReason;
     });
-    const approval=client?new Approval({
+    const approvalFor=(client:OpenCodeClient)=>new Approval({
       newID:()=>Permission.ID.create(),
       events:async function*(signal):AsyncIterable<ApprovalEvent>{
         for await(const event of client.event.subscribe({signal})){
@@ -69,7 +68,15 @@ export default Plugin.define({
         return result.effect;
       },
       reject:async(id,session)=>{await ctx.permission.reply({sessionID:session,requestID:id,decision:"reject"});},
-    }):undefined;
+    });
+    let client=connection.kind==="connected"?connection.client:undefined;
+    let approval=client?approvalFor(client):undefined;
+    // Concurrent executions share one check so that a recovered connection gets a single event stream.
+    let rechecking:Promise<void>|undefined;
+    const recheck=()=>rechecking??=connect(ctx.options).then(next=>{
+      connection=next;
+      if(next.kind==="connected"&&active){client=next.client;approval=approvalFor(next.client);}
+    }).finally(()=>{rechecking=undefined;});
     const approve=(context:ToolContext)=>async(input:Invocation,reason:string)=>{
       if(approval&&await approval.request(context.sessionID,input,reason,context.signal)==="unavailable")
         console.warn(`command-guardian: could not create the guardian approval request; the command is left to OpenCode's own permissions.`);
@@ -101,6 +108,7 @@ export default Plugin.define({
         try{
           fail();
           const snapshot:unknown=structuredClone(input);
+          if(connection.kind==="failed")await recheck();
           if(!client){
             misconfigured();
             return await local.run({context,expected:undefined},()=>original(snapshot,context));

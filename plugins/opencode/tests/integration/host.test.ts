@@ -3,6 +3,7 @@ import { OpenCode } from "@opencode/client";
 import { Service } from "@opencode/client/service";
 import { Permission } from "@opencode/schema/permission";
 import { spawn } from "node:child_process";
+import { createServer, connect, type Socket } from "node:net";
 import { mkdtemp, mkdir, writeFile, readFile, symlink, rm, appendFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -18,7 +19,9 @@ type HostOptions={enforce?:boolean;shell?:string;nativeDeny?:boolean;nativeAsk?:
   // Approval creation fails at the host.
   failApproval?:boolean;
   // A managed-service registration written before launch.
-  registration?:Record<string,unknown>};
+  registration?:Record<string,unknown>;
+  // The serverUrl option to configure instead of the host's own address.
+  serverUrl?:string};
 async function host(options:HostOptions={}) {
   const binary=process.env.OPENCODE_TEST_BIN,guardian=process.env.GUARDIAN_TEST_BIN;
   if (!binary || !guardian) throw new Error("Explicit OPENCODE_TEST_BIN and GUARDIAN_TEST_BIN are required");
@@ -66,7 +69,7 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
   const environment:NodeJS.ProcessEnv={};
   for (const [key,value] of Object.entries(process.env)) if(!key.startsWith("OPENCODE")&&!key.startsWith("GIT_")&&!key.startsWith("SAFE_CHAIN_MINIMUM"))environment[key]=value;
   delete environment.TYPESAFE_API_KEY;
-  Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":options.nativeAsk?"ask":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
+  Object.assign(environment,{HOME:home,XDG_CONFIG_HOME:join(home,"config"),XDG_STATE_HOME:join(home,"state"),XDG_CACHE_HOME:join(home,"cache"),XDG_DATA_HOME:join(home,"data"),TMPDIR:tmpdir(),PATH:`${bin}:${process.env.PATH}`,OPENCODE_DB:join(home,"fixture.db"),OPENCODE_SERVER_PASSWORD:"guardian-test-password-not-real",GUARDIAN_TEST_PASSWORD:options.wrongAuth?"incorrect-fixture-password":"guardian-test-password-not-real",OPENCODE_DISABLE_PROJECT_CONFIG:"1",OPENCODE_DISABLE_MODELS_FETCH:"1",OPENCODE_CONFIG_CONTENT:JSON.stringify({shell:options.shell??"/bin/bash",permissions:[{action:"*",resource:"*",effect:options.nativeDeny?"deny":options.nativeAsk?"ask":"allow"}],plugins:[{package:process.env.GUARDIAN_PLUGIN_DIR??resolve(import.meta.dir,"../.."),options:{serverUrl:options.serverUrl??url,passwordEnv:"GUARDIAN_TEST_PASSWORD"}},process.env.GUARDIAN_TEST_BRIDGE_DIR??resolve(import.meta.dir,"bridge")]})});
   let logs="";
   if(options.stdio){
     const config=JSON.parse(environment.OPENCODE_CONFIG_CONTENT!);
@@ -136,7 +139,7 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
     }
     const info=await client.server.info();expect(info.version).toBe("2.0.21");
     const session=await client.session.create({title:"model-free guardian fixture",location:{directory:project}});
-    return {root,project,sentinel,client,session,logs:()=>logs,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
+    return {root,project,sentinel,url,client,session,logs:()=>logs,execute:(command:string,extra:{workdir?:string;background?:boolean;codeMode?:boolean}={},signal?:AbortSignal)=>client.rpc.call({rpcID:"guardian-test",method:"execute",location:{directory:project},input:{session:session.id,command,...extra}},signal?{signal}:{}),close:async()=>{
       await close("closed");
     }};
   }catch(error){await close(error instanceof Error?error.message:"setup failed");throw error;}
@@ -349,6 +352,47 @@ test("ex_135_failed_explicit_authentication_beside_a_managed_service_warns_and_r
     expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
     expect(connectionWarnings(f)).toBe(3);
   }finally{await f.close();}
+},20000);
+
+function freePort(){
+  const listener=Bun.serve({hostname:"127.0.0.1",port:0,fetch:()=>new Response("fixture")});
+  const port=listener.port;listener.stop(true);
+  if(port===undefined)throw new Error("No free loopback port");
+  return port;
+}
+
+// A plain TCP relay to the host, so the configured address can become reachable after loading.
+async function relay(port:number,target:URL){
+  const sockets=new Set<Socket>();
+  const server=createServer(socket=>{
+    const upstream=connect(Number(target.port),target.hostname);
+    for(const end of [socket,upstream]){sockets.add(end);end.on("error",()=>{socket.destroy();upstream.destroy();});end.on("close",()=>sockets.delete(end));}
+    socket.pipe(upstream).pipe(socket);
+  });
+  await new Promise<void>(resolve=>server.listen(port,"127.0.0.1",resolve));
+  return {close:()=>{for(const socket of sockets)socket.destroy();server.close();}};
+}
+
+// @kotowari[REQ-065, EX-156]
+test("ex_156_explicit_connection_that_failed_at_load_switches_to_guardian_approval_once_reachable",async()=>{
+  const port=freePort();
+  const f=await host({serverUrl:`http://127.0.0.1:${port}`});
+  let reachable:{close:()=>void}|undefined;
+  try{
+    await f.execute("printf before > before-output");
+    expect(await readFile(join(f.project,"before-output"),"utf8")).toBe("before");
+    expect(connectionWarnings(f)).toBeGreaterThan(0);
+    reachable=await relay(port,new URL(f.url));
+    let finished=false;
+    const run=f.execute(ask).then(value=>{finished=true;return value;});
+    const request=(await pending(f,1))[0];if(!request)throw new Error("Missing guardian approval");
+    expect(request.action).toBe("command-guardian");
+    expect(finished).toBe(false);
+    await expect(readFile(join(f.project,"ask-output"),"utf8")).rejects.toThrow();
+    await f.client.permission.reply({sessionID:f.session.id,requestID:request.id,decision:"once"});
+    await run;
+    expect(await readFile(join(f.project,"ask-output"),"utf8")).toBe("ran");
+  }finally{reachable?.close();await f.close();}
 },20000);
 
 // @kotowari[REQ-050, REQ-054, EX-092, EX-102]
