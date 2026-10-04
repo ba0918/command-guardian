@@ -10,13 +10,14 @@ type Execute = (input: unknown, context: unknown) => Promise<unknown>;
 
 // A host stand-in exposing only the plugin context members the plugin calls.
 function host(directory: string, overrides: Record<string, unknown> = {}) {
-  const registered: { createBefore?: CreateBefore; execute?: Execute } = {};
+  const registered: { createBefore?: CreateBefore | undefined; execute?: Execute } = {};
   const disposable = { dispose: async () => {} };
   const context = {
     app: { name: "opencode", version: "9.9.9", channel: "latest" },
     location: { directory },
     options: {},
-    shell: { hook: async (_name: string, handler: CreateBefore) => { registered.createBefore = handler; return disposable; } },
+    // Disposing the shell hook unregisters it, as the host does.
+    shell: { hook: async (_name: string, handler: CreateBefore) => { registered.createBefore = handler; return { dispose: async () => { registered.createBefore = undefined; } }; } },
     permission: { hook: async () => disposable, reply: async () => {} },
     tool: { transform: async (edit: (editor: unknown) => void) => {
       edit({ update: (_id: string, change: (tool: { execute: Execute }) => void) => {
@@ -130,5 +131,29 @@ test("req_065_failed_explicit_connection_warns_at_load_and_on_each_execution", a
     expect(warn).toHaveBeenCalledTimes(3);
     expect(String(warn.mock.calls[0]?.[0])).toContain("serverUrl");
     await cleanup?.();
+  } finally { delete process.env.GUARDIAN_SETUP_TEST_PASSWORD; transport.mockRestore(); warn.mockRestore(); await f.restore(); }
+});
+
+// @kotowari[REQ-065, REQ-053]
+test("req_065_unloading_during_the_connection_recheck_does_not_start_a_block_command", async () => {
+  const f = await fixture("block");
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  // The load-time check is refused; the per-execution recheck stays pending until the plugin is unloaded.
+  let calls = 0, recheckStarted = () => {}, refuseRecheck = () => {};
+  const rechecking = new Promise<void>(resolve => { recheckStarted = resolve; });
+  const transport = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async () => {
+    if (calls++ === 0) return new Response("unauthorized", { status: 401 });
+    recheckStarted();
+    return await new Promise<Response>(resolve => { refuseRecheck = () => resolve(new Response("unauthorized", { status: 401 })); });
+  }, fetch));
+  process.env.GUARDIAN_SETUP_TEST_PASSWORD = "fixture-password-not-real";
+  try {
+    const h = host(f.project, { options: { serverUrl: "http://127.0.0.1:4097", passwordEnv: "GUARDIAN_SETUP_TEST_PASSWORD" } });
+    const cleanup = await plugin.setup(h.context);
+    const running = h.registered.execute?.({ command: "printf fixture" }, toolContext());
+    await rechecking;
+    await cleanup?.();
+    refuseRecheck();
+    await expect(running).rejects.toThrow();
   } finally { delete process.env.GUARDIAN_SETUP_TEST_PASSWORD; transport.mockRestore(); warn.mockRestore(); await f.restore(); }
 });

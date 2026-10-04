@@ -49,6 +49,11 @@ export default Plugin.define({
     let active=true;
     const local=new AsyncLocalStorage<{readonly context:ToolContext;readonly expected:Invocation|undefined}>();
     const fail=()=>{if(!active)throw new Error("Guardian plugin unloaded.");};
+    // Checked after every await: an unload or a cancellation in the meantime must not start the command.
+    const proceed=(context:ToolContext)=>{
+      fail();
+      if(context.signal.aborted)throw new Error("Guardian execution cancelled.");
+    };
     const force=await ctx.permission.hook("evaluate",event=>{
       if(event.action!=="command-guardian"||event.effect==="deny")return;
       event.effect="ask";
@@ -82,12 +87,10 @@ export default Plugin.define({
         console.warn(`command-guardian: could not create the guardian approval request; the command is left to OpenCode's own permissions.`);
     };
     const check=async(input:Invocation,context:ToolContext)=>{
-      fail();
-      if(context.signal.aborted)throw new Error("Guardian execution cancelled.");
+      proceed(context);
       const result=await judge("command-guardian",input,context.signal);
       await authorize(result,input,approve(context),async()=>{});
-      fail();
-      if(context.signal.aborted)throw new Error("Guardian execution cancelled.");
+      proceed(context);
     };
     const shellHook=await ctx.shell.hook("create.before",async invocation=>{
       const current=local.getStore();if(!current)return;
@@ -99,8 +102,7 @@ export default Plugin.define({
       }
       const expected=current.expected;
       if(!expected||actual.command!==expected.command||actual.cwd!==expected.cwd||actual.shell!==expected.shell)await check(actual,current.context);
-      fail();
-      if(current.context.signal.aborted)throw new Error("Guardian execution cancelled.");
+      proceed(current.context);
     });
     const transform=await ctx.tool.transform(editor=>editor.update("shell",tool=>{
       const original=tool.execute;
@@ -108,7 +110,7 @@ export default Plugin.define({
         try{
           fail();
           const snapshot:unknown=structuredClone(input);
-          if(connection.kind==="failed")await recheck();
+          if(connection.kind==="failed"){await recheck();proceed(context);}
           if(!client){
             misconfigured();
             return await local.run({context,expected:undefined},()=>original(snapshot,context));
