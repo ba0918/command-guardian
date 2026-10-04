@@ -77,7 +77,7 @@ For 0.1.2 or an explicit server, complete the connection settings below after ad
 
 ## Alternative: install the matching bundle
 
-Obtain `command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz` and its `.sha256` file from [the matching GitHub release](https://github.com/ba0918/command-guardian/releases/tag/v0.2.0). For another release, replace `0.2.0` in the filenames with that release's version. Verify the checksum before extracting:
+Obtain `command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz` and its `.sha256` file from [the matching GitHub release](https://github.com/ba0918/command-guardian/releases/tag/v0.3.0). For another release, replace `0.3.0` in the filenames with that release's version. Verify the checksum before extracting:
 
 ```sh
 sha256sum -c command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz.sha256
