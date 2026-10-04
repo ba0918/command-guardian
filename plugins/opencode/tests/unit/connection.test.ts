@@ -58,6 +58,24 @@ test("automatic_connection_keeps_the_validated_endpoint_and_does_not_follow_redi
 });
 
 // @kotowari[REQ-052, EX-106]
+test("ex_106_automatic_connection_accepts_its_own_service_whatever_version_it_reports",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"guardian-connection-"));
+  const previous=process.env.XDG_STATE_HOME;
+  // Answer the identity probe at the transport boundary; no real destination is contacted.
+  const transport=spyOn(globalThis,"fetch").mockImplementation(Object.assign(async()=>Response.json({version:"9.9.9",pid:process.pid,urls:[registration.url],paths:{tmp:root}}),fetch));
+  try{
+    process.env.XDG_STATE_HOME=root;
+    await mkdir(join(root,"opencode"));
+    await writeFile(join(root,"opencode/service.json"),JSON.stringify({...registration,version:"9.9.9",pid:process.pid}));
+    expect(await connect({})).toBeDefined();
+  }finally{
+    transport.mockRestore();
+    if(previous===undefined)delete process.env.XDG_STATE_HOME;else process.env.XDG_STATE_HOME=previous;
+    await rm(root,{recursive:true,force:true});
+  }
+});
+
+// @kotowari[REQ-052, EX-106]
 test("automatic_connection_accepts_only_the_authenticated_endpoint_of_its_own_process",()=>{
   expect(sameHostEndpoint(registration,endpoint,42)).toEqual(endpoint);
 });

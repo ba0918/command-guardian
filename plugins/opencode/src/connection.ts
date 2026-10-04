@@ -33,6 +33,6 @@ export async function connect(options:Readonly<Record<string,unknown>>) {
     // discover rereads the registration and sends credentials before validating its destination.
     const connection=OpenCode.make({baseUrl:endpoint.url,headers:Service.headers(endpoint),fetch:Object.assign((input:string|URL|Request,init?:RequestInit)=>fetch(input,{...init,redirect:"error"}),fetch)});
     const info=await connection.server.info({signal:AbortSignal.timeout(1000)});
-    if(info.pid===process.pid&&info.version==="2.0.21")return connection;
+    if(info.pid===process.pid)return connection;
   }catch{return;}
 }

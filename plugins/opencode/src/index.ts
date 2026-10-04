@@ -10,9 +10,24 @@ import { authorize, type Invocation } from "./gate.js";
 import { executionInput, judge } from "./guardian.js";
 import { connect } from "./connection.js";
 
+// The plugin API the plugin calls; its presence, not the OpenCode version, decides support.
+const requiredApis:readonly (readonly [string,(ctx:Plugin.Context)=>unknown,"function"|"string"])[]=[
+  ["shell.hook",ctx=>ctx.shell?.hook,"function"],
+  ["permission.hook",ctx=>ctx.permission?.hook,"function"],
+  ["permission.reply",ctx=>ctx.permission?.reply,"function"],
+  ["tool.transform",ctx=>ctx.tool?.transform,"function"],
+  ["location.directory",ctx=>ctx.location?.directory,"string"],
+];
+
+function missingApis(ctx:Plugin.Context):string[] {
+  return requiredApis.filter(([,read,type])=>typeof read(ctx)!==type).map(([name])=>name);
+}
+
 export default Plugin.define({
   id: "command-guardian",
   async setup(ctx) {
+    const missing=missingApis(ctx);
+    if(missing.length)throw new Error(`command-guardian: missing OpenCode plugin API: ${missing.join(", ")}`);
     const connection=await connect(ctx.options);
     let active=true;
     const local=new AsyncLocalStorage<{readonly context:ToolContext;readonly expected:Invocation|undefined}>();
@@ -64,7 +79,6 @@ export default Plugin.define({
       tool.execute=async(input,context)=>{
         try{
           fail();
-          if(ctx.app.version!=="2.0.21")throw new Error("Guardian plugin requires verified OpenCode V2 2.0.21.");
           const snapshot:unknown=structuredClone(input);
           let shell="/unknown-shell";
           if(connection){
