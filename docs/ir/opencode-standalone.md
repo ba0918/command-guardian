@@ -46,9 +46,9 @@ command-guardian の導入手順は、"opencode run --standalone" が接続設�
 - kind: ubiquitous
 - source: docs/decision/records/2026-10-04-opencode-standalone.md#A8, docs/decision/records/2026-10-04-opencode-standalone.md#A18, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A26
 - verification: review
-- how_to_verify: 結合試験に使う OpenCode の固定版を "serve --stdio" でモデルなしに隔離して起動する結合試験の実行結果を確かめ、allow の実行、block の拒否、承認が要る実行が OpenCode の規則に従って実行または確認または拒否されること、明示した接続設定の失敗と承認要求の作成失敗で警告が出て OpenCode に委ねられることの証拠があり、普段の OpenCode の設定とセッションを使っていないことを確認する
+- how_to_verify: 結合試験に使う OpenCode の固定版をモデルなしに隔離して起動する結合試験（接続が無いときは "serve --stdio"）の実行結果を確かめ、allow の実行、block の拒否、承認が要る実行が OpenCode の規則に従って実行または確認または拒否されること、明示した接続設定の失敗と承認要求の作成失敗で警告が出て OpenCode に委ねられることの証拠があり、普段の OpenCode の設定とセッションを使っていないことを確認する
 
-接続が無いときの判定と委任、明示した接続設定の失敗、承認要求の作成失敗は、結合試験に使う OpenCode の固定版を "serve --stdio" でモデルなしに隔離して起動した結合試験で検証する。その版は試験の環境であり、対応の条件ではない。"opencode run --standalone" の通し実行は必須にしない。
+接続が無いときの判定と委任は、結合試験に使う OpenCode の固定版を "serve --stdio" でモデルなしに隔離して起動した結合試験で検証する。明示した接続設定の失敗と承認要求の作成失敗は、同じ固定版をモデルなしに隔離して起動した既存の結合試験の仕組みで検証し、作成失敗には作成を失敗させる偽の仕組みを使う。その版は試験の環境であり、対応の条件ではない。"opencode run --standalone" の通し実行は必須にしない。
 
 ## Examples
 
