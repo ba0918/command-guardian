@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-04
+
 - Add top-level `--version` and `-V`, which print `command-guardian <version>` and exit 0 without reading configuration or standard input. `--version` after `check` or `hook` is still an argument to that entry point.
 - When explicit OpenCode connection options fail, the plugin now checks the connection again for each command, giving up after 1 second, and uses guardian approval again as soon as the server can be reached. Previously a failure at load time lasted until the plugin was loaded again.
 - When the OpenCode plugin cannot create a guardian approval request and leaves the command to OpenCode's own permissions, it no longer sends a reject reply for that request, so other approval prompts waiting in the same session are not rejected with it.
@@ -38,6 +40,7 @@
 - Provide a CLI and agent hook that inspect Bash commands for destructive effects and return `allow`, `ask`, or `block` based on target paths and configuration.
 - Distribute a single Linux x86_64 binary through GitHub Releases.
 
+[0.3.1]: https://github.com/ba0918/command-guardian/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ba0918/command-guardian/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ba0918/command-guardian/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/ba0918/command-guardian/compare/v0.1.2...v0.1.3

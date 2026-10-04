@@ -65,11 +65,11 @@ If connection options are set but incomplete, or the connection or authenticatio
 The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag:
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.3.0
-opencode plugin add 'github:ba0918/command-guardian#v0.3.0::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.3.1
+opencode plugin add 'github:ba0918/command-guardian#v0.3.1::path:plugins/opencode'
 ```
 
-For another release, replace `0.3.0` in both commands and the configuration below with that release's version. OpenCode V2 supports GitHub package specifications with tags and repository-subdirectory selectors. The `plugin add` command installs the package and adds it to your global configuration. You do not need to place the plugin files yourself or install a separate npm package. See [OpenCode's plugin configuration guide](https://opencode.ai/v2/docs/plugins).
+For another release, replace `0.3.1` in both commands and the configuration below with that release's version. OpenCode V2 supports GitHub package specifications with tags and repository-subdirectory selectors. The `plugin add` command installs the package and adds it to your global configuration. You do not need to place the plugin files yourself or install a separate npm package. See [OpenCode's plugin configuration guide](https://opencode.ai/v2/docs/plugins).
 
 The isolated installation check uses the pinned host's public `plugin add` command with an immutable local Git commit and `::path:plugins/opencode`. It installs the source package and its dependencies. Native approval tests then load that installed package in the real host. Downloading this plugin from the published GitHub tag has not been tested. Releases before 0.1.2 do not contain the plugin.
 
@@ -77,11 +77,11 @@ For 0.1.2 or an explicit server, complete the connection settings below after ad
 
 ## Alternative: install the matching bundle
 
-Obtain `command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz` and its `.sha256` file from [the matching GitHub release](https://github.com/ba0918/command-guardian/releases/tag/v0.3.0). For another release, replace `0.3.0` in the filenames with that release's version. Verify the checksum before extracting:
+Obtain `command-guardian-v0.3.1-x86_64-unknown-linux-musl.tar.gz` and its `.sha256` file from [the matching GitHub release](https://github.com/ba0918/command-guardian/releases/tag/v0.3.1). For another release, replace `0.3.1` in the filenames with that release's version. Verify the checksum before extracting:
 
 ```sh
-sha256sum -c command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz.sha256
-tar -xzf command-guardian-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+sha256sum -c command-guardian-v0.3.1-x86_64-unknown-linux-musl.tar.gz.sha256
+tar -xzf command-guardian-v0.3.1-x86_64-unknown-linux-musl.tar.gz
 ```
 
 Install the binary through [the existing mise or source-build route](../README.md#install), or place the extracted `command-guardian` on PATH. Place the extracted `opencode/` directory at a stable, user-owned absolute path. Keep `server.js`, `package.json`, `source/`, and `licenses/` together. The manifest version is generated from Cargo.toml. Update the binary and plugin together. No separate npm publication or runtime dependency installation is required; the JavaScript bundle includes dependencies and license notices.
@@ -104,7 +104,7 @@ Edit the OpenCode V2 global configuration yourself, preserving existing settings
   "shell": "/bin/bash",
   "plugins": [
     {
-      "package": "github:ba0918/command-guardian#v0.3.0::path:plugins/opencode",
+      "package": "github:ba0918/command-guardian#v0.3.1::path:plugins/opencode",
       "options": {
         "serverUrl": "http://127.0.0.1:4097",
         "passwordEnv": "OPENCODE_SERVER_PASSWORD"
