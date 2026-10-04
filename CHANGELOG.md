@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add top-level `--version` and `-V`, which print `command-guardian <version>` and exit 0 without reading configuration or standard input. `--version` after `check` or `hook` is still an argument to that entry point.
+- When explicit OpenCode connection options fail, the plugin now checks the connection again for each command, giving up after 1 second, and uses guardian approval again as soon as the server can be reached. Previously a failure at load time lasted until the plugin was loaded again.
+- When the OpenCode plugin cannot create a guardian approval request and leaves the command to OpenCode's own permissions, it no longer sends a reject reply for that request, so other approval prompts waiting in the same session are not rejected with it.
+
 ## [0.3.0] - 2026-10-04
 
 - **BREAKING** Make the OpenCode V2 plugin work with `opencode run --standalone` and with the managed service disabled, without connection settings. Without a connection it judges the actual shell input, refuses `block`, and leaves commands that would need a guardian approval to OpenCode's own permissions instead of stopping them.
