@@ -137,10 +137,11 @@ The server must find `command-guardian` on PATH. Guardian reads its existing con
 - `block` prevents execution, including with automatic approval enabled.
 - Confirmed shadow mode adds no guardian approval or rejection. Native permissions remain. Shadow-log failures and unsupported shells are warnings.
 - Missing guardian, invalid responses, process timeout, and unsupported shells require approval.
-- If an approval request cannot be created, or no response to its creation arrives, the plugin writes a warning to its standard error and leaves that command to OpenCode's own permissions. A later reply to a leftover guardian confirmation does nothing to that command. The same applies when the approval event stream has already ended before creation.
+- If an approval request cannot be created, or no response to its creation arrives, the plugin writes a warning to its standard error and leaves that command to OpenCode's own permissions. A later reply to a leftover guardian confirmation does nothing to that command. A rejection that arrives before the creation response still stands: the command does not run even if creation then fails. If the approval event stream ends while a request is being created and the creation response then reports a pending approval, the command is cancelled rather than left to OpenCode.
+- If the approval event stream has already ended when a command needs approval, the plugin reconnects the stream and then creates the approval request as usual. If reconnecting fails, it warns and leaves that command to OpenCode's own permissions.
 - Without a connection, including failed explicit options, the rules in [Standalone runs and running without a connection](#standalone-runs-and-running-without-a-connection) apply instead.
 
-Approval waits have no plugin-specific deadline or saved history. A wait starts when the approval request's creation response arrives. Detected cancellation, unload, stream termination, or stream error permanently cancels pending execution. A later approval does not replay it. Silent stalls are not detected immediately. Orphaned approval-display cleanup is best effort, including creation/cancellation races. The plugin does not stop already launched background processes.
+Approval waits have no plugin-specific deadline or saved history. A wait starts when the approval request's creation response arrives. Detected cancellation, unload, stream termination, or stream error permanently cancels pending execution. A later approval or reconnection does not replay it. Silent stalls are not detected immediately. Orphaned approval-display cleanup is best effort, including creation/cancellation races. The plugin does not stop already launched background processes.
 
 ## Verification scope
 
