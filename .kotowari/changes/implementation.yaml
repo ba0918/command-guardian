@@ -6,7 +6,7 @@ entries:
   files:
   - path: plugins/opencode/src/approval.ts
     before: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
-    after: sha256:3d30f3a7066a41abe7f9c57668287262726c3062ba95e28b5a9fc4be8665f32b
+    after: sha256:8efc2ab3e28f23b91db73e70b14fdf6b30b7befa790b219fde033cd2f660aac3
   - path: plugins/opencode/src/connection.ts
     before: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
     after: sha256:5194fbb4d36b417049a7597c88bca457f30ba6466d21316c4163053e1cadb0f9
@@ -24,16 +24,16 @@ entries:
     after: sha256:0c7250ca6efb53674e210f57c983b92c813ddaf42579a564c56f724a7123d46a
   - path: plugins/opencode/tests/unit/approval.test.ts
     before: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
-    after: sha256:a5f522812339f9b01bc654afe96478730fae9b87e08d14bd982b2fa05246b075
+    after: sha256:ae1a00f6f6a52b9bbcddc3fa612ccd6aab8666863f8dfc1e1c7c7947eff6f51b
   - path: plugins/opencode/tests/unit/connection.test.ts
     before: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
     after: sha256:2e07a4e6aaac562b9577261edfdb13c91ec54f60e34482494c5bd6a37b12f61b
   - path: plugins/opencode/tests/unit/setup.test.ts
     before: null
-    after: sha256:5d8b4e8e63421fb76b33cf962d48a1f6ad878c35159f3b03345564d3f4bf6698
+    after: sha256:56d901dc556c7e20504ef50a9a3133b961d1fd4219e94f108a748df259d163fd
   ir:
   - path: docs/ir/opencode-standalone.md
-    sha256: sha256:7b7708ba4210d5badb353ac16f8ae501707570225429e07bc194a9bd994e2479
+    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
   - path: docs/ir/opencode.md
     sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
   - path: docs/ir/opencode-delivery.md
@@ -43,8 +43,9 @@ entries:
     プラグインはOpenCodeの版を照合せず、読み込み時にshell.hook、permission.hook、permission.reply、tool.transform、location.directoryの有無を確かめ、欠けた名前を示して失敗する(REQ-070、EX-144、EX-145)。自動接続は版を照合せずPID、loopback、認証情報、リダイレクト拒否の照合だけで採否する(REQ-052、EX-106〜EX-108)。
     connectの結果を接続済み、未指定で接続なし、明示設定の失敗に分けた。明示設定は読み込み時にserver.infoで接続と認証を確かめ、失敗しても自動接続へ切り替えず、読み込み時と実行ごとにconsole.warnで警告する(REQ-052、REQ-065、EX-089、EX-109、EX-135)。
     接続が無いときはツールの包みで判定せず、create.beforeが受け取る実際のshell、cwd、コマンドで判定し、blockだけを拒否してそれ以外は何も出さずに戻り、OpenCode自身の権限判断に委ねる。起動入力を確定できない場合も委ねる(REQ-065、REQ-066、REQ-047、EX-133、EX-134、EX-136、EX-137、EX-140、EX-141、EX-146)。接続がある場合の経路は変えていない(EX-138)。
-    承認要求の作成が失敗したとき、作成の応答を受け取れなかったとき、作成の前にイベントの通信が止まっていたときはunavailableを返し、呼び出し側が実行ごとに警告して委ねる。承認待ちは作成の応答を受け取った時点から始まり、作成中の通信の終了では取りやめず、応答がaskならその時点で通信の終了を検知して取りやめる。承認待ちの後の通信の終了、中断、解除では従来どおり取りやめる(REQ-067、REQ-053、EX-147〜EX-149)。
-    試験は固定版のホストをserve --stdioとserveで隔離起動し、偽のguardianとbridgeの評価フックで判定の入力、タイムアウト、作成の失敗を作る。既存の試験の期待を変えたのは、明示設定の失敗と作成失敗で止めないというREQ-052の改定に当たるものだけで、承認待ちの切断の単体試験は作成の応答を受け取ってから切断するよう同期だけを直した。
+    承認要求の作成が失敗したとき、作成の応答を受け取れなかったときはunavailableを返し、呼び出し側が実行ごとに警告して委ねる。承認待ちは作成の応答を受け取った時点から始まり、作成中の通信の終了だけでは取りやめない(REQ-067、EX-147、EX-149)。
+    イベントの通信を接続ごとの単位に分け、各承認要求は作成時の接続を持つ。作成中にその接続が切れて応答がaskで届いた場合は、別の接続へつなぎ直した後でも取りやめ、委ねない(A27、EX-150)。作成の応答より前に届いた拒否の返答は覚えておき、その後に作成が失敗しても拒否として扱う(A28、EX-151)。通信が終わった後に承認要求が要る実行が来たときは新しい接続でつなぎ直してから作成し、つなぎ直せなければunavailableを返して委ねる(A29、EX-152、EX-153)。承認待ちの後の通信の終了、中断、解除では従来どおり取りやめ、後の承認や再接続でも再開しない(REQ-053、EX-148)。
+    試験は固定版のホストをserve --stdioとserveで隔離起動し、偽のguardianとbridgeの評価フックで判定の入力、タイムアウト、作成の失敗を作る。基準からの既存の試験の期待の変更は、作成失敗で止めずに委ねるというREQ-052からREQ-067への改定に当たるものだけで、承認待ちの切断の単体試験は作成の応答を受け取ってから切断するよう同期を直し、EX-148の印を足した。単体試験の器具はつなぎ直しごとに新しい通信を作るよう改めた。頼るAPIが無いときの試験(EX-145)は、読み込みの失敗と欠けたAPIの名前を含むことだけを確かめる。
   requirements: [REQ-047, REQ-052, REQ-053, REQ-065, REQ-066, REQ-067, REQ-070]
   decisions:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A16
@@ -56,6 +57,9 @@ entries:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A24
   - docs/decision/records/2026-10-04-opencode-standalone.md#A25
   - docs/decision/records/2026-10-04-opencode-standalone.md#A26
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
   handoff: null
   gaps: []
 - id: opencode-standalone-docs-implementation
@@ -70,10 +74,10 @@ entries:
     after: sha256:546f5d19cd69bc27d5aec8457d4f300e9ad6fc9d0e16f6c7ee777b7d8702d4e5
   - path: docs/opencode.md
     before: sha256:615565e2574d8b70c32593c570612a6eaf810941f4a36d4a12808e00403795b2
-    after: sha256:7aa2831006306ef47ba8cd2a8d3e6ac72fc7f0f84ebba62fa8b60b2f7cd0ff60
+    after: sha256:2353a437e51aab1013906a4aa02b87de1b8830597bd30826d044268c646b269c
   ir:
   - path: docs/ir/opencode-standalone.md
-    sha256: sha256:7b7708ba4210d5badb353ac16f8ae501707570225429e07bc194a9bd994e2479
+    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
   - path: docs/ir/opencode-delivery.md
     sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
   - path: docs/ir/opencode.md
@@ -82,7 +86,8 @@ entries:
   reason: >-
     導入手順からOpenCodeの版を対応の条件とする記述を外し、プラグインが頼るフックと文脈のAPIの一覧、読み込み失敗後の扱いと他のプラグインのevaluateフックによる上書きを保証しないことを書いた。固定版2.0.21は結合試験の環境としてだけ記す(REQ-057、REQ-070)。
     opencode run --standaloneが接続設定なしで動くこと、接続が無いときはblockだけを拒否し、guardianの承認が要る実行にguardianの確認を出さずOpenCode自身の権限判断に委ねること、明示設定の失敗と承認要求の作成失敗では警告して委ねることを新しい節に書き、standaloneに明示の接続設定を求める案内を消した(REQ-068、REQ-065〜REQ-067)。検証の範囲にserve --stdioの結合試験と通し実行をしないことを足した(REQ-058、REQ-069)。
-    既存の見出しは変えず、site/build.pyの生成が成功することを確かめた。CHANGELOGはUnreleasedの節だけに足した。README-ja.mdも同じ内容に改めたが、変更照合の対象の外である。
+    承認の振る舞いの節に、作成の応答より前に届いた拒否は作成が失敗しても守ること、作成中に通信が切れた後に応答が承認待ちを示せば取りやめること、通信が終わった後はつなぎ直してから承認要求を作り、つなぎ直せなければ警告して委ねること、再接続でも取りやめた実行を再開しないことを書いた(REQ-067、REQ-053、A27〜A29)。
+    既存の見出しは変えず、site/build.pyの生成が成功することを確かめた。CHANGELOGはUnreleasedの節だけに足した。README-ja.mdも同じ内容に改めた。README-ja.mdと紹介ページsite/template.html(A30で版ではなくプラグインAPIを対応条件とする記述に改めた)は変更照合の対象の外である。
   requirements: [REQ-057, REQ-058, REQ-065, REQ-066, REQ-067, REQ-068, REQ-069, REQ-070]
   decisions:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A9
@@ -93,5 +98,9 @@ entries:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A22
   - docs/decision/records/2026-10-04-opencode-standalone.md#A23
   - docs/decision/records/2026-10-04-opencode-standalone.md#A25
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A30
   handoff: null
   gaps: []
