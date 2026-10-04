@@ -7,12 +7,12 @@
 ### REQ-065: 接続が無いときの判定
 
 - kind: state_driven
-- source: docs/decision/records/2026-10-04-opencode-standalone.md#A19, docs/decision/records/2026-10-04-opencode-standalone.md#A2, docs/decision/records/2026-10-04-opencode-standalone.md#A4, docs/decision/records/2026-10-04-opencode-standalone.md#A13, docs/decision/records/2026-10-04-opencode-standalone.md#A22, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+- source: docs/decision/records/2026-10-04-opencode-standalone.md#A19, docs/decision/records/2026-10-04-opencode-standalone.md#A2, docs/decision/records/2026-10-04-opencode-standalone.md#A4, docs/decision/records/2026-10-04-opencode-standalone.md#A13, docs/decision/records/2026-10-04-opencode-standalone.md#A22, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-version-and-followups.md#A5
 - verification: unit
 
 プラグインが自身をホストするサーバーへ接続できないとき、プラグインは登録に書かれた宛先へ通信せず、shell の "create.before" フックが受け取る実際の shell、cwd、コマンドを guardian の判定へ渡す。shell を "/unknown-shell" として判定しない。判定が allow なら guardian 由来の確認も拒否も出さず OpenCode 自身の権限判断に委ね、block なら拒否する。本体の応答で影実行と確定できた場合は opencode.md の REQ-048 を優先し、guardian 由来の確認も拒否も出さない。
 
-接続オプションを明示したが設定が不完全か、接続や認証に失敗したときは、管理サービスの自動接続へ切り替えず、設定の誤りをプラグインの標準エラーへの警告で、読み込み時に1回と実行ごとに1回示したうえでこの要求に従う。
+接続オプションを明示したが設定が不完全か、接続や認証に失敗したときは、管理サービスの自動接続へ切り替えず、設定の誤りをプラグインの標準エラーへの警告で、読み込み時に1回と実行ごとに1回示したうえでこの要求に従う。この状態では実行のたびに接続を1秒で打ち切って確かめ直し、つながればその実行から opencode.md の REQ-050 から REQ-052 の承認の経路を使う。
 
 ### REQ-066: 接続が無いときの承認が要る実行
 
@@ -27,10 +27,10 @@ REQ-065 の状態で、判定が ask の実行、判定結果を取得できな�
 ### REQ-067: 承認要求を作れないとき
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-04-opencode-standalone.md#A27, docs/decision/records/2026-10-04-opencode-standalone.md#A28, docs/decision/records/2026-10-04-opencode-standalone.md#A29
+- source: docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A25, docs/decision/records/2026-10-04-opencode-standalone.md#A27, docs/decision/records/2026-10-04-opencode-standalone.md#A28, docs/decision/records/2026-10-04-opencode-standalone.md#A29, docs/decision/records/2026-10-04-version-and-followups.md#A6
 - verification: unit
 
-接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。ただし、作成の応答より前に利用者の拒否の返答が届いていた場合は、作成が失敗しても実行しない。作成中にイベントの通信が切れ、その後に作成の応答が ask で届いた場合は、その実行を取りやめ、OpenCode に委ねない。イベントの通信が終わった後に承認要求が要る実行が来たときは、通信をつなぎ直してから承認要求を作り、つなぎ直せなければ承認要求を作れなかったものとして扱う。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
+接続がある状態で、判定が ask の実行、判定結果を取得できない実行（REQ-051）、Bash 以外の shell の実行（REQ-055）、判定と起動の一致を確かめられない実行（REQ-047）の承認要求を作れなかったとき、プラグインはそのたびにプラグインの標準エラーへ警告を出し、その実行を OpenCode 自身の権限判断に委ねる。作成の応答を受け取れなかった場合（失敗した場合と、成功したか分からない場合）も作れなかったものとして扱う。作れなかったものとして扱う要求には、拒否の返答を送らない。承認待ちは作成の応答を受け取った時点から始まる。作れなかったものとして扱った実行について、残った guardian の確認にあとから返答があっても、その実行には何もしない。ただし、作成の応答より前に利用者の拒否の返答が届いていた場合は、作成が失敗しても実行しない。作成中にイベントの通信が切れ、その後に作成の応答が ask で届いた場合は、その実行を取りやめ、OpenCode に委ねない。イベントの通信が終わった後に承認要求が要る実行が来たときは、通信をつなぎ直してから承認要求を作り、つなぎ直せなければ承認要求を作れなかったものとして扱う。警告が画面に表示されるかは保証しない。承認待ちの途中で通信の終了やエラーを検知した実行は、opencode.md の REQ-053 のとおり取りやめ、後の承認や再接続でも再開しない。
 
 ### REQ-068: 接続が無いときの対応条件の説明
 
@@ -154,10 +154,24 @@ Scenario: 通信が終わった後の ask では通信をつなぎ直して承�
   When エージェントが ask になるコマンドを実行する
   Then 通信をつなぎ直し、guardian の承認要求が出て、返答があるまで起動しない
 
-@id=EX-153 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A29,docs/decision/records/2026-10-04-opencode-standalone.md#A25
+@id=EX-153 @about=REQ-067 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A29,docs/decision/records/2026-10-04-opencode-standalone.md#A25,docs/decision/records/2026-10-04-version-and-followups.md#A7
 Scenario: 通信をつなぎ直せなければ警告して OpenCode に委ねる
   Given プラグインが自身の管理サービスへ接続し、イベントの通信が一度終わっている
   And 通信をつなぎ直せない
   When エージェントが ask になるコマンドを実行する
   Then ホストの標準エラーに警告が出て、OpenCode 自身の権限判断で実行の可否が決まる
+
+@id=EX-156 @about=REQ-065 @source=docs/decision/records/2026-10-04-version-and-followups.md#A5
+Scenario: 明示した接続の失敗の後でつながれば通常の承認の経路に戻る
+  Given 接続オプションを明示し、読み込み時の確認では接続に失敗した
+  And その後、明示した接続先へつながるようになった
+  When エージェントが ask になるコマンドを実行する
+  Then 接続を確かめ直して guardian の承認要求が出て、返答があるまで起動しない
+
+@id=EX-157 @about=REQ-067 @source=docs/decision/records/2026-10-04-version-and-followups.md#A6
+Scenario: 作れなかった承認要求には拒否の返答を送らない
+  Given プラグインが自身の管理サービスへ接続している
+  And 承認要求の作成が失敗する
+  When エージェントが ask になるコマンドを実行する
+  Then その要求への拒否の返答は送られず、同じセッションの他の承認待ちは返答を待ち続ける
 ```
