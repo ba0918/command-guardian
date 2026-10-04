@@ -76,11 +76,19 @@ command-guardian は、git のコマンドを、対象のパスが git の作業
 ### REQ-045: 入口に応じたヘルプの内容
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-02-cli-language-help.md#A3, docs/decision/records/2026-10-02-cli-language-help.md#A6, docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19
+- source: docs/decision/records/2026-10-02-cli-language-help.md#A3, docs/decision/records/2026-10-02-cli-language-help.md#A6, docs/decision/records/2026-09-30-hook-guardian-scope.md#A19, docs/decision/records/2026-09-30-hook-guardian-scope.md#A27, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-04-version-and-followups.md#A3
 - verification: review
 - how_to_verify: トップレベル、check、hook のヘルプを読み、用途、呼出し方、引数、オプション、使用例、終了コードが英語で説明され、各入口の契約と一致することを確かめる。check の cwd 省略時と format の既定の説明は実装と照合し、hook の終了コードを check の判定別終了コードと混同していないことを確かめる
 
-ヘルプは、各入口に応じた用途、呼出し方、引数、オプション、使用例、終了コードを英語で示す。トップレベルでは "check" と "hook" の入口を案内する。"check" では判定するコマンド文字列、作業ディレクトリを指定する "--cwd"（省略時は現在の作業ディレクトリ）、出力形式を指定する "--format text|json"（既定は "text"）、判定別の終了コード 0、1、2 と判定を出せない失敗の 3 を説明する。"hook" では標準入力でフックの入力を受けること、"--agent claude|codex|opencode"、プロトコル上の終了コードは常に 0 であることを説明する。各入口で "--help" と "-h" を案内する。
+ヘルプは、各入口に応じた用途、呼出し方、引数、オプション、使用例、終了コードを英語で示す。トップレベルでは "check" と "hook" の入口と、版を表示する "--version" と "-V" を案内する。"check" では判定するコマンド文字列、作業ディレクトリを指定する "--cwd"（省略時は現在の作業ディレクトリ）、出力形式を指定する "--format text|json"（既定は "text"）、判定別の終了コード 0、1、2 と判定を出せない失敗の 3 を説明する。"hook" では標準入力でフックの入力を受けること、"--agent claude|codex|opencode"、プロトコル上の終了コードは常に 0 であることを説明する。各入口で "--help" と "-h" を案内する。
+
+### REQ-071: 版の表示
+
+- kind: event_driven
+- source: docs/decision/records/2026-10-04-version-and-followups.md#A1, docs/decision/records/2026-10-04-version-and-followups.md#A2
+- verification: unit
+
+トップレベルで "--version" または "-V" が指定されたとき、command-guardian は、標準出力へ "command-guardian <版>" の1行を出し、終了コード 0 で終わる。版は Cargo.toml の "[package].version" と同じ値である。版の表示では、設定読込と標準入力の読取を行わない。"check" や "hook" の後ろの "--version" は版の表示として扱わない。
 
 ## Examples
 
@@ -201,4 +209,14 @@ Scenario: 非UTF-8のcwdを入力として受理する
 Scenario: 非UTF-8の本文とformatを拒否する
   When 本文またはformatに非UTF-8のバイトをcheckへ渡す
   Then 終了コードは3になる
+
+@id=EX-154 @about=REQ-071 @source=docs/decision/records/2026-10-04-version-and-followups.md#A1
+Scenario: 版を表示する
+  When "command-guardian --version" と "command-guardian -V" を実行する
+  Then どちらも標準出力に "command-guardian " と Cargo.toml の版を並べた1行が出て、終了コード 0 で終わる
+
+@id=EX-155 @about=REQ-071 @source=docs/decision/records/2026-10-04-version-and-followups.md#A2
+Scenario: サブコマンドの後ろの --version は版の表示にしない
+  When "command-guardian hook --version" を実行する
+  Then 版の1行は出ず、"hook" の入口として扱われる
 ```
