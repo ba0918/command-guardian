@@ -58,7 +58,7 @@ Without a connection, the plugin judges each command in the shell's `create.befo
 - Commands that would need a guardian approval — `ask`, a missing guardian or an invalid response or timeout, a shell other than Bash, or input that cannot be matched to what will start — get no guardian confirmation. They are left to OpenCode's own permissions: OpenCode's rules allow them, ask through OpenCode's own shell confirmation, or deny them. The plugin does not stop them because it lacks an approval route.
 - Confirmed shadow mode still adds no guardian refusal.
 
-If connection options are set but incomplete, or the connection or authentication fails, the plugin does not switch to automatic connection. It writes a warning to its standard error once when it loads and once per command, then behaves as without a connection. OpenCode keeps that output in its log; whether it is shown on screen is not guaranteed.
+If connection options are set but incomplete, or the connection or authentication fails, the plugin does not switch to automatic connection. It writes a warning to its standard error once when it loads and once per command. While the connection is failing, the plugin checks it again for each command, giving up after 1 second, and handles that command as without a connection if the check fails. Once the server can be reached, it uses guardian approval from that command on, as with a working connection. OpenCode keeps that output in its log; whether it is shown on screen is not guaranteed.
 
 ## Install with mise and a GitHub package
 
