@@ -38,8 +38,9 @@ entries:
     sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
   - path: docs/ir/opencode-delivery.md
     sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
-  conclusion: existing
+  conclusion: new
   reason: >-
+    比較基準の時点ではREQ-065〜REQ-070とdocs/ir/opencode-standalone.mdは無く、REQ-052は接続・認証・承認要求の作成の失敗で実行を止め、自動接続で版2.0.21だけを受け入れると定めていた。この範囲で決定A16〜A29を採ってIRを追加・改訂したため、基準から見て既存の要求の内側ではなく新しい選択である。基準のREQ-052と版の照合を覆す選択(A16、A17、A21〜A24、A29)と、基準が定めていなかった読み込み時のAPI確認、警告の出し先、作成と切断の重なり(A20、A25〜A28)を仕様の欠落として記録した。
     プラグインはOpenCodeの版を照合せず、読み込み時にshell.hook、permission.hook、permission.reply、tool.transform、location.directoryの有無を確かめ、欠けた名前を示して失敗する(REQ-070、EX-144、EX-145)。自動接続は版を照合せずPID、loopback、認証情報、リダイレクト拒否の照合だけで採否する(REQ-052、EX-106〜EX-108)。
     connectの結果を接続済み、未指定で接続なし、明示設定の失敗に分けた。明示設定は読み込み時にserver.infoで接続と認証を確かめ、失敗しても自動接続へ切り替えず、読み込み時と実行ごとにconsole.warnで警告する(REQ-052、REQ-065、EX-089、EX-109、EX-135)。
     接続が無いときはツールの包みで判定せず、create.beforeが受け取る実際のshell、cwd、コマンドで判定し、blockだけを拒否してそれ以外は何も出さずに戻り、OpenCode自身の権限判断に委ねる。起動入力を確定できない場合も委ねる(REQ-065、REQ-066、REQ-047、EX-133、EX-134、EX-136、EX-137、EX-140、EX-141、EX-146)。接続がある場合の経路は変えていない(EX-138)。
@@ -61,7 +62,31 @@ entries:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A28
   - docs/decision/records/2026-10-04-opencode-standalone.md#A29
   handoff: null
-  gaps: []
+  gaps:
+  - category: spec_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A16
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A17
+  - category: spec_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A24
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A25
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A26
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A28
 - id: opencode-standalone-docs-implementation
   base: 46bf07490feb15418df6e0ae69a3b50922ef39ea
   role: implementer
@@ -82,8 +107,9 @@ entries:
     sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
   - path: docs/ir/opencode.md
     sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
-  conclusion: existing
+  conclusion: new
   reason: >-
+    比較基準の文書はstandalone、リモート、明示起動のサーバーに接続オプションを求め、自身の管理サービスの版2.0.21を確かめられなければ実行しないと案内していた。この前提を決定A9、A18、A19、A30で改め、基準の仕様と食い違う委任の扱い(A21〜A23)と、基準に無かったAPI確認と作成・切断の重なりの扱い(A20、A27〜A29)を記録したため、結論を新しい選択とする。
     導入手順からOpenCodeの版を対応の条件とする記述を外し、プラグインが頼るフックと文脈のAPIの一覧、読み込み失敗後の扱いと他のプラグインのevaluateフックによる上書きを保証しないことを書いた。固定版2.0.21は結合試験の環境としてだけ記す(REQ-057、REQ-070)。
     opencode run --standaloneが接続設定なしで動くこと、接続が無いときはblockだけを拒否し、guardianの承認が要る実行にguardianの確認を出さずOpenCode自身の権限判断に委ねること、明示設定の失敗と承認要求の作成失敗では警告して委ねることを新しい節に書き、standaloneに明示の接続設定を求める案内を消した(REQ-068、REQ-065〜REQ-067)。検証の範囲にserve --stdioの結合試験と通し実行をしないことを足した(REQ-058、REQ-069)。
     承認の振る舞いの節に、作成の応答より前に届いた拒否は作成が失敗しても守ること、作成中に通信が切れた後に応答が承認待ちを示せば取りやめること、通信が終わった後はつなぎ直してから承認要求を作り、つなぎ直せなければ警告して委ねること、再接続でも取りやめた実行を再開しないことを書いた(REQ-067、REQ-053、A27〜A29)。
@@ -103,4 +129,27 @@ entries:
   - docs/decision/records/2026-10-04-opencode-standalone.md#A29
   - docs/decision/records/2026-10-04-opencode-standalone.md#A30
   handoff: null
-  gaps: []
+  gaps:
+  - category: premise_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A9
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A19
+  - category: premise_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A18
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A30
+  - category: spec_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A29
