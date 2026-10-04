@@ -7,12 +7,13 @@ OpenCode V2 のエージェントによる shell 実行へ guardian の判定を
 ### REQ-047: 対象となる実行
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#A24
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#A24, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
 OpenCode のエージェントが "shell" ツールを呼ぶとき、プラグインはその入力を既存の guardian の判定へ渡す。通常実行、バックグラウンド実行、Code Mode 経由の実行、およびコマンドを付けないリダイレクトによる切り詰めを含める。人が OpenCode から直接実行する shell と、MCP ツール内部の実行は連携の対象にしない。
 
 対応条件内で、guardian が判定するコマンド本文・cwd・shellと、承認対象および起動入力を一致させ、その実行への対応を承認待ちの間も保持する。省略・相対cwdと、同じ本文でcwdが違う並行実行も検証する。一致を確認できない場合は判定不能として承認を求める。影実行と確定済みの場合は REQ-048 を優先する。他のhookによる変更と、承認待ち中のファイル状態変化はこの一致の保証に含めない。
+接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
 
 ### REQ-048: 共通設定と影実行
 
@@ -28,40 +29,40 @@ Rust 本体の "hook --agent opencode" は既存の guardian の設定・影実�
 ### REQ-049: 権限判断を弱めない合成
 
 - kind: invariant
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A4, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A4, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
-影実行と確定済みの場合は REQ-048 を優先し、以下のguardian判定の強制は行わない。
+影実行と確定済みの場合は REQ-048 を優先し、以下のguardian判定の強制は行わない。接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
 
 プラグインは OpenCode の権限判断と guardian の判定の厳しいほうを採用する。OpenCode の拒否・確認を guardian の `allow` で緩和しない。OpenCode が許可していても、guardian の `ask` は承認要求を出し、`block` は実行を拒否する。`block` は "run --auto" でも拒否する。
 
 ### REQ-050: 実行ごとの承認
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A5, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A16, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A5, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A16, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
-影実行と確定済みの場合は REQ-048 を優先し、以下のguardian由来の承認要求は出さない。
+影実行と確定済みの場合は REQ-048 を優先し、以下のguardian由来の承認要求は出さない。接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
 
 guardian が `ask` と判定した実行では、その実行の承認要求を OpenCode の承認フローへ渡し、`OpenCode承認`を得る前に対象コマンドを実行しない。OpenCode の保存済み許可でこの要求を省略しない。"run --auto" による自動承認は有効な承認として扱い、人の確認を追加で強制しない。要求が拒否された場合は対象コマンドを実行せず、同じセッションの他の保留要求も拒否する OpenCode の標準挙動に従う。
 
 ### REQ-051: 判定結果を取得できない場合
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
-バイナリ未検出、タイムアウト、無効な応答により guardian の判定結果を取得できず、影実行か確定できない場合、プラグインは判定できなかった理由を示して OpenCode の承認フローに渡す。連携異常だけで危険と断定して `block` にせず、承認なしで実行もしない。承認の意味は REQ-050 に従う。
+バイナリ未検出、タイムアウト、無効な応答により guardian の判定結果を取得できず、影実行か確定できない場合、プラグインは判定できなかった理由を示して OpenCode の承認フローに渡す。連携異常だけで危険と断定して `block` にせず、承認なしで実行もしない。承認の意味は REQ-050 に従う。接続が無い場合や承認要求を作れない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
 
 ### REQ-052: 承認経路を利用できない場合
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15, docs/decision/records/2026-10-04-opencode-standalone.md#A3, docs/decision/records/2026-10-04-opencode-standalone.md#A13, docs/decision/records/2026-10-04-opencode-standalone.md#A17
+- source: docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A15, docs/decision/records/2026-10-04-opencode-standalone.md#A13, docs/decision/records/2026-10-04-opencode-standalone.md#A17, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A22, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
-プラグインは自身をホストする同一 OpenCode HTTP サーバーで承認要求を作る。接続オプションが未指定なら管理サービスの登録情報を一度だけ読み、通信前に登録PIDが自身の実行プロセスと一致し、URLと非空の認証情報が文字列であり、URLがloopback HTTPであることを確認する。検証済みのURLと認証情報を固定したSDK接続でサーバー情報を取得し、応答PIDが自身と一致する場合だけ採用し、相手の版は照合しない。自動接続ではHTTPリダイレクトを拒否し、別サービスを起動しない。接続オプションを一つでも指定した場合は明示設定を使い、不完全な設定や認証失敗から自動探索へ切り替えない。接続オプションを指定した場合の接続・認証の失敗では対象コマンドを実行せず、失敗の理由を返す。これは guardian が危険と判定した `block` と区別し、警告だけで実行を継続しない。
+プラグインは自身をホストする同一 OpenCode HTTP サーバーで承認要求を作る。接続オプションが未指定なら管理サービスの登録情報を一度だけ読み、通信前に登録PIDが自身の実行プロセスと一致し、URLと非空の認証情報が文字列であり、URLがloopback HTTPであることを確認する。検証済みのURLと認証情報を固定したSDK接続でサーバー情報を取得し、応答PIDが自身と一致する場合だけ採用し、相手の版は照合しない。自動接続ではHTTPリダイレクトを拒否し、別サービスを起動しない。接続オプションを一つでも指定した場合は明示設定を使い、不完全な設定や認証失敗から自動探索へ切り替えない。接続オプションを指定した場合の不完全な設定や接続・認証の失敗と、接続がある状態で承認要求を作れない場合は、opencode-standalone.md の REQ-065 から REQ-067 に従い、警告を出してプラグインの都合で実行を止めない（block は拒否する）。
 
-接続オプションが未指定で、登録が無いか登録の検証に失敗して自身の管理サービスへ接続できない場合は、opencode-standalone.md の REQ-065 から REQ-067 に従い、登録に書かれた宛先へは通信しない。
+接続オプションが未指定で、登録が無いか登録の検証に失敗して自身の管理サービスへ接続できない場合は、opencode-standalone.md の REQ-065 と REQ-066 に従い、登録に書かれた宛先へは通信しない。
 
 ### REQ-053: 承認待ちの寿命
 
@@ -84,10 +85,11 @@ guardian が `ask` と判定した実行では、その実行の承認要求を 
 ### REQ-055: 対応外の shell
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
 - verification: unit
 
 Bash 以外の shell では安全に判定できたと見なさず、対象外である理由を示して OpenCode の承認フローに渡す。影実行と確定済みの場合は REQ-048 を優先する。Bash を明示設定し、他の hook が実行コマンド・cwd・shell を変更しないという対応条件は REQ-057 に従う。
+接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
 
 ## Examples
 
@@ -118,12 +120,12 @@ Scenario: 検証済みの自動接続先を固定する
   When 登録情報が差し替えられるかサーバーがHTTPリダイレクトを返す
   Then 登録差替えやリダイレクトにより別の宛先へ接続しない
 
-@id=EX-109 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A2
+@id=EX-109 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A2,docs/decision/records/2026-10-04-opencode-standalone.md#A22
 Scenario: 不完全な明示設定や認証失敗を自動接続で隠さない
   Given 自身の管理サービスへ自動接続できる環境である
   And 明示した接続オプションが不完全か認証に失敗する
   When shellツールを実行する
-  Then 自動接続へ切り替えず対象コマンドを実行しない
+  Then 自動接続へ切り替えず、設定の誤りを警告し、接続が無いときの扱いで判定と委任を行う
 ```
 
 ```gherkin
@@ -197,11 +199,11 @@ Scenario: 明示した同一サーバーで承認要求を作る
   When 承認要求を作る
   Then その接続と認証を使う
 
-@id=EX-089 @about=REQ-052 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A15,docs/decision/records/2026-10-04-opencode-standalone.md#A13
-Scenario: 承認要求を作れなければ実行しない
+@id=EX-089 @about=REQ-052 @source=docs/decision/records/2026-10-04-opencode-standalone.md#A22
+Scenario: 明示した接続の認証に失敗しても止めずに警告する
   Given 明示した接続設定でHTTPサーバーへの認証に失敗する
-  When 承認要求を作ろうとする
-  Then 対象コマンドを実行せず認証失敗の理由を返す
+  When エージェントがshell実行を要求する
+  Then 認証失敗を警告し、接続が無いときの扱いで判定と委任を行う
 
 @id=EX-090 @about=REQ-053 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A14
 Scenario: 独自期限で承認待ちを打ち切らない
