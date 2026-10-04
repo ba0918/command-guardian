@@ -30,6 +30,8 @@ jobs:
       - run: cargo build --release --locked
       - name: Build the landing page from the current repository
         run: python3 site/build.py --binary target/release/command-guardian --out _site
+      - name: Check the landing page
+        run: python3 site/check.py --out _site
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:

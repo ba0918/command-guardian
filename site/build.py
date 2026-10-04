@@ -399,6 +399,7 @@ def build(binary: Path, out: Path) -> None:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     (out / "index.html").write_text(page)
+    shutil.copy(SITE / "language-preference.js", out / "language-preference.js")
     shutil.copy(SITE / "style.css", out / "style.css")
     shutil.copy(SITE / "favicon.svg", out / "favicon.svg")
     (out / ".nojekyll").write_text("")

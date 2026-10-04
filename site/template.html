@@ -10,13 +10,10 @@
 <meta property="og:type" content="website">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<script src="language-preference.js"></script>
 <script>
   (function () {
-    var lang = null;
-    try { lang = localStorage.getItem("cg-lang"); } catch (e) {}
-    if (lang !== "en" && lang !== "ja") {
-      lang = /^ja\b/i.test(navigator.language || "") ? "ja" : "en";
-    }
+    var lang = siteLanguage.read('cg-lang');
     document.documentElement.dataset.lang = lang;
     document.documentElement.lang = lang;
   })();
@@ -349,7 +346,7 @@ mode = "observe"  <span class="comment"># "off" (default), "observe" or "enforce
       root.dataset.lang = next;
       root.lang = next;
       localize();
-      try { localStorage.setItem("cg-lang", next); } catch (e) {}
+      siteLanguage.save(next);
     });
     document.querySelectorAll("button.copy").forEach(function (button) {
       button.addEventListener("click", function () {
