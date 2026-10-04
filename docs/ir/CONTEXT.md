@@ -4,6 +4,7 @@
 |---|---|---|
 | allow | 判定の 1 つ。ガードは口を出さず、コマンドを止めない | docs/decision/records/2026-09-30-hook-guardian-scope.md#A3 |
 | ask | 判定の 1 つ。利用者に確認を求める。Codex にはこの出口がない。OpenCodeではホストの承認フローに渡し、明示的な自動承認も尊重する。OpenCodeで接続や承認の経路が使えないときは OpenCode 自身の権限判断に委ねる | docs/decision/records/2026-09-30-hook-guardian-scope.md#A3, docs/decision/records/2026-09-30-hook-guardian-scope.md#A24, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23 |
+| ask委任 | 利用者設定の "mode.defer_ask" が有効なとき、フックで最終判定が ask のものを返さず、エージェント本来の権限判断に委ねること。guardian が allow を出したことにはならない | docs/decision/records/2026-10-04-auto-allow-ask.md#A1, docs/decision/records/2026-10-04-auto-allow-ask.md#A2, docs/decision/records/2026-10-04-auto-allow-ask.md#A3, docs/decision/records/2026-10-04-auto-allow-ask.md#A4 |
 | OpenCode承認 | OpenCodeの承認要求に対する許可。対話での許可と明示的なrun --autoによる自動承認を含み、人がその場で承認したことだけを意味しない | docs/decision/records/2026-10-02-opencode-v2-hook.md#A7 |
 | block | 判定の 1 つ。コマンドを止め、エージェントに理由と代替を返す | docs/decision/records/2026-09-30-hook-guardian-scope.md#A3, docs/decision/records/2026-09-30-hook-guardian-scope.md#A26, docs/decision/records/2026-09-30-hook-guardian-scope.md#A28 |
 | ephemeral | パスの分類の 1 つ。一時領域の中にあるか、コマンド自身が作ったパス。消えると戻せないものは無い | docs/decision/records/2026-09-30-hook-guardian-scope.md#A7, docs/decision/records/2026-09-30-hook-guardian-scope.md#A17 |

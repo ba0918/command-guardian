@@ -7,32 +7,35 @@
 ### REQ-013: 設定のファイルと層
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18, docs/decision/records/2026-10-01-rename.md#A1, docs/decision/records/2026-10-03-llm-advice-layer.md#A18
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18, docs/decision/records/2026-10-01-rename.md#A1, docs/decision/records/2026-10-03-llm-advice-layer.md#A18, docs/decision/records/2026-10-04-auto-allow-ask.md#A3
 - verification: unit
 
 command-guardian は、利用者の設定を "XDG_CONFIG_HOME" が指すディレクトリの "command-guardian/config.toml"（"XDG_CONFIG_HOME" が無いときは "~/.config/command-guardian/config.toml"）から、プロジェクトの設定を作業中のディレクトリから上へ探して最初に見つかった ".command-guardian.toml" から読む。マージは組み込み、利用者、プロジェクトの順に行い、リストは足し合わせ、それ以外は後のものが勝つ。
 
 助言の"advisor"節だけはadvisor/provider.mdの利用者限定規則に従い、プロジェクト層のマージ対象にしない。
+"mode.defer_ask" も defer-ask.md の REQ-059 に従い、プロジェクト層のマージ対象にしない。
 
 ### REQ-014: プロジェクト設定の信頼
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A20, docs/decision/records/2026-10-03-llm-advice-layer.md#A18, docs/decision/records/2026-10-03-llm-advice-layer.md#A46
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A20, docs/decision/records/2026-10-03-llm-advice-layer.md#A18, docs/decision/records/2026-10-03-llm-advice-layer.md#A46, docs/decision/records/2026-10-04-auto-allow-ask.md#A3
 - verification: unit
 
 プロジェクトの設定は、既定では判定を厳しくする変更だけを反映する。反映するのは、保護ルートの追加、`unknown` の判定の `block` への変更、`ask` か `block` を返すパターンの追加であり、許可ルートの追加、ルールの無効化、判定を緩める変更は無視して警告を出す。利用者設定の "trusted_projects" にリポジトリのパスがあるときだけ、すべてを反映する。
 
 助言の"advisor"節は例外であり、信頼済みプロジェクトでも全キーを無視して警告する。
+"mode.defer_ask" も同じく、信頼済みプロジェクトでも無視して警告する。
 
 ### REQ-015: 壊れた設定
 
 - kind: event_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-09-30-hook-guardian-scope.md#A45, docs/decision/records/2026-10-02-ir-friction-contracts.md#A1, docs/decision/records/2026-10-03-llm-advice-layer.md#A46, docs/decision/records/2026-10-03-llm-advice-layer.md#A60
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A5, docs/decision/records/2026-09-30-hook-guardian-scope.md#A45, docs/decision/records/2026-10-02-ir-friction-contracts.md#A1, docs/decision/records/2026-10-03-llm-advice-layer.md#A46, docs/decision/records/2026-10-03-llm-advice-layer.md#A60, docs/decision/records/2026-10-04-auto-allow-ask.md#A15
 - verification: unit
 
 設定が読めない、TOML構文が壊れている、または一般設定の型・値が誤っているとき、command-guardian は、その設定ファイル全体を不採用にして警告を出す。組み込みの既定と他の正常な設定層で判定を続け、壊れたファイルの正常部分は残さない。個々のguard規則の誤りはREQ-034の規則単位無効化を使う。commandsセクションやguard一覧自体の型の誤りは一般設定の誤りとして扱う。
 
 プロジェクトの"advisor"要素はTOML構文解析後、助言固有の検証前に除去するため、その無視する型や値の不正で他の正常な保護規則を不採用にしない。
+プロジェクトの"mode.defer_ask"も一般設定の検証前に除去し、同じく他の正常な保護規則を不採用にしない。
 TOML構文エラーと読取失敗、実際に適用する一般設定の不正はこの例外に含めず、利用者ファイルのadvisorは検証対象とする。
 
 ### REQ-026: ルールの意味論
@@ -47,7 +50,7 @@ command-guardian のルールは、名前を持つ判定の単位である。組
 
 ### TBL-001: 設定のキー
 
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A4, docs/decision/records/2026-09-30-hook-guardian-scope.md#A9, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18, docs/decision/records/2026-09-30-hook-guardian-scope.md#A20, docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-09-30-hook-guardian-scope.md#A31, docs/decision/records/2026-09-30-hook-guardian-scope.md#A32, docs/decision/records/2026-09-30-hook-guardian-scope.md#A42, docs/decision/records/2026-09-30-hook-guardian-scope.md#A47
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A4, docs/decision/records/2026-09-30-hook-guardian-scope.md#A9, docs/decision/records/2026-09-30-hook-guardian-scope.md#A18, docs/decision/records/2026-09-30-hook-guardian-scope.md#A20, docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-09-30-hook-guardian-scope.md#A31, docs/decision/records/2026-09-30-hook-guardian-scope.md#A32, docs/decision/records/2026-09-30-hook-guardian-scope.md#A42, docs/decision/records/2026-09-30-hook-guardian-scope.md#A47, docs/decision/records/2026-10-04-auto-allow-ask.md#A3, docs/decision/records/2026-10-04-auto-allow-ask.md#A1, docs/decision/records/2026-10-04-auto-allow-ask.md#A13
 
 | キー | 既定 | 意味 |
 |---|---|---|
@@ -59,6 +62,7 @@ command-guardian のルールは、名前を持つ判定の単位である。組
 | "commands.guard" | 空 | プログラムごとの使い方を止める規則の一覧（guards.md） |
 | "git.enabled" | true | git による分類を使うかどうか |
 | "mode.enforce" | true | 判定を返すか、影実行でログだけ残すか |
+| "mode.defer_ask" | false | フックで ask を返さずエージェントの権限判断に委ねるか（利用者設定のみ。推奨しない） |
 | "trusted_projects" | 空 | プロジェクト設定をすべて反映するリポジトリのパス |
 
 ## Examples

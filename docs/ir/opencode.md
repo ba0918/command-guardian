@@ -18,31 +18,34 @@ OpenCode のエージェントが "shell" ツールを呼ぶとき、プラグ�
 ### REQ-048: 共通設定と影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#D1, docs/decision/records/2026-10-03-llm-advice-layer.md#A45
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A6, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-02-opencode-v2-hook.md#D1, docs/decision/records/2026-10-03-llm-advice-layer.md#A45, docs/decision/records/2026-10-04-auto-allow-ask.md#A5, docs/decision/records/2026-10-04-auto-allow-ask.md#A6
 - verification: unit
 
-Rust 本体の "hook --agent opencode" は既存の guardian の設定・影実行・ログを使い、プラグインはこれらの設定を別に読み直さない。本体の応答で "mode.enforce" が false の影実行と確定できた場合だけ、guardian 由来の確認・拒否を出さず、OpenCode 本来の権限判断を維持する。確定済みの影実行では、影ログ保存失敗と対応外shellは警告にとどめる。ログは影実行時だけ記録する。OpenCode 用の応答は判定の無い影実行と判定不能を区別する。影実行か確定できない応答失敗は REQ-051 に従う。JSON の具体的なキーは委譲範囲内で実装担当が契約として記録する。"check" と Claude Code・Codex の既存 hook 契約は変更しない。
+Rust 本体の "hook --agent opencode" は既存の guardian の設定・影実行・ログを使い、プラグインはこれらの設定を別に読み直さない。本体の応答で "mode.enforce" が false の影実行と確定できた場合だけ（REQ-061 の委任の応答を除く）、guardian 由来の確認・拒否を出さず、OpenCode 本来の権限判断を維持する。確定済みの影実行では、影ログ保存失敗と対応外shellは警告にとどめる。ログは影実行時だけ記録する。OpenCode 用の応答は判定の無い影実行と判定不能を区別する。影実行か確定できない応答失敗は REQ-051 に従う。JSON の具体的なキーは委譲範囲内で実装担当が契約として記録する。"check" と Claude Code・Codex の既存 hook 契約は変更しない。
 
 ここでのログは影ログを指す。
 助言のメタデータログはadvisor/context.mdに従う別の保存であり、プラグインによる設定の再読込を追加しない。
+`ask委任` の記録は影実行時に限らず、REQ-062 に従う。
 
 ### REQ-049: 権限判断を弱めない合成
 
 - kind: invariant
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A4, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A4, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-auto-allow-ask.md#A5
 - verification: unit
 
 影実行と確定済みの場合は REQ-048 を優先し、以下のguardian判定の強制は行わない。接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
+`ask委任` の応答を受けた場合は REQ-061 を優先し、guardian の `ask` による承認要求は出さない。
 
 プラグインは OpenCode の権限判断と guardian の判定の厳しいほうを採用する。OpenCode の拒否・確認を guardian の `allow` で緩和しない。OpenCode が許可していても、guardian の `ask` は承認要求を出し、`block` は実行を拒否する。`block` は "run --auto" でも拒否する。
 
 ### REQ-050: 実行ごとの承認
 
 - kind: event_driven
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A5, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A16, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A5, docs/decision/records/2026-10-02-opencode-v2-hook.md#A7, docs/decision/records/2026-10-02-opencode-v2-hook.md#A16, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-04-opencode-standalone.md#A21, docs/decision/records/2026-10-04-opencode-standalone.md#A23, docs/decision/records/2026-10-04-auto-allow-ask.md#A5
 - verification: unit
 
 影実行と確定済みの場合は REQ-048 を優先し、以下のguardian由来の承認要求は出さない。接続や承認の経路が使えない場合は opencode-standalone.md の REQ-066 と REQ-067 に従う。
+`ask委任` の応答を受けた場合は REQ-061 を優先し、以下の承認要求は出さない。
 
 guardian が `ask` と判定した実行では、その実行の承認要求を OpenCode の承認フローへ渡し、`OpenCode承認`を得る前に対象コマンドを実行しない。OpenCode の保存済み許可でこの要求を省略しない。"run --auto" による自動承認は有効な承認として扱い、人の確認を追加で強制しない。要求が拒否された場合は対象コマンドを実行せず、同じセッションの他の保留要求も拒否する OpenCode の標準挙動に従う。
 

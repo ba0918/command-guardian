@@ -25,13 +25,14 @@ M1 の成果物は、"command-guardian" という 1 つの実行ファイルで�
 ### REQ-018: 影実行
 
 - kind: state_driven
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-03-llm-advice-layer.md#A45
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A22, docs/decision/records/2026-10-02-ir-friction-contracts.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A23, docs/decision/records/2026-10-02-opencode-v2-hook.md#A19, docs/decision/records/2026-10-03-llm-advice-layer.md#A45, docs/decision/records/2026-10-04-auto-allow-ask.md#A6
 - verification: unit
 
 "mode.enforce" が false のとき、command-guardian は、フックとして判定を返さず、判定と理由をログに書く。M1 では、影実行のときだけログに書く。
 
 この保存条件は影ログを指す。
 助言のメタデータログはadvisor/context.mdの別契約であり、影ログの本文方針を変更しない。
+`ask委任` の記録は影実行時に限らず同じ保存先へ書き、defer-ask.md の REQ-062 に従う。
 
 ログの保存場所がない、または保存できないときは、その記録を省略して標準エラーへ警告する。Claude Code と Codex の hook の標準出力は空で、終了コードは0にする。OpenCode の影実行の応答は REQ-048 が扱い、判定を返さず影実行と判定不能を区別する。
 

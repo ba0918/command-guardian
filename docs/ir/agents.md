@@ -7,10 +7,12 @@ Claude Code と Codex のフックとして呼ばれたときの入出力の契�
 ### REQ-022: Claude Code の写像
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A24, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35
+- source: docs/decision/records/2026-09-30-hook-guardian-scope.md#A24, docs/decision/records/2026-09-30-hook-guardian-scope.md#A35, docs/decision/records/2026-10-04-auto-allow-ask.md#A1, docs/decision/records/2026-10-04-auto-allow-ask.md#A3, docs/decision/records/2026-10-04-auto-allow-ask.md#A7
 - verification: unit
 
 Claude Code のフックとして呼ばれたとき、command-guardian は、"hookSpecificOutput" の封筒に "hookEventName" を "PreToolUse" として置き、`allow` のときは何も返さず、`ask` のときは "permissionDecision" に "ask" と "permissionDecisionReason" を返し、`block` のときは "deny" と理由を返す。"permission_mode" が "dontAsk" か "bypassPermissions" のときは、`ask` を何も返さないに落とす。
+
+"mode.defer_ask" が有効で "mode.enforce" が true のときの `ask` は、defer-ask.md の REQ-060 に従う。
 
 ### REQ-023: Codex の写像
 
