@@ -231,16 +231,16 @@ Codex用の出力には`--agent codex`を使います。現在は、どちらの
 miseで本体を入れ、OpenCode V2に同じリリースタグのプラグインを登録してください。
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.2.0
-opencode plugin add 'github:ba0918/command-guardian#v0.2.0::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.3.0
+opencode plugin add 'github:ba0918/command-guardian#v0.3.0::path:plugins/opencode'
 ```
 
-別の版を使う場合は、両方のコマンドの`0.2.0`をその版に置き換えてください。
+別の版を使う場合は、両方のコマンドの`0.3.0`をその版に置き換えてください。
 同じ版のタグにあるプラグインのサブディレクトリを指定するため、別のnpmパッケージは不要です。
 0.1.2では登録後、プラグインに同じOpenCodeサーバーへの認証付き接続を設定してください。
 0.1.3からは、接続オプションを省略すると自身のローカルバックグラウンドサービスへ自動接続します。
 明示起動したサーバーには引き続き接続設定が必要です。
-0.2.0より後の版では、`opencode run --standalone`に接続設定は不要です。
+0.3.0から、`opencode run --standalone`に接続設定は不要です。
 接続が無いときもblockは拒否しますが、guardianの承認が要る実行にguardianの確認は出ず、OpenCode自身の権限判断に委ねます。
 詳しくは英語の導入ガイドの[接続が無いときの動作](docs/opencode.md#standalone-runs-and-running-without-a-connection)を参照してください。
 対応の範囲はOpenCodeの版ではなく、プラグインが頼るプラグインのAPIで示します。

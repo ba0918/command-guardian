@@ -198,13 +198,13 @@ The `hook` subcommand always exits with `0`. Hosts must read its JSON decision, 
 The plugin is available from guardian 0.1.2. Install the binary with mise, then register the plugin from the same release tag with OpenCode V2:
 
 ```sh
-mise use -g github:ba0918/command-guardian@0.2.0
-opencode plugin add 'github:ba0918/command-guardian#v0.2.0::path:plugins/opencode'
+mise use -g github:ba0918/command-guardian@0.3.0
+opencode plugin add 'github:ba0918/command-guardian#v0.3.0::path:plugins/opencode'
 ```
 
-For another release, replace `0.2.0` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
+For another release, replace `0.3.0` in both commands with that release's version. The GitHub package specification selects the plugin subdirectory at the matching tag. No separate npm package is required.
 From 0.1.3, the plugin automatically connects to its own local background service when connection options are omitted. Explicit servers and 0.1.2 still need connection settings. See the [installation guide](docs/opencode.md#automatic-connection-to-the-background-service).
-In releases after 0.2.0, `opencode run --standalone` needs no connection settings. Without a connection, `block` is still refused, and commands that would need a guardian approval get no guardian confirmation; they are left to OpenCode's own permissions. See [running without a connection](docs/opencode.md#standalone-runs-and-running-without-a-connection).
+From 0.3.0, `opencode run --standalone` needs no connection settings. Without a connection, `block` is still refused, and commands that would need a guardian approval get no guardian confirmation; they are left to OpenCode's own permissions. See [running without a connection](docs/opencode.md#standalone-runs-and-running-without-a-connection).
 Support is defined by the plugin API the plugin relies on, listed in the [installation guide](docs/opencode.md#supported-environment), not by the OpenCode version.
 
 Use Linux x86_64 or WSL with explicitly configured Bash and no other hooks that change the command, working directory, or shell.

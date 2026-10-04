@@ -2,8 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
 - Make the OpenCode V2 plugin work with `opencode run --standalone` and with the managed service disabled, without connection settings. Without a connection it judges the actual shell input, refuses `block`, and leaves commands that would need a guardian approval to OpenCode's own permissions instead of stopping them.
-- Warn on standard error instead of stopping commands when explicit connection options are incomplete or fail, or when a guardian approval request cannot be created; those commands are left to OpenCode's own permissions. Failed explicit options never fall back to automatic connection.
+- **BREAKING** Warn on standard error instead of stopping commands when explicit connection options are incomplete or fail, or when a guardian approval request cannot be created; those commands are left to OpenCode's own permissions. Failed explicit options never fall back to automatic connection.
 - Stop requiring OpenCode 2.0.21. The plugin no longer checks the host version; it checks at load time that the plugin API it relies on exists and names any missing member.
 - Add the opt-in, not recommended `mode.defer_ask` user setting. When enabled, hooks leave `ask` verdicts to the agent's own permission decision instead of requesting confirmation, while `block` is still denied and `check` is unchanged. Every deferral is recorded in the shadow log with a sixth `deferred` field, and OpenCode receives a separate `deferred` response.
 
@@ -32,6 +34,7 @@
 - Provide a CLI and agent hook that inspect Bash commands for destructive effects and return `allow`, `ask`, or `block` based on target paths and configuration.
 - Distribute a single Linux x86_64 binary through GitHub Releases.
 
+[0.3.0]: https://github.com/ba0918/command-guardian/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ba0918/command-guardian/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/ba0918/command-guardian/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ba0918/command-guardian/compare/v0.1.1...v0.1.2
