@@ -1,26 +1,152 @@
-{
-  "version": 1,
-  "entries": [
-    {
-      "id": "lp-check-independent-review",
-      "base": "46bf07490feb15418df6e0ae69a3b50922ef39ea",
-      "role": "reviewer",
-      "files": [
-        {
-          "path": ".github/workflows/pages.yml",
-          "before": "sha256:ef7a967083537c31f87c6c34f29a96ca45baff8aac7b33ce3d99ffd06d4e1b6d",
-          "after": "sha256:5cea357936da51b123eeffb328b3fac4066b917550c58718433203d6d504ebc6"
-        }
-      ],
-      "ir": [],
-      "conclusion": "new",
-      "reason": "workflowの追加2行は既存の実バイナリ由来ビルド後にsite/check.pyを呼ぶだけであり、A1の公開前検証の運用判断と一致する。ローカルで同じcheckを実行して成功を観測し、既存の版・README・CHANGELOG・実バイナリ由来の生成元と公開条件を変えていないことを差分で確認した。PROJECT.mdはLPを製品外部契約から分離しており、この運用追加に製品IRの変更は必要ない。既存changes設定に含まれるworkflow1件をGitのmodeとblobから再計算した。設定対象外のsite変更も別の独立レポートで日英6画面一致と言語・CTA・タブ・コピー操作を検証済みであり、対象外を理由に未レビューとはしていない。公開や最終commitの統合ゲート成功はこの記録の判断に含めない。",
-      "requirements": [],
-      "decisions": [
-        "docs/decision/records/2026-10-04-landing-page-check.md#A1"
-      ],
-      "handoff": null,
-      "gaps": []
-    }
-  ]
-}
+version: 1
+entries:
+- id: opencode-standalone-plugin-review
+  base: 46bf07490feb15418df6e0ae69a3b50922ef39ea
+  role: reviewer
+  files:
+  - path: plugins/opencode/src/approval.ts
+    before: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
+    after: sha256:8efc2ab3e28f23b91db73e70b14fdf6b30b7befa790b219fde033cd2f660aac3
+  - path: plugins/opencode/src/connection.ts
+    before: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
+    after: sha256:5194fbb4d36b417049a7597c88bca457f30ba6466d21316c4163053e1cadb0f9
+  - path: plugins/opencode/src/index.ts
+    before: sha256:997bead58252ffdf928596c8d610718edc2f1c3c2cbe8186c7ca2a650ec188d2
+    after: sha256:83bf0ee5dfdc1e65c05d48942d48e994167395dd7a57361b47cdac251efd353b
+  - path: plugins/opencode/tests/helpers/host-process.ts
+    before: sha256:1a602f1a17ff30e323e9062cb3ef2a68f1e8e2fc8e44d90ca72f93fd58e99ecb
+    after: sha256:6e6035e2e000ea8febbe894975497f067866fcd8f36ccfbd74c146906a6c7681
+  - path: plugins/opencode/tests/integration/bridge/index.ts
+    before: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
+    after: sha256:6aa8a94d5808c3ba8a3ee858d759902563f4a714ebe6ba97e83f6f12922c3f88
+  - path: plugins/opencode/tests/integration/host.test.ts
+    before: sha256:58b947a4d89c9d37de8b515d96e7f86be0c3f97c862d2555f5b9d781e1c3a87a
+    after: sha256:0c7250ca6efb53674e210f57c983b92c813ddaf42579a564c56f724a7123d46a
+  - path: plugins/opencode/tests/unit/approval.test.ts
+    before: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
+    after: sha256:ae1a00f6f6a52b9bbcddc3fa612ccd6aab8666863f8dfc1e1c7c7947eff6f51b
+  - path: plugins/opencode/tests/unit/connection.test.ts
+    before: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
+    after: sha256:2e07a4e6aaac562b9577261edfdb13c91ec54f60e34482494c5bd6a37b12f61b
+  - path: plugins/opencode/tests/unit/setup.test.ts
+    before: null
+    after: sha256:56d901dc556c7e20504ef50a9a3133b961d1fd4219e94f108a748df259d163fd
+  ir:
+  - path: docs/ir/opencode-standalone.md
+    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
+  - path: docs/ir/opencode.md
+    sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
+  - path: docs/ir/opencode-delivery.md
+    sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
+  - path: docs/ir/CONTEXT.md
+    sha256: sha256:f70eff6925f62d0406eb533141d80939f31e14c1b8e5b1559c7134b5f1a98f75
+  conclusion: new
+  reason: >-
+    基準の時点のIRでは、接続や認証の失敗と承認要求を作れない場合は実行しない(当時のREQ-052、EX-089、EX-109)、自動接続は版2.0.21の相手だけを採用し、実行ごとに版を照合していた。今回の実装はこれらを外し、基準のIRの内側には収まらないため新しい判断として扱う。根拠はすべて利用者が決めた2026-10-04-opencode-standalone.mdの決定で、同じ比較範囲でIR(REQ-065〜REQ-067、REQ-070と改訂したREQ-047、REQ-049〜REQ-052、REQ-055、CONTEXTのask)に反映済みである。
+    index.tsは読み込み時にrequiredApisの5つの名前を確かめて欠けた名前で失敗し(A20、EX-145)、ctx.app.versionの照合を消した(A16、EX-144)。connection.tsは結果を接続済み・なし・明示設定の失敗に分け、自動接続の版照合を消し(A17、EX-106)、明示設定はserver.infoで確かめて失敗しても自動接続へ切り替えない(A22)。接続が無いときはtool.executeで判定せず、create.beforeの実際のshell・cwd・コマンドで判定し、blockだけを拒否してそれ以外と起動入力を確定できない場合は何もせず戻る(A2、A4、A21、REQ-065、REQ-066)。明示設定の失敗は読み込み時1回と実行ごと1回console.warnする(A25)。
+    approval.tsはイベントの通信を接続ごとに分け、承認待ちを作成の応答の受領から始め(A24)、作成失敗や応答なしはunavailableとして呼び出し側が毎回警告して委ねる(A23、A25)。作成前の拒否の保持(A28)、作成中に作成時の接続が切れた後のaskの取りやめ(A27)、通信終了後のつなぎ直しと失敗時の委任(A29)を実装し、承認待ち後の切断・中断・解除の取りやめは保った(REQ-053)。
+    試験の期待の変更は、旧EX-089・EX-109の停止を警告と委任に改めたもの、作成失敗をunavailableとしたもの(REQ-067、EX-147)、承認待ちの切断の試験を作成の応答の後に切るよう同期したもの(EX-148)で、いずれも改訂後のIRと一致する。削除された要求IDつきの試験は無く、既存の同一性・リダイレクト・未認証の試験は残る。単体試験44件の成功を確かめた。結合試験は実行していない。
+    範囲外の観察(info、遮断しない): 応答の不明な作成の後始末のrejectが同じセッションの他の保留要求をまとめて拒否しうること、ex_153が再接続の回数を固定していること、明示設定の読み込み時の1秒の確認が一時的に失敗するとそのセッションの間は接続なしで動くこと(A22の範囲内)。
+  requirements: [REQ-047, REQ-049, REQ-050, REQ-051, REQ-052, REQ-053, REQ-055, REQ-065, REQ-066, REQ-067, REQ-070]
+  decisions:
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A2
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A4
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A7
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A16
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A17
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A19
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A21
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A24
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A25
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A26
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+  handoff: null
+  gaps:
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A2
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A4
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A19
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
+  - category: spec_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A16
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A17
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A24
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+- id: opencode-standalone-docs-review
+  base: 46bf07490feb15418df6e0ae69a3b50922ef39ea
+  role: reviewer
+  files:
+  - path: CHANGELOG.md
+    before: sha256:70b171ac0db0f9750abee33bc24ad89a2b2ce2a0ebc88ada2f91124a7db3753d
+    after: sha256:0f05bd7883bf06e5d1e8d1e9ec5a2c7a3a1c0796c996b58678cfe371f285929c
+  - path: README.md
+    before: sha256:ad6a3bcd57ecd557163dde629283c08c4af655ff5d1cb4548c3d2b27c500939d
+    after: sha256:546f5d19cd69bc27d5aec8457d4f300e9ad6fc9d0e16f6c7ee777b7d8702d4e5
+  - path: docs/opencode.md
+    before: sha256:615565e2574d8b70c32593c570612a6eaf810941f4a36d4a12808e00403795b2
+    after: sha256:2353a437e51aab1013906a4aa02b87de1b8830597bd30826d044268c646b269c
+  ir:
+  - path: docs/ir/opencode-standalone.md
+    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
+  - path: docs/ir/opencode-delivery.md
+    sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
+  - path: docs/ir/opencode.md
+    sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
+  - path: docs/ir/CONTEXT.md
+    sha256: sha256:f70eff6925f62d0406eb533141d80939f31e14c1b8e5b1559c7134b5f1a98f75
+  conclusion: new
+  reason: >-
+    基準の時点のREQ-057は版2.0.21を検証基準として導入手順に明記することを求め、導入手順はstandaloneに明示の接続設定を案内し、接続や認証の失敗では実行しないと説明していた。今回の文書の変更はこれらを改めるもので、基準のIRの内側には収まらないため新しい判断として扱う。根拠は利用者が決めたA5、A8、A9、A16、A18〜A23、A25、A27〜A29で、REQ-057・REQ-058の改訂とREQ-068〜REQ-070として同じ比較範囲のIRに反映済みである。
+    docs/opencode.mdは版を対応条件から外し、プラグインが頼る5つのAPIを列挙し(index.tsのrequiredApisと一致)、読み込み失敗後と他のプラグインのevaluateによる上書きを保証しないと書く(REQ-057、REQ-070、A5、A20)。standaloneは接続設定なしで動き、接続が無いときはblockだけを拒否し承認が要る実行はguardianの確認なしにOpenCodeに委ねること、明示設定の失敗の警告(読み込み時と実行ごと)、standaloneに明示設定を使わないことを書く(REQ-065、REQ-066、REQ-068)。承認の節は作成失敗の委任、先に届いた拒否の保持、作成中の切断後の取りやめ、つなぎ直し、承認待ちが作成の応答から始まることを書き(REQ-067、REQ-053)、検証の範囲はserve --stdioの結合試験と通し実行を必須にしないことを書く(REQ-058、REQ-069)。いずれも実装と一致する。READMEは版の記載を外し参照先を足し、CHANGELOGはUnreleasedだけに足した。
+    README-ja.md、site/template.html(A30)、決定記録とIRは変更照合の対象の外で、ここでは判断していない。
+  requirements: [REQ-053, REQ-057, REQ-058, REQ-065, REQ-066, REQ-067, REQ-068, REQ-069, REQ-070]
+  decisions:
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A5
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A8
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A9
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A16
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A18
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A19
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A21
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A25
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
+  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+  handoff: null
+  gaps:
+  - category: premise_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A9
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A19
+  - category: spec_conflict
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A16
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A18
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
+  - category: missing_spec
+    disposition: recorded
+    refs:
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A5
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A8
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
+    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
