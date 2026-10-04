@@ -399,3 +399,150 @@ fn req_019_multiline_command_stays_one_record() {
     assert!(line.contains("\\n"), "{line}");
     assert!(line.contains("\\t"), "{line}");
 }
+
+fn write_user_config(xdg: &Path, text: &str) {
+    let path = xdg.join("command-guardian/config.toml");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, text).unwrap();
+}
+
+fn bash_input_with_mode(command: &str, cwd: &str, mode: &str) -> String {
+    format!(
+        r#"{{"tool_name":"Bash","tool_input":{{"command":{}}},"cwd":{},"permission_mode":{}}}"#,
+        serde_json::to_string(command).unwrap(),
+        serde_json::to_string(cwd).unwrap(),
+        serde_json::to_string(mode).unwrap()
+    )
+}
+
+fn log_lines(state: &Path) -> Vec<String> {
+    match std::fs::read_to_string(state.join("command-guardian/shadow.log")) {
+        Ok(log) => log.lines().map(str::to_string).collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+// @kotowari[REQ-062, EX-126]
+#[test]
+fn ex_126_deferred_ask_is_recorded_with_the_deferred_mark() {
+    let home = temp_dir("defer-log-home-");
+    let state = temp_dir("defer-log-state-");
+    let xdg = home.path().join("config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\nenforce = true\n");
+    let r = run_hook(
+        &bash_input("rm /mnt/fixture/x", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+    let lines = log_lines(state.path());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let fields: Vec<&str> = lines[0].split('\t').collect();
+    assert_eq!(fields.len(), 6, "{}", lines[0]);
+    assert!(fields[0].parse::<u64>().unwrap() > 0);
+    assert_eq!(fields[1], "ask");
+    assert!(fields[2].contains("unknown"), "{}", lines[0]);
+    assert_eq!(fields[3], "/mnt/fixture/x");
+    assert_eq!(fields[4], "rm /mnt/fixture/x");
+    assert_eq!(fields[5], "deferred");
+}
+
+// @kotowari[REQ-062, EX-127]
+#[test]
+fn ex_127_codex_and_bypass_permissions_are_also_recorded() {
+    let home = temp_dir("defer-log-home-");
+    let xdg = home.path().join("config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    for (agent, input) in [
+        ("codex", bash_input("rm /mnt/fixture/x", "/tmp/scratch")),
+        (
+            "claude",
+            bash_input_with_mode("rm /mnt/fixture/x", "/tmp/scratch", "bypassPermissions"),
+        ),
+    ] {
+        let state = temp_dir("defer-log-state-");
+        let r = run_bin(
+            &["hook", "--agent", agent],
+            Some(&input),
+            home.path(),
+            &xdg,
+            Some(state.path()),
+        );
+        assert_eq!(r.code, 0, "{agent}: {}", r.stderr);
+        assert!(r.stdout.is_empty(), "{agent}: {}", r.stdout);
+        let lines = log_lines(state.path());
+        assert_eq!(lines.len(), 1, "{agent}: {lines:?}");
+        assert!(lines[0].ends_with("\tdeferred"), "{agent}: {}", lines[0]);
+    }
+}
+
+// @kotowari[REQ-062, EX-128]
+#[test]
+fn ex_128_no_record_without_defer_ask() {
+    let home = temp_dir("defer-log-home-");
+    let state = temp_dir("defer-log-state-");
+    let xdg = home.path().join("config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = false\nenforce = true\n");
+    let r = run_bin(
+        &["hook", "--agent", "codex"],
+        Some(&bash_input("rm /mnt/fixture/x", "/tmp/scratch")),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0, "{}", r.stderr);
+    assert!(log_lines(state.path()).is_empty());
+}
+
+// @kotowari[REQ-062, REQ-019, EX-129]
+#[test]
+fn ex_129_record_failure_warns_and_still_defers() {
+    let home = temp_dir("defer-log-home-");
+    let state = temp_dir("defer-log-state-");
+    let xdg = home.path().join("config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    let sentinel = state.path().join("sentinel");
+    std::fs::write(&sentinel, "unchanged").unwrap();
+    let dir = state.path().join("command-guardian");
+    std::fs::create_dir(&dir).unwrap();
+    std::os::unix::fs::symlink(&sentinel, dir.join("shadow.log")).unwrap();
+    let r = run_hook(
+        &bash_input("rm /mnt/fixture/x", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+    assert!(
+        r.stderr.to_lowercase().contains("shadow log"),
+        "{}",
+        r.stderr
+    );
+    assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "unchanged");
+}
+
+// @kotowari[REQ-063, REQ-018, EX-130]
+#[test]
+fn ex_130_shadow_mode_takes_precedence_over_defer_ask() {
+    let home = temp_dir("defer-log-home-");
+    let state = temp_dir("defer-log-state-");
+    let xdg = home.path().join("config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\nenforce = false\n");
+    let r = run_hook(
+        &bash_input("rm /mnt/fixture/x", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        Some(state.path()),
+    );
+    assert_eq!(r.code, 0, "{}", r.stderr);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+    let lines = log_lines(state.path());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let fields: Vec<&str> = lines[0].split('\t').collect();
+    assert_eq!(fields.len(), 5, "{}", lines[0]);
+    assert_eq!(fields[1], "ask");
+    assert!(!lines[0].contains("deferred"));
+}

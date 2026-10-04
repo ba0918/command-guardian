@@ -93,7 +93,17 @@ pub(super) fn run(text: &str) -> i32 {
     if !enforce && crate::log::write_shadow(&report, &input.command).is_err() {
         crate::diagnostic(format_args!("Warning: Could not write shadow log."));
     }
-    let response = native_response(&report, enforce);
+    let response = if enforce && super::defers(report.verdict, engine.config().defer_ask) {
+        let warning = crate::log::write_deferred(&report, &input.command)
+            .is_err()
+            .then_some("Could not write shadow log.");
+        if let Some(warning) = warning {
+            crate::diagnostic(format_args!("Warning: {warning}"));
+        }
+        deferred_response(&report, warning)
+    } else {
+        native_response(&report, enforce)
+    };
     let _ = crate::output(format_args!("{response}"));
     crate::advisor::finish(completion);
     0
@@ -105,6 +115,16 @@ fn native_response(report: &guardian_app::Report, enforce: bool) -> Value {
     } else {
         json!({"status": "shadow", "mode": {"enforce": false}, "reason": "Guardian shadow mode."})
     }
+}
+
+/// 委任の応答。judged の "verdict" を持たせず、allow と取り違えない別の "status" にする。
+fn deferred_response(report: &guardian_app::Report, warning: Option<&str>) -> Value {
+    let mut response =
+        json!({"status": "deferred", "mode": {"enforce": true}, "reason": report.message});
+    if let Some(warning) = warning {
+        response["warning"] = json!(warning);
+    }
+    response
 }
 
 #[cfg(test)]

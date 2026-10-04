@@ -135,6 +135,7 @@ The server must find `command-guardian` on PATH. Guardian reads its existing con
 - `allow` retains native permissions; it does not override native denial or confirmation.
 - `ask` creates a native `command-guardian` approval for this execution. Saved permission does not skip it. `run --auto` can approve with `once`; guardian adds no second human prompt.
 - `block` prevents execution, including with automatic approval enabled.
+- With `mode.defer_ask = true` (not recommended), a guardian `ask` adds no guardian approval request; native permissions alone decide. `block` and missing or invalid guardian responses are unchanged, and a deferral-record failure is only a warning.
 - Confirmed shadow mode adds no guardian approval or rejection. Native permissions remain. Shadow-log failures and unsupported shells are warnings.
 - Missing guardian, invalid responses, process timeout, and unsupported shells require approval.
 - If an approval request cannot be created, or no response to its creation arrives, the plugin writes a warning to its standard error and leaves that command to OpenCode's own permissions. A later reply to a leftover guardian confirmation does nothing to that command. A rejection that arrives before the creation response still stands: the command does not run even if creation then fails. If the approval event stream ends while a request is being created and the creation response then reports a pending approval, the command is cancelled rather than left to OpenCode.

@@ -1,4 +1,4 @@
-//! 影実行のログ（REQ-019）。判定を 1 行ずつ追記し、所有者だけが読める権限にする。
+//! 影実行のログ（REQ-019）と、同じ保存先への委任の記録（REQ-062）。判定を 1 行ずつ追記し、所有者だけが読める権限にする。
 
 use guardian_app::Report;
 use guardian_policy::message;
@@ -21,8 +21,20 @@ pub fn shadow_log_path(xdg_state_home: Option<&Path>, home: Option<&Path>) -> Op
     Some(base.join("command-guardian/shadow.log"))
 }
 
+/// 委任の行だけに足す 6 番目の欄。影実行の行は 5 欄のまま変えない（REQ-062）。
+const DEFERRED_MARK: &str = "deferred";
+
 /// 影実行の 1 判定を追記する。
 pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
+    append(report, command, None)
+}
+
+/// フックで委任した 1 判定を、影実行と同じ保存先へ印付きで追記する。
+pub fn write_deferred(report: &Report, command: &str) -> std::io::Result<()> {
+    append(report, command, Some(DEFERRED_MARK))
+}
+
+fn append(report: &Report, command: &str, mark: Option<&str>) -> std::io::Result<()> {
     let xdg_state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let Some(path) = shadow_log_path(xdg_state_home.as_deref(), home.as_deref()) else {
@@ -65,9 +77,10 @@ pub fn write_shadow(report: &Report, command: &str) -> std::io::Result<()> {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
+    let mark = mark.map(|mark| format!("\t{mark}")).unwrap_or_default();
     writeln!(
         file,
-        "{now}\t{}\t{}\t{}\t{}",
+        "{now}\t{}\t{}\t{}\t{}{mark}",
         report.verdict,
         escape_field(&reason_text(report)),
         escape_field(&target_text(report)),

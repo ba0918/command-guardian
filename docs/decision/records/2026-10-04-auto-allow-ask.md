@@ -70,6 +70,15 @@ Position: 第1ラウンドでA2〜A9、第2ラウンドでA10〜A13、第3ラウ
   - why: 影ログの保存失敗を警告にとどめる既存の扱いとそろえ、警告付きの応答が判定不能の経路に流れて承認要求が出ることを防ぐため
   - decided_by: 利用者（推奨を採用）
 
+- A18 委任の記録行は、影実行の行と同じ5つのタブ区切りの欄（時刻、判定、理由、対象パス、コマンド本文）の後に、6番目の欄として`deferred`を足す。判定の欄は`ask`のままにする。影実行の行は5欄のまま変えない。
+  - why: 既存の影実行の行の形を変えずに、欄の数と最後の欄で委任の行を見分けられるようにするため。コマンド本文のタブはエスケープ済みなので、欄の数は一意に決まる
+  - rejected: 判定の欄を`deferred-ask`などに変える案（判定の値が`allow`・`ask`・`block`以外になる）、先頭に印の欄を挟む案（委任の行で既存の欄の位置がずれる）
+  - decided_by: 実装担当。A10の委任の範囲
+- A19 OpenCode用の委任の応答は`{"status": "deferred", "mode": {"enforce": true}, "reason": <理由>}`とし、"verdict"を含めない。記録の保存に失敗したときは`"warning": <文字列>`を足す。プラグインは、"mode.enforce"がtrueで"verdict"が無く、"warning"が無いか文字列のときだけ委任として扱い、それ以外の"deferred"の応答は無効な応答として承認を求める。
+  - why: judged・shadow・unavailableの既存の応答の形と分類を変えず、allowと取り違えない別の"status"にするため。古いプラグインは未知の"status"を無効な応答として承認を求めるので、安全側に倒れる
+  - rejected: judgedの"verdict"に`deferred`を足す案（judgedの"verdict"は判定の値だけというA2の形が変わる）
+  - decided_by: 実装担当。A12・A17の委任の範囲
+
 ## Rejected
 
 - R1 `ask`を`allow`の判定へ変える案。

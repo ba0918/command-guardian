@@ -64,3 +64,54 @@ fn req_034_invalid_guard_rules_do_not_discard_the_valid_general_settings() {
     assert!(layer.guard.is_empty());
     assert_eq!(layer.warnings.len(), 1);
 }
+
+// @kotowari[REQ-059]
+#[test]
+fn req_059_user_defer_ask_true_is_adopted() {
+    let layer = parse_layer("[mode]\ndefer_ask = true", Path::new("/work"), None).unwrap();
+    assert_eq!(layer.defer_ask, Some(true));
+    let mut config = guardian_policy::Config::builtin(None);
+    guardian_policy::layers::merge(&mut config, &layer);
+    assert!(config.defer_ask);
+}
+
+// @kotowari[REQ-059]
+#[test]
+fn req_059_defer_ask_is_off_by_default() {
+    assert!(!guardian_policy::Config::builtin(None).defer_ask);
+    let layer = parse_layer("[mode]\nenforce = true", Path::new("/work"), None).unwrap();
+    assert_eq!(layer.defer_ask, None);
+}
+
+// @kotowari[REQ-059, REQ-015]
+#[test]
+fn req_059_invalid_user_defer_ask_rejects_the_whole_file() {
+    for invalid in ["'yes'", "1", "[]"] {
+        let result = parse_layer(
+            &format!("[mode]\ndefer_ask = {invalid}\n[git]\nenabled = false"),
+            Path::new("/work"),
+            None,
+        );
+        assert!(result.is_err(), "{invalid}: {result:?}");
+    }
+}
+
+// @kotowari[REQ-059]
+#[test]
+fn req_059_project_defer_ask_is_removed_with_a_warning_before_validation() {
+    for value in ["true", "'yes'"] {
+        let layer = guardian_policy::layers::parse_project_layer(
+            &format!("[mode]\ndefer_ask = {value}\n[paths]\nprotected_roots = ['/work/keep']"),
+            Path::new("/work"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(layer.defer_ask, None, "{value}");
+        assert_eq!(layer.protected_roots, vec![Path::new("/work/keep")]);
+        assert!(
+            layer.warnings.iter().any(|w| w.contains("mode.defer_ask")),
+            "{value}: {:?}",
+            layer.warnings
+        );
+    }
+}

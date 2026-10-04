@@ -39,6 +39,7 @@ pub struct Config {
     pub guard: Vec<GuardRule>,
     pub git_enabled: bool,
     pub enforce: bool,
+    pub defer_ask: bool,
     pub trusted_projects: Vec<PathBuf>,
 }
 
@@ -60,6 +61,7 @@ impl Config {
             guard: Vec::new(),
             git_enabled: true,
             enforce: true,
+            defer_ask: false,
             trusted_projects: Vec::new(),
         }
     }

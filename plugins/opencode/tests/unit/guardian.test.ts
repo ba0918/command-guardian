@@ -3,6 +3,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { judge, executionInput } from "../../src/guardian.js";
+import { authorize } from "../../src/gate.js";
 
 const input = { command: "echo '$HOME'; > notes", cwd: "/workspace", shell: "/bin/bash" };
 
@@ -91,4 +92,14 @@ test("req_047_normal_and_background_inputs_keep_lexical_cwd_and_exact_command", 
     expect(executionInput({command:input.command,background},"/workspace","/bin/bash")).toEqual(input);
     expect(raw.workdir).toBe("sub/../other");
   }
+});
+
+// @kotowari[REQ-061, REQ-051, EX-125]
+test("req_061_missing_binary_is_not_deferred_and_asks_with_the_reason", async () => {
+  const result = await judge("/nonexistent/guardian-fixture", input, new AbortController().signal);
+  let displayed = "";
+  let started = false;
+  await authorize(result, input, async (_input, reason) => { displayed = reason; }, async () => { started = true; });
+  expect(displayed).toContain("not found");
+  expect(started).toBe(true);
 });

@@ -94,6 +94,14 @@ pub fn run(args: &[std::ffi::OsString]) -> i32 {
         crate::advisor::finish(completion);
         return 0;
     }
+    // 影実行を先に分岐させ、委任より優先する（REQ-063）。
+    if defers(report.verdict, engine.config().defer_ask) {
+        if crate::log::write_deferred(&report, &input.command).is_err() {
+            crate::diagnostic(format_args!("Warning: Could not write shadow log."));
+        }
+        crate::advisor::finish(completion);
+        return 0;
+    }
     if let Some(output) = response(agent, &report, input.permission_mode.as_deref()) {
         let _ = crate::output(format_args!("{output}"));
     }
@@ -193,6 +201,11 @@ fn parse_input(text: &str) -> Option<HookInput> {
     })
 }
 
+/// 最終判定をエージェント本来の権限判断に委ねるか（REQ-060）。影実行かどうかは呼び出し側が先に見る。
+fn defers(verdict: Verdict, defer_ask: bool) -> bool {
+    defer_ask && verdict == Verdict::Ask
+}
+
 /// エージェントごとの出口。`None` は何も返さない。
 fn decision(agent: Agent, verdict: Verdict, permission_mode: Option<&str>) -> Option<&'static str> {
     match agent {
@@ -263,6 +276,32 @@ mod advisor_output_tests {
             assert!((2..=4).contains(&reason.lines().count()));
             assert_eq!(reason, known.message);
         }
+    }
+
+    // @kotowari[REQ-060, EX-122]
+    #[test]
+    fn ex_122_advice_block_is_denied_even_when_ask_is_deferred() {
+        let block = crate::advisor::operational_tests::fixture_report(
+            "harmful_irreversible",
+            "0.95",
+            "confirmed",
+            Mode::Enforce,
+        );
+        assert_eq!(block.verdict, Verdict::Block);
+        assert!(!defers(block.verdict, true));
+        assert_eq!(
+            response(Agent::Claude, &block, None).unwrap()["hookSpecificOutput"]["permissionDecision"],
+            "deny"
+        );
+        let ask = crate::advisor::operational_tests::fixture_report(
+            "major_destructive",
+            "0.95",
+            "confirmed",
+            Mode::Enforce,
+        );
+        assert_eq!(ask.verdict, Verdict::Ask);
+        assert!(defers(ask.verdict, true));
+        assert!(!defers(ask.verdict, false));
     }
 
     // @kotowari[REQ-advisor-003, REQ-022, REQ-023]

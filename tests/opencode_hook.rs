@@ -8,15 +8,19 @@ struct Fixture {
 
 impl Fixture {
     fn new(shadow: bool) -> Self {
+        Self::with_config(&format!("[mode]\nenforce = {}\n", !shadow))
+    }
+
+    fn with_config(text: &str) -> Self {
         let root = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
         let config = root.path().join("config/command-guardian");
         std::fs::create_dir_all(&config).unwrap();
-        std::fs::write(
-            config.join("config.toml"),
-            format!("[mode]\nenforce = {}\n", !shadow),
-        )
-        .unwrap();
+        std::fs::write(config.join("config.toml"), text).unwrap();
         Self { root }
+    }
+
+    fn log(&self) -> Option<String> {
+        std::fs::read_to_string(self.root.path().join("state/command-guardian/shadow.log")).ok()
     }
 
     fn run(&self, input: &str) -> (Value, String) {
@@ -126,4 +130,46 @@ fn req_048_unsupported_shell_in_shadow_warns_without_bash_judgment() {
             .join("state/command-guardian/shadow.log")
             .exists()
     );
+}
+
+// @kotowari[REQ-061, REQ-062, EX-123]
+#[test]
+fn ex_123_opencode_deferred_ask_is_distinct_from_allow_and_recorded() {
+    let f = Fixture::with_config("[mode]\nenforce = true\ndefer_ask = true\n");
+    let (response, _) = f.run(&f.input("rm /mnt/fixture/x", "/bin/bash"));
+    assert_eq!(response["status"], "deferred", "{response}");
+    assert_eq!(response["mode"]["enforce"], true);
+    assert!(response.get("verdict").is_none(), "{response}");
+    assert!(response.get("warning").is_none(), "{response}");
+    assert!(response["reason"].as_str().is_some_and(|s| !s.is_empty()));
+    let log = f.log().unwrap();
+    assert!(log.trim_end().ends_with("\tdeferred"), "{log}");
+    for (command, verdict) in [("true", "allow"), ("rm /etc/x", "block")] {
+        let (response, _) = f.run(&f.input(command, "/bin/bash"));
+        assert_eq!(response["status"], "judged", "{command}: {response}");
+        assert_eq!(response["verdict"], verdict);
+    }
+    assert_eq!(f.log().unwrap().lines().count(), 1);
+}
+
+// @kotowari[REQ-061, REQ-062, EX-131]
+#[test]
+fn ex_131_opencode_record_failure_keeps_the_deferral_with_a_warning() {
+    let f = Fixture::with_config("[mode]\nenforce = true\ndefer_ask = true\n");
+    let sentinel = f.root.path().join("sentinel");
+    std::fs::write(&sentinel, "unchanged").unwrap();
+    let dir = f.root.path().join("state/command-guardian");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::os::unix::fs::symlink(&sentinel, dir.join("shadow.log")).unwrap();
+    let (response, stderr) = f.run(&f.input("rm /mnt/fixture/x", "/bin/bash"));
+    assert_eq!(response["status"], "deferred", "{response}");
+    assert_eq!(response["mode"]["enforce"], true);
+    assert!(
+        response["warning"]
+            .as_str()
+            .is_some_and(|w| w.contains("shadow log")),
+        "{response}"
+    );
+    assert!(stderr.contains("shadow log"), "{stderr}");
+    assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "unchanged");
 }

@@ -4,7 +4,9 @@ export interface Invocation {
   readonly shell: string;
 }
 
-export type Judgment = { readonly kind: "allow" | "ask" | "block" | "shadow"; readonly reason: string };
+export type Judgment =
+  | { readonly kind: "allow" | "ask" | "block" | "shadow"; readonly reason: string }
+  | { readonly kind: "deferred"; readonly reason: string; readonly warning?: string };
 
 export function response(text: string): Judgment {
   const invalid: Judgment = { kind: "ask", reason: "Invalid guardian response." };
@@ -14,6 +16,10 @@ export function response(text: string): Judgment {
   const enforce = "mode" in value && typeof value.mode === "object" && value.mode !== null && "enforce" in value.mode ? value.mode.enforce : undefined;
   if (value.status === "shadow" && enforce === false && !("verdict" in value)) return { kind: "shadow", reason: value.reason };
   if (value.status === "judged" && enforce === true && "verdict" in value && (value.verdict === "allow" || value.verdict === "ask" || value.verdict === "block")) return { kind: value.verdict, reason: value.reason };
+  if (value.status === "deferred" && enforce === true && !("verdict" in value)) {
+    if (!("warning" in value)) return { kind: "deferred", reason: value.reason };
+    if (typeof value.warning === "string") return { kind: "deferred", reason: value.reason, warning: value.warning };
+  }
   if (value.status === "unavailable" && enforce !== false && !("verdict" in value)) return { kind: "ask", reason: value.reason };
   return invalid;
 }
@@ -27,6 +33,7 @@ export async function authorize<T>(
   switch (judgment.kind) {
     case "block": throw new Error(judgment.reason);
     case "ask": await approve(input, judgment.reason); break;
+    case "deferred": if (judgment.warning !== undefined) console.warn(judgment.warning); break;
     case "shadow":
     case "allow": break;
   }

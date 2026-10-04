@@ -120,6 +120,7 @@ Project configuration is untrusted by default. It can add protected roots and re
 | `commands.guard` | Empty | Match program arguments, flags, option values, or environment assignments |
 | `git.enabled` | `true` | Enable Git-based classification |
 | `mode.enforce` | `true` | Return hook decisions instead of only logging them |
+| `mode.defer_ask` | `false` | Not recommended. Leave hook `ask` verdicts to the agent's own permission decision; user configuration only |
 | `trusted_projects` | Empty | Allow listed projects to use otherwise restricted settings |
 | `advisor.mode` | `"off"` | Available from 0.2.0. Disable advice, observe it, or enforce tighter verdicts; user configuration only |
 
@@ -222,6 +223,23 @@ enforce = false
 This setting affects hook decisions, not `check` verdicts or exit codes. Shadow mode writes one record per judgment to `$XDG_STATE_HOME/command-guardian/shadow.log`, falling back to `$HOME/.local/state/command-guardian/shadow.log`. Records contain the command text, target paths, verdict, reason, and timestamp. Treat the log as sensitive data.
 
 The log uses owner-only permissions. The checker rejects symlinks at the dedicated `command-guardian` directory or `shadow.log` file and rejects nonregular log files. If logging fails, it warns on standard error, emits no hook decision, and still exits with `0`. It does not promise to reject every symlink in parent directories or hard links.
+
+### Deferring ask to the agent
+
+This setting is not recommended. It removes guardian's confirmation for every hook `ask` verdict. If you still want the agent's own permission decision, such as Claude Code's auto mode or OpenCode's `run --auto`, to settle those requests, put this in your user configuration:
+
+```toml
+[mode]
+defer_ask = true
+```
+
+When enabled, and `mode.enforce` is `true`, a hook whose final verdict is `ask` returns no confirmation request. Claude and Codex modes print nothing and exit with `0`; guardian does not approve the command, and the agent's normal permission flow decides. The OpenCode plugin adds no guardian approval request, but OpenCode's own permissions still apply. `block` verdicts, including those from advice, are still denied, and `check` still reports `ask` with exit code `1`.
+
+Every `ask` is deferred, whatever its reason. This includes commands whose syntax cannot be read, internal errors, Git failures, and other cases where guardian cannot judge what the command would affect. No per-judgment warning is shown.
+
+The setting is read from user configuration only. Project configuration cannot enable it, even in a trusted project; the value is removed with a warning, without discarding the rest of that file. An invalid user value discards the user configuration file, as with other configuration errors. Shadow mode (`mode.enforce = false`) takes precedence and is unchanged.
+
+Each deferred judgment is recorded in the shadow log, at the same location and with the same permissions and symlink checks. A deferred record has the five tab-separated shadow fields (timestamp, verdict, reason, target path, command text) followed by a sixth field, `deferred`. Shadow-mode records keep exactly five fields. Deferrals are recorded even where the hook would print nothing anyway, such as Codex mode or Claude's `dontAsk` and `bypassPermissions` modes. If recording fails, guardian warns on standard error and the hook output is unchanged.
 
 ## Scope and limitations
 

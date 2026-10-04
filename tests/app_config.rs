@@ -617,3 +617,73 @@ fn req_027_untrusted_project_guard_rule_warning_is_kept() {
         r.warnings
     );
 }
+
+// @kotowari[REQ-059, REQ-014]
+#[test]
+fn req_059_project_defer_ask_is_ignored_with_a_warning_even_when_trusted() {
+    for trusted in [false, true] {
+        let dir = fixture_dir("defer-ask-project-");
+        let root = dir.path().canonicalize().unwrap();
+        let user = root.join("user.toml");
+        let trust = if trusted {
+            format!("trusted_projects=[{:?}]\n", root.to_str().unwrap())
+        } else {
+            String::new()
+        };
+        write(&user, &trust);
+        write(
+            &root.join(".command-guardian.toml"),
+            "[mode]\ndefer_ask = true\n",
+        );
+        let e = engine(Some(&user), &root);
+        assert!(!e.config().defer_ask, "trusted: {trusted}");
+        assert!(
+            e.check("true")
+                .warnings
+                .iter()
+                .any(|w| w.contains("mode.defer_ask")),
+            "trusted: {trusted}"
+        );
+    }
+}
+
+// @kotowari[REQ-059, REQ-015, EX-116]
+#[test]
+fn ex_116_invalid_project_defer_ask_keeps_the_protected_root() {
+    let dir = fixture_dir("defer-ask-project-invalid-");
+    let root = dir.path();
+    write(
+        &root.join(".command-guardian.toml"),
+        "[mode]\ndefer_ask = 'yes'\n[paths]\nprotected_roots = ['/tmp/defer-ask-fixture-protected']\n",
+    );
+    let e = engine(None, root);
+    assert!(!e.config().defer_ask);
+    assert_eq!(
+        verdict_of(&e, "rm /tmp/defer-ask-fixture-protected/x"),
+        Verdict::Block
+    );
+    assert!(
+        e.check("true")
+            .warnings
+            .iter()
+            .any(|w| w.contains("mode.defer_ask"))
+    );
+}
+
+// @kotowari[REQ-059, REQ-015]
+#[test]
+fn req_059_invalid_user_defer_ask_discards_the_file_and_stays_off() {
+    let dir = fixture_dir("defer-ask-user-invalid-");
+    let root = dir.path();
+    let user = root.join("user.toml");
+    write(&user, "[mode]\ndefer_ask = 'yes'\n[git]\nenabled = false\n");
+    let e = engine(Some(&user), root);
+    assert!(!e.config().defer_ask);
+    assert!(e.config().git_enabled);
+    assert!(
+        e.check("true")
+            .warnings
+            .iter()
+            .any(|w| w.contains("user configuration"))
+    );
+}

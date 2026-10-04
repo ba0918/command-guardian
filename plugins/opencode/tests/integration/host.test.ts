@@ -8,7 +8,7 @@ import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { stopHost } from "../helpers/host-process";
 
-type HostOptions={enforce?:boolean;shell?:string;nativeDeny?:boolean;nativeAsk?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean;controlPeer?:boolean;advisor?:boolean;
+type HostOptions={enforce?:boolean;shell?:string;nativeDeny?:boolean;nativeAsk?:boolean;deferAsk?:boolean;brokenLog?:boolean;wrongAuth?:boolean;managedService?:boolean;incompleteConnection?:boolean;controlPeer?:boolean;advisor?:boolean;
   // Launch as "opencode run --standalone" does: "serve --stdio" with no connection options.
   stdio?:boolean;
   // Record every judgment input before handing it to the real guardian.
@@ -53,8 +53,12 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
     await writeFile(join(bin,"command-guardian"),`#!/bin/sh\ninput=$(cat)\nprintf '%s\\n' "$input" >> ${JSON.stringify(join(root,"judgments.jsonl"))}\nprintf '%s' "$input" | exec ${JSON.stringify(guardian)} "$@"\n`,{mode:0o700});
   }else await symlink(guardian,join(bin,"command-guardian"));
   const config=join(home,"config","command-guardian");await mkdir(config,{recursive:true});
-  await writeFile(join(config,"config.toml"),`[mode]\nenforce = ${options.enforce??true}\n[paths]\nprotected_roots = [${JSON.stringify(join(project,"sentinel"))}]\n${options.advisor ? "[advisor]\nmode='enforce'\ntimeout_ms=10000\n" : ""}`);
+  await writeFile(join(config,"config.toml"),`[mode]\nenforce = ${options.enforce??true}\n${options.deferAsk ? "defer_ask = true\n" : ""}[paths]\nprotected_roots = [${JSON.stringify(join(project,"sentinel"))}]\n${options.advisor ? "[advisor]\nmode='enforce'\ntimeout_ms=10000\n" : ""}`);
   const sentinel=join(project,"sentinel");await writeFile(sentinel,"unchanged");
+  if(options.brokenLog){
+    await mkdir(join(home,"state","command-guardian"),{recursive:true});
+    await symlink(sentinel,join(home,"state","command-guardian","shadow.log"));
+  }
   // Hold a loopback port only long enough to select it; authenticate every subsequent request.
   const listener=Bun.serve({hostname:"127.0.0.1",port:0,fetch:()=>new Response("fixture")});
   const port=listener.port;listener.stop(true);
@@ -501,4 +505,47 @@ test("ex_147_failed_approval_creation_warns_and_leaves_the_command_to_opencode",
       expect(f.logs().split("\n").filter(line=>line.includes("command-guardian:")&&line.includes("approval request")).length).toBe(1);
     }finally{await f.close();}
   }
+},20000);
+
+// @kotowari[REQ-061, REQ-062, EX-123]
+test("req_061_native_deferred_ask_runs_without_a_guardian_request_and_is_recorded",async()=>{
+  const f=await host({deferAsk:true});
+  try{
+    await f.execute('printf ran > deferred; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    expect(await readFile(join(f.project,"deferred"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    const log=await readFile(join(f.root,"home/state/command-guardian/shadow.log"),"utf8");
+    expect(log.trim().endsWith("\tdeferred")).toBe(true);
+    const blocked=await f.execute("> sentinel");
+    expect(JSON.stringify(blocked)).toContain("protected");
+    expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-061, EX-124]
+test("req_061_native_deferred_ask_keeps_opencode_own_approval",async()=>{
+  const f=await host({deferAsk:true,nativeAsk:true});
+  try{
+    const run=f.execute('printf ran > native-ask; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    const requests=await pending(f,1);
+    const request=requests[0];if(!request)throw new Error("Missing native approval request");
+    expect(request.action).not.toBe("command-guardian");
+    await expect(readFile(join(f.project,"native-ask"),"utf8")).rejects.toThrow();
+    await f.client.permission.reply({sessionID:f.session.id,requestID:request.id,decision:"once"});
+    await run;
+    expect(await readFile(join(f.project,"native-ask"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+  }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-061, EX-131]
+test("req_061_native_record_failure_warns_and_keeps_the_deferral",async()=>{
+  const f=await host({deferAsk:true,brokenLog:true});
+  try{
+    await f.execute('printf ran > deferred-warning; eval "$GUARDIAN_FIXTURE_UNKNOWN"');
+    expect(await readFile(join(f.project,"deferred-warning"),"utf8")).toBe("ran");
+    expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
+    expect(await readFile(f.sentinel,"utf8")).toBe("unchanged");
+    expect(f.logs()).toContain("Could not write shadow log.");
+  }finally{await f.close();}
 },20000);

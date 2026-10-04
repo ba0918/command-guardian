@@ -19,6 +19,7 @@ pub struct Layer {
     pub guard: Vec<GuardRule>,
     pub git_enabled: Option<bool>,
     pub enforce: Option<bool>,
+    pub defer_ask: Option<bool>,
     pub trusted_projects: Vec<PathBuf>,
     pub warnings: Vec<String>,
 }
@@ -43,6 +44,11 @@ fn parse_layer_kind(
         && value
             .as_table_mut()
             .is_some_and(|table| table.remove("advisor").is_some());
+    let removed_defer_ask = project
+        && value
+            .get_mut("mode")
+            .and_then(toml::Value::as_table_mut)
+            .is_some_and(|mode| mode.remove("defer_ask").is_some());
     let mut layer = Layer::default();
     let root = &value;
     if root.as_table().is_none() {
@@ -91,6 +97,7 @@ fn parse_layer_kind(
     read_custom_rules(root, &mut layer.rules_custom, &mut layer.warnings);
     layer.git_enabled = read_bool(root, "git", "enabled", &mut layer.warnings);
     layer.enforce = read_bool(root, "mode", "enforce", &mut layer.warnings);
+    layer.defer_ask = read_bool(root, "mode", "defer_ask", &mut layer.warnings);
     read_path_list(
         root,
         "",
@@ -124,6 +131,11 @@ fn parse_layer_kind(
         layer
             .warnings
             .push("Ignoring advisor in project configuration".into());
+    }
+    if removed_defer_ask {
+        layer
+            .warnings
+            .push("Ignoring mode.defer_ask in project configuration".into());
     }
     Ok(layer)
 }
@@ -313,6 +325,9 @@ pub fn merge(config: &mut Config, layer: &Layer) {
     }
     if let Some(b) = layer.enforce {
         config.enforce = b;
+    }
+    if let Some(b) = layer.defer_ask {
+        config.defer_ask = b;
     }
     config
         .trusted_projects

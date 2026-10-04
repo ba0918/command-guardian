@@ -60,3 +60,37 @@ test("req_051_unavailable_reason_is_presented_for_approval", async () => {
   expect(await authorize({ kind: "ask", reason: "Could not establish execution input" }, invocation, async (_input, reason) => { displayed = reason; }, async () => "approved")).toBe("approved");
   expect(displayed).toContain("execution input");
 });
+
+// @kotowari[REQ-061, EX-123]
+test("req_061_deferred_response_runs_without_a_guardian_approval_request", async () => {
+  const result = response(JSON.stringify({ status: "deferred", mode: { enforce: true }, reason: "guardian reason" }));
+  expect(result.kind).toBe("deferred");
+  expect(await authorize(result, invocation, async () => { throw new Error("must not ask"); }, async () => "native execution")).toBe("native execution");
+});
+
+// @kotowari[REQ-061, EX-131]
+test("req_061_deferred_response_with_a_record_warning_shows_it_and_still_runs", async () => {
+  const result = response(JSON.stringify({ status: "deferred", mode: { enforce: true }, reason: "guardian reason", warning: "Could not write shadow log." }));
+  expect(result.kind).toBe("deferred");
+  const shown: unknown[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => { shown.push(...args); };
+  try {
+    expect(await authorize(result, invocation, async () => { throw new Error("must not ask"); }, async () => "native execution")).toBe("native execution");
+  } finally { console.warn = original; }
+  expect(shown.join(" ")).toContain("Could not write shadow log.");
+});
+
+// @kotowari[REQ-061, REQ-048, REQ-051]
+test("req_061_malformed_deferred_responses_are_not_deferred", async () => {
+  for (const value of [
+    { status: "deferred", reason: "missing mode" },
+    { status: "deferred", mode: { enforce: false }, reason: "shadow mode" },
+    { status: "deferred", mode: { enforce: true }, verdict: "allow", reason: "with verdict" },
+    { status: "deferred", mode: { enforce: true }, reason: "bad warning", warning: 1 },
+  ]) {
+    let started = false;
+    await expect(authorize(response(JSON.stringify(value)), invocation, async () => { throw new Error("approval rejected"); }, async () => { started = true; })).rejects.toThrow("approval rejected");
+    expect(started).toBe(false);
+  }
+});

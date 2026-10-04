@@ -29,11 +29,16 @@ fn run_hook(args: &[&str], input: &str, home: &Path, xdg: &Path) -> Run {
 
 /// 環境変数をそのまま渡してフックを起動する（空文字列の検証に使う）。
 fn run_hook_env(args: &[&str], input: &str, home: &str, xdg: &str, tmpdir: &str) -> Run {
-    let mut child = Command::new(bin())
-        .args(args)
+    let mut cmd = Command::new(bin());
+    cmd.args(args)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", xdg)
-        .env("TMPDIR", tmpdir)
+        .env("TMPDIR", tmpdir);
+    spawn_with_input(cmd, input)
+}
+
+fn spawn_with_input(mut cmd: Command, input: &str) -> Run {
+    let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -389,4 +394,209 @@ fn req_015_hook_warns_when_the_user_config_is_broken() {
     assert_eq!(r.code, 0);
     assert!(r.stderr.contains("Warning:"), "{}", r.stderr);
     assert!(r.stderr.contains("user configuration"), "{}", r.stderr);
+}
+
+/// XDG_STATE_HOME もフィクスチャへ向けてフックを起動する。委任の記録が実利用者の
+/// 影ログへ書かれないよう、`defer_ask` を有効にする試験はこれを使う。
+fn run_hook_with_state(args: &[&str], input: &str, home: &Path, xdg: &Path, state: &Path) -> Run {
+    let mut cmd = Command::new(bin());
+    cmd.args(args)
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", xdg)
+        .env("XDG_STATE_HOME", state)
+        .env("TMPDIR", "/tmp");
+    spawn_with_input(cmd, input)
+}
+
+fn write_user_config(xdg: &Path, text: &str) {
+    let path = xdg.join("command-guardian/config.toml");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, text).unwrap();
+}
+
+fn real_home() -> std::path::PathBuf {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap()
+}
+
+// @kotowari[REQ-059, EX-114]
+#[test]
+fn ex_114_without_defer_ask_claude_still_asks() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm /mnt/fixture/x", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert_eq!(
+        envelope(&r.stdout)["hookSpecificOutput"]["permissionDecision"],
+        "ask"
+    );
+}
+
+// @kotowari[REQ-059, EX-115]
+#[test]
+fn ex_115_trusted_project_cannot_enable_defer_ask() {
+    let xdg = temp_dir("command-guardian-hook-xdg-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let repo = git_repo_with_untracked();
+    let root = repo.path().canonicalize().unwrap();
+    write_user_config(
+        xdg.path(),
+        &format!("trusted_projects = [{:?}]\n", root.to_str().unwrap()),
+    );
+    std::fs::write(
+        root.join(".command-guardian.toml"),
+        "[mode]\ndefer_ask = true\n",
+    )
+    .unwrap();
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm notes.txt", root.to_str().unwrap()),
+        &real_home(),
+        xdg.path(),
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert_eq!(
+        envelope(&r.stdout)["hookSpecificOutput"]["permissionDecision"],
+        "ask"
+    );
+    assert!(r.stderr.contains("mode.defer_ask"), "{}", r.stderr);
+}
+
+// @kotowari[REQ-059, EX-117]
+#[test]
+fn ex_117_invalid_user_defer_ask_keeps_asking_and_warns() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = \"yes\"\n");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm /mnt/fixture/x", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert_eq!(
+        envelope(&r.stdout)["hookSpecificOutput"]["permissionDecision"],
+        "ask"
+    );
+    assert!(r.stderr.contains("user configuration"), "{}", r.stderr);
+}
+
+// @kotowari[REQ-060, EX-118]
+#[test]
+fn ex_118_claude_defers_ask_with_empty_output() {
+    let xdg = temp_dir("command-guardian-hook-xdg-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let repo = git_repo_with_untracked();
+    write_user_config(xdg.path(), "[mode]\ndefer_ask = true\n");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm notes.txt", repo.path().to_str().unwrap()),
+        &real_home(),
+        xdg.path(),
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+}
+
+// @kotowari[REQ-060, EX-119]
+#[test]
+fn ex_119_unreadable_syntax_ask_is_also_deferred() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("if then fi (", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+}
+
+// @kotowari[REQ-060, EX-120]
+#[test]
+fn ex_120_block_is_not_deferred() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "claude"],
+        &bash_input("rm -rf /etc/nginx", "/tmp/scratch"),
+        home.path(),
+        &xdg,
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    let value = envelope(&r.stdout);
+    assert_eq!(value["hookSpecificOutput"]["permissionDecision"], "deny");
+    assert!(
+        !value["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+// @kotowari[REQ-060, REQ-018, EX-121]
+#[test]
+fn ex_121_check_ignores_defer_ask() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    let out = Command::new(bin())
+        .args([
+            "check",
+            "rm /mnt/fixture/x",
+            "--cwd",
+            "/tmp/scratch",
+            "--format",
+            "json",
+        ])
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", &xdg)
+        .env("XDG_STATE_HOME", state.path())
+        .env("TMPDIR", "/tmp")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(value["verdict"], "ask");
+    assert!(!state.path().join("command-guardian").exists());
+}
+
+// @kotowari[REQ-060, REQ-062, REQ-022, EX-132]
+#[test]
+fn ex_132_unreadable_hook_input_is_not_deferred_or_recorded() {
+    let home = temp_dir("command-guardian-hook-home-");
+    let state = temp_dir("command-guardian-hook-state-");
+    let xdg = home.path().join(".config");
+    write_user_config(&xdg, "[mode]\ndefer_ask = true\n");
+    let r = run_hook_with_state(
+        &["hook", "--agent", "codex"],
+        "{not json",
+        home.path(),
+        &xdg,
+        state.path(),
+    );
+    assert_eq!(r.code, 0, "stderr: {}", r.stderr);
+    assert!(r.stdout.is_empty(), "{}", r.stdout);
+    assert!(!state.path().join("command-guardian/shadow.log").exists());
 }
