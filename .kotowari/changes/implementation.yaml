@@ -9,7 +9,7 @@ entries:
     after: sha256:9e83c7df3f83c7ed57139b286c08a66c99b802c9b7d736e1784fb096a1299057
   - path: CHANGELOG.md
     before: sha256:7e9e66bee52072cfebd09adbf50bd803639c666136588dfdf7b3397388ca3418
-    after: sha256:81dfe2db5cc8594a5ca34d8cc09528b41a9ee1560bbd594d0d6a51341019cef7
+    after: sha256:6eff958cbf7165de20b2d9df7e363fd35105606fd6f8497d00d3353939ba85d9
   - path: README.md
     before: sha256:74780bf44146cf072c2f643b2f20cc76316bef75618f230875895235023d1804
     after: sha256:34d314421d84bd6e5c7dafff5b98365c93e13d85f863d4e5ded30eab20d7ab9c
@@ -34,8 +34,10 @@ entries:
     UnreleasedをCHANGELOGの日付付き0.3.0見出しへ昇格し、0.2.0から0.3.0への比較リンクを加えた。
     各項目は承認済み要求のとおりで、接続が無いときの判定と承認が要る実行の委任はREQ-065からREQ-069、
     版の確認をやめ頼るAPIを読み込み時に確かめることはREQ-070、mode.defer_askはREQ-059からREQ-064に対応する。
-    BREAKINGの印は、明示の接続設定の失敗や承認要求を作れないときに実行を止めず警告して委ねる挙動が、
-    従来の停止から変わることを示すもので、REQ-052とREQ-067で承認済みの意味を利用者へ知らせるだけで要求を加えない。
+    BREAKINGの印は2項目に付けた。一つは接続設定なしで動く項目で、0.2.0では接続できないとき実行を止めていた(当時のREQ-052)が、
+    0.3.0では接続が無いときblock以外をOpenCode自身の権限判断に委ねて実行が進む(REQ-065、REQ-066)ため。
+    もう一つは明示の接続設定の失敗や承認要求を作れないときに実行を止めず警告して委ねる項目で、従来の停止から変わる(REQ-067)ため。
+    どちらも承認済みの意味を利用者へ知らせるだけで要求を加えない。
     READMEとOpenCode導入ガイドのmiseとplugin addの版付き例、明示サーバーの登録例を0.3.0へ揃え、
     standaloneの説明をREQ-068の内容のまま「0.2.0より後」から「0.3.0から」へ言い換えた。
     docs/opencode.mdの同梱物で導入する節は、アーカイブ名、リリースへのリンク(releases/tag/v0.3.0)、
