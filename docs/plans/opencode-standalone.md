@@ -6,12 +6,12 @@
 
 ## Specification
 
-IR は `docs/ir/` にある。判断の経緯と、固定版 OpenCode のコードを調べて確かめた事実は `docs/decision/records/2026-10-04-opencode-standalone.md` にある（A1〜A26、Investigation の節）。A3、A6、A10〜A15 は A21〜A23 で改められている。この計画が扱うのは次のとおり。
+IR は `docs/ir/` にある。判断の経緯と、固定版 OpenCode のコードを調べて確かめた事実は `docs/decision/records/2026-10-04-opencode-standalone.md` にある（A1〜A30、Investigation の節）。A3、A6、A10〜A15 は A21〜A23 で改められている。この計画が扱うのは次のとおり。
 
 - `docs/ir/opencode-standalone.md#REQ-065`、`#REQ-066`、`#REQ-067`、`#REQ-068`、`#REQ-069`
 - `docs/ir/opencode-delivery.md#REQ-070`、`#REQ-057`、`#REQ-058`
 - `docs/ir/opencode.md#REQ-052`（あわせて REQ-047、REQ-049、REQ-050、REQ-051、REQ-055 に足した委任への参照）
-- 例: EX-133 から EX-138、EX-140、EX-141、EX-144 から EX-149、EX-089、EX-106、EX-107、EX-108、EX-109、EX-098、EX-099
+- 例: EX-133 から EX-138、EX-140、EX-141、EX-144 から EX-153、EX-089、EX-106、EX-107、EX-108、EX-109、EX-098、EX-099
 
 各要求は `kotowari query REQ-nnn` で、例は `kotowari query EX-nnn` で読む。REQ-068、REQ-069、REQ-057、REQ-058 は verification が review なので試験を付けない。`docs/ir/FLAGS.md` の FLAG-002 は変更前からの出典の不足で、この計画では扱わない。
 
@@ -47,6 +47,8 @@ IR は `docs/ir/` にある。判断の経緯と、固定版 OpenCode のコー�
   - 既存の試験の期待は、REQ-052 の改定（版の照合をやめる、明示した設定の失敗と承認要求の作成失敗で止めない）に当たるものだけ改める
 - `docs/opencode.md`、`README.md`、`README-ja.md`
   - 既存の見出しは変えない。`site/build.py` が README の見出しで節を探すため
+- `site/template.html`
+  - 紹介ページの OpenCode の版を対応の条件とする記述だけ（決定 A30）
 - `CHANGELOG.md`
   - `## [Unreleased]` の節だけ
 - `.kotowari/changes/implementation.yaml`
@@ -64,7 +66,7 @@ S1 を最初にする。版の例外が残っていると、版の違う環境�
 |---|---|---|
 | S1 | REQ-070, REQ-052 | EX-144, EX-145, EX-106, EX-107, EX-108 |
 | S2 | REQ-065, REQ-066, REQ-052 | EX-133, EX-134, EX-135, EX-136, EX-137, EX-138, EX-140, EX-141, EX-146, EX-089, EX-109 |
-| S3 | REQ-067 | EX-147, EX-148, EX-149 |
+| S3 | REQ-067 | EX-147, EX-148, EX-149, EX-150, EX-151, EX-152, EX-153 |
 | S4 | REQ-068, REQ-069, REQ-057, REQ-058 | EX-098, EX-099（review） |
 | S5 | 上の全部の試験の印と、実装者の変更照合の記録 | 上の全部 |
 
@@ -110,7 +112,6 @@ kotowari check --format json
 - 接続できて承認要求を作れる場合の承認の経路の変更（決定 A7）
 - Rust 本体の変更
 - 版の更新とリリース。CHANGELOG の Unreleased に足すだけにする
-- 紹介ページ（`site/`）の変更
 - 実モデルを使う評価と、`opencode run --standalone` の通し実行
 
 ## Steps
@@ -139,23 +140,23 @@ kotowari check --format json
 
 ### S3: 接続がある状態で承認要求を作れないときに警告して委ねる
 
-- Purpose: 承認要求の作成が失敗したとき、作成の応答を受け取れなかったとき、作成の前に承認の経路（イベントの通信）がすでに止まっているときは、警告して OpenCode 自身の権限判断に委ね、承認待ちに入った後の通信の終了と、作成中の実行の中断やプラグインの解除では従来どおり取りやめる
+- Purpose: 承認要求の作成が失敗したとき、作成の応答を受け取れなかったとき、作成の前に承認の経路（イベントの通信）がすでに止まっていてつなぎ直せないときは、警告して OpenCode 自身の権限判断に委ね、承認待ちに入った後の通信の終了と、作成中の実行の中断やプラグインの解除では従来どおり取りやめる
 - Specification: `docs/ir/opencode-standalone.md#REQ-067`
 - Prerequisites: S2
 - May change: `plugins/opencode/src/index.ts`, `plugins/opencode/src/approval.ts`, `plugins/opencode/src/` の下の新しいファイル, `plugins/opencode/tests/unit/`, `plugins/opencode/tests/integration/host.test.ts`, `plugins/opencode/tests/helpers/host-process.ts`
-- Done when: 承認要求の作成が失敗するとホストの標準エラーに警告が出て OpenCode 自身の権限判断で実行の可否が決まり（EX-147）、作成の要求を送った後に応答を受け取る前に通信が切れても同じ扱いになり（EX-149）、承認待ちに入った後の通信の終了ではその実行が起動しない（EX-148）。`tests/unit/approval.test.ts` の作成失敗を承認と見なさない試験（今は EX-089 の印）は期待と印を REQ-067・EX-147 に改め、既存の REQ-053 の試験は、作成の応答を確かめてから切断するよう同期だけを直してよい
-- Shown by: test — EX-147 は、作成を失敗させる偽の仕組みを使う結合試験（管理サービスへ接続した既存の起動）で必須とし、approval の単体試験を足してもよい。EX-149 は応答の前に切る偽の仕組みを使う結合試験か approval の単体試験。EX-148 は既存の通信の終了の試験の印を確かめるか、足りなければ足す。各例に1つずつ
+- Done when: 承認要求の作成が失敗するとホストの標準エラーに警告が出て OpenCode 自身の権限判断で実行の可否が決まり（EX-147）、作成の要求を送った後に応答を受け取る前に通信が切れても同じ扱いになり（EX-149）、承認待ちに入った後の通信の終了ではその実行が起動しない（EX-148）。作成中に通信が切れた後に作成の応答が ask で届けばその実行を取りやめて OpenCode に委ねず（EX-150）、作成の応答より前に届いた拒否は作成が失敗しても守り（EX-151）、通信が終わった後に承認要求が要る実行が来たときは通信をつなぎ直して承認を求め（EX-152）、つなぎ直せなければ警告して OpenCode 自身の権限判断に委ねる（EX-153）。`tests/unit/approval.test.ts` の作成失敗を承認と見なさない試験（今は EX-089 の印）は期待と印を REQ-067・EX-147 に改め、既存の REQ-053 の試験は、作成の応答を確かめてから切断するよう同期だけを直してよい
+- Shown by: test — EX-147 は、作成を失敗させる偽の仕組みを使う結合試験（管理サービスへ接続した既存の起動）で必須とし、approval の単体試験を足してもよい。EX-149 は応答の前に切る偽の仕組みを使う結合試験か approval の単体試験。EX-148 は既存の通信の終了の試験の印を確かめるか、足りなければ足す。EX-150、EX-151、EX-152、EX-153 は approval の単体試験。各例に1つずつ
 - Left to the implementer: 作成の失敗と応答の欠落を作る偽の仕組みの形
 - Stop and hand back if: 承認要求の作成の失敗や、応答を受け取る前の通信の切断を、試験で作れない
 
 ### S4: 導入手順で standalone と委任と頼る API を説明し、更新履歴に足す
 
-- Purpose: docs/opencode.md と README で、standalone が接続設定なしで動くこと、接続が無いときは承認が要る実行を OpenCode 自身の権限判断に委ねること、対応の範囲を頼る API の一覧で示すこと、他のプラグインの上書きと読み込み失敗後の扱いを保証しないことを説明し、CHANGELOG の Unreleased に足す
+- Purpose: docs/opencode.md と README で、standalone が接続設定なしで動くこと、接続が無いときは承認が要る実行を OpenCode 自身の権限判断に委ねること、対応の範囲を頼る API の一覧で示すこと、他のプラグインの上書きと読み込み失敗後の扱いを保証しないことを説明し、CHANGELOG の Unreleased に足し、紹介ページ（site/template.html）の版を対応の条件とする記述を改める
 - Specification: `docs/ir/opencode-standalone.md#REQ-068`, `docs/ir/opencode-standalone.md#REQ-069`, `docs/ir/opencode-delivery.md#REQ-057`, `docs/ir/opencode-delivery.md#REQ-058`
 - Prerequisites: S1, S2, S3
-- May change: `docs/opencode.md`, `README.md`, `README-ja.md`, `CHANGELOG.md`
-- Done when: 文書に OpenCode の版を対応の条件とする記述が残らず（結合試験の環境としての固定版の記述は残してよい）、頼る API の一覧と standalone と接続が無いときの委任の説明があり、standalone に明示の接続設定を求める案内が無く、既存の見出しが変わらず、`cargo build --release --locked` の後の `python3 site/build.py` が失敗しない
-- Shown by: check — `cargo build --release --locked`、`python3 site/build.py`、`rg -n "2\.0\.21" README.md README-ja.md docs/opencode.md` の結果が試験の環境の記述だけであることを確かめ、その後に REQ-068 と REQ-057 の how_to_verify の項目を、プラグインのエラーの文面（`plugins/opencode/src/` の Error と警告の文字列）も含めて人が読んで確かめる
+- May change: `docs/opencode.md`, `README.md`, `README-ja.md`, `site/template.html`, `CHANGELOG.md`
+- Done when: 文書と紹介ページ（site/template.html）に OpenCode の版を対応の条件とする記述が残らず（結合試験の環境としての固定版の記述は残してよい）、頼る API の一覧と standalone と接続が無いときの委任の説明があり、standalone に明示の接続設定を求める案内が無く、既存の見出しが変わらず、`cargo build --release --locked` の後の `python3 site/build.py` が失敗しない
+- Shown by: check — `cargo build --release --locked`、`python3 site/build.py`、`rg -n "2\.0\.21" README.md README-ja.md docs/opencode.md site/template.html` の結果が試験の環境の記述だけであることを確かめ、その後に REQ-068 と REQ-057 の how_to_verify の項目を、プラグインのエラーの文面（`plugins/opencode/src/` の Error と警告の文字列）も含めて人が読んで確かめる
 - Left to the implementer: 文章と、説明を置く節の中の位置
 - Stop and hand back if: 既存の見出しを変えないと説明を置けない
 
