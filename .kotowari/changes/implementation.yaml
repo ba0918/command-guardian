@@ -15,7 +15,7 @@ entries:
     after: sha256:34d314421d84bd6e5c7dafff5b98365c93e13d85f863d4e5ded30eab20d7ab9c
   - path: docs/opencode.md
     before: sha256:ebf8c6ca9790fbea8294821dad6bf8f97e019a21edd90cff76409bdb2635b5e2
-    after: sha256:a23494545e789cc758e7171bbbf0c5bece1b481639154535041163d54088fa6a
+    after: sha256:dc6f2cc06f91ad06a9487f43fac83d565deba6f813c1deeb792049645b82f3ee
   ir:
   - path: docs/ir/release.md
     sha256: sha256:afde40e013384671970408604eaf548b3a3265716e6f03a5e060710bd88b0d01
@@ -38,9 +38,8 @@ entries:
     従来の停止から変わることを示すもので、REQ-052とREQ-067で承認済みの意味を利用者へ知らせるだけで要求を加えない。
     READMEとOpenCode導入ガイドのmiseとplugin addの版付き例、明示サーバーの登録例を0.3.0へ揃え、
     standaloneの説明をREQ-068の内容のまま「0.2.0より後」から「0.3.0から」へ言い換えた。
-    ただしdocs/opencode.mdの同梱物で導入する節は、アーカイブ名を0.3.0にした一方で、
-    リンク先がreleases/tag/v0.2.0のままで、他の版では0.2.0を置き換えるという案内も残っており、文面が食い違う。
-    これは要求の意味の変更ではなく文書の誤りとして、この記録は現在のバイト列をそのまま照合したものである。
+    docs/opencode.mdの同梱物で導入する節は、アーカイブ名、リリースへのリンク(releases/tag/v0.3.0)、
+    他の版では0.3.0を置き換えるという案内をすべて0.3.0に揃え、手順の内容は変えていない。
     同版プラグインの登録と対応条件(REQ-056、REQ-057)、配布物の構成(REQ-025)は変えていない。
     タグは先行作成せず、既存CIが全検査後に公開する。
   requirements: [REQ-025, REQ-052, REQ-056, REQ-057, REQ-059, REQ-060, REQ-061, REQ-062, REQ-063, REQ-064, REQ-065, REQ-066, REQ-067, REQ-068, REQ-069, REQ-070]
