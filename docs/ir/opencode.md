@@ -97,7 +97,7 @@ Bash 以外の shell では安全に判定できたと見なさず、対象外�
 ## Examples
 
 ```gherkin
-@id=EX-106 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-04-opencode-standalone.md#A17
+@id=EX-106 @about=REQ-052 @source=docs/decision/records/2026-10-03-opencode-managed-service.md#A3,docs/decision/records/2026-10-04-opencode-standalone.md#A17,docs/decision/records/2026-10-04-version-and-followups.md#A8
 Scenario: 接続設定なしで自身の管理サービスを使う
   Given プラグインが認証付きloopbackの管理サービス内で動いている
   And 接続オプションが未指定である
@@ -196,7 +196,7 @@ Scenario: 判定のタイムアウトを黙って通さない
   When エージェントがshell実行を要求する
   Then タイムアウトの理由を示し承認なしで実行しない
 
-@id=EX-088 @about=REQ-052 @source=docs/decision/records/2026-10-02-opencode-v2-hook.md#A10
+@id=EX-088 @about=REQ-052 @source=docs/decision/records/2026-10-04-version-and-followups.md#A8
 Scenario: 明示した同一サーバーで承認要求を作る
   Given プラグインをホストする同一HTTPサーバーへの接続と認証を明示設定している
   When 承認要求を作る

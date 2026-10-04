@@ -16,7 +16,7 @@ TypeScript で実装したプラグインを guardian のリリースに同梱�
 ### REQ-057: 対応条件と保証の限界
 
 - kind: ubiquitous
-- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A17, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22, docs/decision/records/2026-10-04-opencode-standalone.md#A5, docs/decision/records/2026-10-04-opencode-standalone.md#A18
+- source: docs/decision/records/2026-10-02-opencode-v2-hook.md#A8, docs/decision/records/2026-10-03-opencode-managed-service.md#A3, docs/decision/records/2026-10-03-opencode-managed-service.md#A2, docs/decision/records/2026-10-02-opencode-v2-hook.md#A17, docs/decision/records/2026-10-02-opencode-v2-hook.md#A20, docs/decision/records/2026-10-02-opencode-v2-hook.md#A21, docs/decision/records/2026-10-02-opencode-v2-hook.md#A22, docs/decision/records/2026-10-04-opencode-standalone.md#A5, docs/decision/records/2026-10-04-opencode-standalone.md#A18, docs/decision/records/2026-10-04-version-and-followups.md#A8
 - verification: review
 - how_to_verify: 導入手順でLinux x86_64・WSL、Bashの明示設定、入力を変更する他のhookがない条件、同一HTTPサーバーへの接続・認証設定、プラグインが頼るフックと文脈のAPIの一覧を確認する。OpenCodeの版を対応の条件にしていないこと、無応答の即時検知、競合時の確認表示の完全な後始末を保証していないことを確かめる。
 
