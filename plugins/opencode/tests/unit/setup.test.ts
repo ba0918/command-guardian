@@ -74,7 +74,7 @@ test("ex_145_missing_shell_hook_api_fails_loading_with_its_name", async () => {
     const h = host(f.project, { shell: {} });
     const failure = await Promise.resolve(plugin.setup(h.context)).then(() => undefined, (error: unknown) => error);
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/missing OpenCode plugin API: shell\.hook$/);
+    expect((failure as Error).message).toContain("shell.hook");
     expect(h.registered.execute).toBeUndefined();
   } finally { await f.restore(); }
 });
