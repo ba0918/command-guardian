@@ -1,155 +1,120 @@
 version: 1
 entries:
-- id: opencode-standalone-plugin-implementation
-  base: 46bf07490feb15418df6e0ae69a3b50922ef39ea
-  role: implementer
-  files:
-  - path: plugins/opencode/src/approval.ts
-    before: sha256:2e6ea5d3de9c957dfc5da7b53ef14240e0bebd274b82da5dfaef472f9f914fd3
-    after: sha256:8efc2ab3e28f23b91db73e70b14fdf6b30b7befa790b219fde033cd2f660aac3
-  - path: plugins/opencode/src/connection.ts
-    before: sha256:812e12e315330c50adb248a010ff68244c66acddd60d1a253285dd315e9f3a02
-    after: sha256:5194fbb4d36b417049a7597c88bca457f30ba6466d21316c4163053e1cadb0f9
-  - path: plugins/opencode/src/index.ts
-    before: sha256:997bead58252ffdf928596c8d610718edc2f1c3c2cbe8186c7ca2a650ec188d2
-    after: sha256:83bf0ee5dfdc1e65c05d48942d48e994167395dd7a57361b47cdac251efd353b
-  - path: plugins/opencode/tests/helpers/host-process.ts
-    before: sha256:1a602f1a17ff30e323e9062cb3ef2a68f1e8e2fc8e44d90ca72f93fd58e99ecb
-    after: sha256:6e6035e2e000ea8febbe894975497f067866fcd8f36ccfbd74c146906a6c7681
-  - path: plugins/opencode/tests/integration/bridge/index.ts
-    before: sha256:fc7746d1d80fa1a3543a24a3e610bbefaa88b7503dcd02094d01882d82bfda69
-    after: sha256:6aa8a94d5808c3ba8a3ee858d759902563f4a714ebe6ba97e83f6f12922c3f88
-  - path: plugins/opencode/tests/integration/host.test.ts
-    before: sha256:58b947a4d89c9d37de8b515d96e7f86be0c3f97c862d2555f5b9d781e1c3a87a
-    after: sha256:0c7250ca6efb53674e210f57c983b92c813ddaf42579a564c56f724a7123d46a
-  - path: plugins/opencode/tests/unit/approval.test.ts
-    before: sha256:c168054ffd2ac74c723f2962f59a31408a65a595108d689688d3275c552dc006
-    after: sha256:ae1a00f6f6a52b9bbcddc3fa612ccd6aab8666863f8dfc1e1c7c7947eff6f51b
-  - path: plugins/opencode/tests/unit/connection.test.ts
-    before: sha256:f68dd2f0765b96b7dac6eaf146a7eab4b234f66bf074343f486bf8c19f292631
-    after: sha256:2e07a4e6aaac562b9577261edfdb13c91ec54f60e34482494c5bd6a37b12f61b
-  - path: plugins/opencode/tests/unit/setup.test.ts
-    before: null
-    after: sha256:56d901dc556c7e20504ef50a9a3133b961d1fd4219e94f108a748df259d163fd
-  ir:
-  - path: docs/ir/opencode-standalone.md
-    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
-  - path: docs/ir/opencode.md
-    sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
-  - path: docs/ir/opencode-delivery.md
-    sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
-  conclusion: new
-  reason: >-
-    比較基準の時点ではREQ-065〜REQ-070とdocs/ir/opencode-standalone.mdは無く、REQ-052は接続・認証・承認要求の作成の失敗で実行を止め、自動接続で版2.0.21だけを受け入れると定めていた。この範囲で決定A16〜A29を採ってIRを追加・改訂したため、基準から見て既存の要求の内側ではなく新しい選択である。基準のREQ-052と版の照合を覆す選択(A16、A17、A21〜A24、A29)と、基準が定めていなかった読み込み時のAPI確認、警告の出し先、作成と切断の重なり(A20、A25〜A28)を仕様の欠落として記録した。
-    プラグインはOpenCodeの版を照合せず、読み込み時にshell.hook、permission.hook、permission.reply、tool.transform、location.directoryの有無を確かめ、欠けた名前を示して失敗する(REQ-070、EX-144、EX-145)。自動接続は版を照合せずPID、loopback、認証情報、リダイレクト拒否の照合だけで採否する(REQ-052、EX-106〜EX-108)。
-    connectの結果を接続済み、未指定で接続なし、明示設定の失敗に分けた。明示設定は読み込み時にserver.infoで接続と認証を確かめ、失敗しても自動接続へ切り替えず、読み込み時と実行ごとにconsole.warnで警告する(REQ-052、REQ-065、EX-089、EX-109、EX-135)。
-    接続が無いときはツールの包みで判定せず、create.beforeが受け取る実際のshell、cwd、コマンドで判定し、blockだけを拒否してそれ以外は何も出さずに戻り、OpenCode自身の権限判断に委ねる。起動入力を確定できない場合も委ねる(REQ-065、REQ-066、REQ-047、EX-133、EX-134、EX-136、EX-137、EX-140、EX-141、EX-146)。接続がある場合の経路は変えていない(EX-138)。
-    承認要求の作成が失敗したとき、作成の応答を受け取れなかったときはunavailableを返し、呼び出し側が実行ごとに警告して委ねる。承認待ちは作成の応答を受け取った時点から始まり、作成中の通信の終了だけでは取りやめない(REQ-067、EX-147、EX-149)。
-    イベントの通信を接続ごとの単位に分け、各承認要求は作成時の接続を持つ。作成中にその接続が切れて応答がaskで届いた場合は、別の接続へつなぎ直した後でも取りやめ、委ねない(A27、EX-150)。作成の応答より前に届いた拒否の返答は覚えておき、その後に作成が失敗しても拒否として扱う(A28、EX-151)。通信が終わった後に承認要求が要る実行が来たときは新しい接続でつなぎ直してから作成し、つなぎ直せなければunavailableを返して委ねる(A29、EX-152、EX-153)。承認待ちの後の通信の終了、中断、解除では従来どおり取りやめ、後の承認や再接続でも再開しない(REQ-053、EX-148)。
-    試験は固定版のホストをserve --stdioとserveで隔離起動し、偽のguardianとbridgeの評価フックで判定の入力、タイムアウト、作成の失敗を作る。基準からの既存の試験の期待の変更は、作成失敗で止めずに委ねるというREQ-052からREQ-067への改定に当たるものだけで、承認待ちの切断の単体試験は作成の応答を受け取ってから切断するよう同期を直し、EX-148の印を足した。単体試験の器具はつなぎ直しごとに新しい通信を作るよう改めた。頼るAPIが無いときの試験(EX-145)は、読み込みの失敗と欠けたAPIの名前を含むことだけを確かめる。
-  requirements: [REQ-047, REQ-052, REQ-053, REQ-065, REQ-066, REQ-067, REQ-070]
-  decisions:
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A16
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A17
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A20
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A21
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A22
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A23
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A24
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A25
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A26
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
-  handoff: null
-  gaps:
-  - category: spec_conflict
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A16
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A17
-  - category: spec_conflict
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A24
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A29
-  - category: missing_spec
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A25
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A26
-  - category: missing_spec
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A27
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A28
-- id: opencode-standalone-docs-implementation
+- id: defer-ask-implementation
   base: 46bf07490feb15418df6e0ae69a3b50922ef39ea
   role: implementer
   files:
   - path: CHANGELOG.md
     before: sha256:70b171ac0db0f9750abee33bc24ad89a2b2ce2a0ebc88ada2f91124a7db3753d
-    after: sha256:0f05bd7883bf06e5d1e8d1e9ec5a2c7a3a1c0796c996b58678cfe371f285929c
+    after: sha256:85565fe201ea13477a50f9579588978c14f45c279426f80e972cfed022f96f16
   - path: README.md
     before: sha256:ad6a3bcd57ecd557163dde629283c08c4af655ff5d1cb4548c3d2b27c500939d
-    after: sha256:546f5d19cd69bc27d5aec8457d4f300e9ad6fc9d0e16f6c7ee777b7d8702d4e5
+    after: sha256:a67a08838098174f5fd227ec2840f4c4b054725467ffff731694e33f4f9224ae
+  - path: crates/guardian-policy/src/config.rs
+    before: sha256:c8eeb2ed78b4e51ad7bab460d3c161373be442708e132c4db769d699129d972b
+    after: sha256:9b2ca524166b53839e681a83d3e31aeabc9653b6a3bcf7a498fcb45f265ad170
+  - path: crates/guardian-policy/src/layers.rs
+    before: sha256:7cf09074da42278e970123be7bf5bd7b4450ec0283bdba77b3aa9be3254fa66d
+    after: sha256:8c3334b640497f1512ed9ec12d893e9921a2cfb81896fb08ef995fa6ba5a63b4
+  - path: crates/guardian-policy/tests/layers.rs
+    before: sha256:67f351702cd426e2c62d5a3bbf01db1f5b8753597d1ba8ffafa58f0f361aa989
+    after: sha256:13e4a66bac2847b877973105693383538ce1a4be28b2cc5caa3a13ab2e3e2e8a
   - path: docs/opencode.md
     before: sha256:615565e2574d8b70c32593c570612a6eaf810941f4a36d4a12808e00403795b2
-    after: sha256:2353a437e51aab1013906a4aa02b87de1b8830597bd30826d044268c646b269c
+    after: sha256:c10cc1dca4cb7d53bcfa568d87014c7aa767869ce93aec23b99b70c19326c58d
+  - path: plugins/opencode/src/gate.ts
+    before: sha256:7cff3be711d45cf2353e18ad469120aeb7c65f1e5171e7b47da23813ac02528b
+    after: sha256:eb9d19553206382289778d05bd3407b527d0cb14fe1c0f7672ae7a9d9290c191
+  - path: plugins/opencode/tests/integration/host.test.ts
+    before: sha256:58b947a4d89c9d37de8b515d96e7f86be0c3f97c862d2555f5b9d781e1c3a87a
+    after: sha256:5fb296428d4413556ee9f13102e6c9f0132d0d60a0ff8a414f1e8997f244e18e
+  - path: plugins/opencode/tests/unit/gate.test.ts
+    before: sha256:e6e55f2114636b2838911416239685bb1cec0ada7df2c6fd993a7b8a1dcdb2e3
+    after: sha256:9ba64c389361a0dab97827e98fc326626cfecf23e2a24be9e8063e2ec1d8ea5a
+  - path: plugins/opencode/tests/unit/guardian.test.ts
+    before: sha256:a3d1abb522a06f4503f68bbce29473479e1920408fb243315af83a67c6ff1e13
+    after: sha256:1274266e39ac2e584dd0e37da3e4fd11ef498ed0ae38c01c0b30340cef5523ce
+  - path: src/hook.rs
+    before: sha256:24960f0be29fcaf685fe75fe39917ae369b946ea0a282e86533189c8c9c69e04
+    after: sha256:167aaf95e71427d75dbbc56a399c4c28c164d83a23904b1f0d736e802e660be5
+  - path: src/hook/opencode.rs
+    before: sha256:eeb22ddc6c9ae87be1b3093578cb921ee1e995718632873f2bca5759a666eec8
+    after: sha256:31daf4020c1b5378f1cf0661d39e25d9eda13826183dac6023c69a43ee5cbd7e
+  - path: src/log.rs
+    before: sha256:c7411127741d0ed1fbcbe52c3d185b1f358b64b4a25021097d5bddc4b4b4b550
+    after: sha256:79f765bf581f8a06fefb8845c2b5e2f0b79bf86888dbe37e9451ddb19eccd3e6
+  - path: tests/app_config.rs
+    before: sha256:403b04fa4196f74201058f6a594fd16f35d3b6011aa9c884a14d427f8b9bc8a1
+    after: sha256:05a586b839e4c9e958a5423219cb7a4775a2d9412ae49f54e0b9d126d0d1afff
+  - path: tests/hook.rs
+    before: sha256:220a25ecd4f8caff35bfd5953f242bdab2ad4a1ff7ef66f2051a776a06870a69
+    after: sha256:6b243e754e4762ced6cae64b31ad3023761acf762ef83b0b75d9e11e36d9251c
+  - path: tests/opencode_hook.rs
+    before: sha256:1e6456174bcb63d57387b707931c49921c72325263bb637a557cda3c46ce1c9f
+    after: sha256:385547750bf7fd3b2f4327a936afb5c9b648d9e408dd0d2f2dbc8c239337616c
+  - path: tests/shadow.rs
+    before: sha256:883db416085e1c6db617f0690aebe85d25f774610a33efc6141b9aeaa8d71512
+    after: sha256:bee852717b6162ac2dc6918cf74098706b4b47abec2464cc078cfc2a2c299e9e
   ir:
-  - path: docs/ir/opencode-standalone.md
-    sha256: sha256:a05753cae91964e93861f22f93965f9e495194019fb7f4ef57c58e92a23fb0ce
-  - path: docs/ir/opencode-delivery.md
-    sha256: sha256:bf5b31af0f93f704aab700b018242a739bcc97fdac98714d5bb574cdf59e814d
+  - path: docs/ir/CONTEXT.md
+    sha256: sha256:c99630fc59a64836c7f5359703f09c36baab85fb851ae9d2e57eda5105b3a061
+  - path: docs/ir/agents.md
+    sha256: sha256:d261edbd7871da3b6f8125f7211158b53c0768ba1044ad1aa6e7eddcc7f783ec
+  - path: docs/ir/cli.md
+    sha256: sha256:80ae91c6fb3c0ee3ca5358765b4f1be1f46df8301c978b382ffb924fe7af985c
+  - path: docs/ir/config.md
+    sha256: sha256:eb7b6d121bc30933019ee50cd812e124636debcdab87a7ce27957f067c0f2942
+  - path: docs/ir/defer-ask.md
+    sha256: sha256:84f99b2f0bd9c48dba5e8f05b600c98112d67bcc6c01c04813476f4af60fc010
   - path: docs/ir/opencode.md
-    sha256: sha256:ff8e3a913d2031512e8f3ccebf4010422210bae4f48721d9f90004efdc5a11ab
+    sha256: sha256:aea73493f925e211ab28a77eddbd7afb6b21f8543c0c5f1cc2397ce93f6fce33
   conclusion: new
   reason: >-
-    比較基準の文書はstandalone、リモート、明示起動のサーバーに接続オプションを求め、自身の管理サービスの版2.0.21を確かめられなければ実行しないと案内していた。この前提を決定A9、A18、A19、A30で改め、基準の仕様と食い違う委任の扱い(A21〜A23)と、基準に無かったAPI確認と作成・切断の重なりの扱い(A20、A27〜A29)を記録したため、結論を新しい選択とする。
-    導入手順からOpenCodeの版を対応の条件とする記述を外し、プラグインが頼るフックと文脈のAPIの一覧、読み込み失敗後の扱いと他のプラグインのevaluateフックによる上書きを保証しないことを書いた。固定版2.0.21は結合試験の環境としてだけ記す(REQ-057、REQ-070)。
-    opencode run --standaloneが接続設定なしで動くこと、接続が無いときはblockだけを拒否し、guardianの承認が要る実行にguardianの確認を出さずOpenCode自身の権限判断に委ねること、明示設定の失敗と承認要求の作成失敗では警告して委ねることを新しい節に書き、standaloneに明示の接続設定を求める案内を消した(REQ-068、REQ-065〜REQ-067)。検証の範囲にserve --stdioの結合試験と通し実行をしないことを足した(REQ-058、REQ-069)。
-    承認の振る舞いの節に、作成の応答より前に届いた拒否は作成が失敗しても守ること、作成中に通信が切れた後に応答が承認待ちを示せば取りやめること、通信が終わった後はつなぎ直してから承認要求を作り、つなぎ直せなければ警告して委ねること、再接続でも取りやめた実行を再開しないことを書いた(REQ-067、REQ-053、A27〜A29)。
-    既存の見出しは変えず、site/build.pyの生成が成功することを確かめた。CHANGELOGはUnreleasedの節だけに足した。README-ja.mdも同じ内容に改めた。README-ja.mdと紹介ページsite/template.html(A30で版ではなくプラグインAPIを対応条件とする記述に改めた)は変更照合の対象の外である。
-  requirements: [REQ-057, REQ-058, REQ-065, REQ-066, REQ-067, REQ-068, REQ-069, REQ-070]
+    呼出元が固定した比較元からHEADまでの変更ファイルについて、Git modeとblob、関連IRの全bytesを再取得した。
+    利用者設定のmode.defer_askを既定falseの真偽値として読み、プロジェクト設定の値は型の検証前に取り除いて警告し、利用者設定の不正値はファイル全体を不採用にする（REQ-059、REQ-013からREQ-015）。
+    Claude CodeとCodexのフックは影実行の分岐の後で、最終判定がaskのものだけを何も出力せず終了コード0で委ね、blockと助言のblockは拒否し、checkと判定に至らない入力の扱いは変えない（REQ-060、REQ-063、REQ-018、REQ-022、REQ-023）。
+    委任の記録は影ログと同じ保存先と検査を使い、保存失敗は警告にとどめる（REQ-062、REQ-019）。
+    REQ-061とREQ-062が実装担当に委ねた具体的な形として、記録行の6番目の欄deferred（A18）と、OpenCodeのstatus deferredの応答とwarningの載せ方（A19）を新しく決めたためnewとする。既存のjudged・shadow・unavailableの応答と影実行の行の形は変えていない。
+    プラグインは設定を読まず、委任の応答だけでguardian由来の承認要求を省き、判定を取得できない場合は従来どおり承認を求める（REQ-048からREQ-051）。
+    README、CHANGELOG、OpenCode導入文書は、推奨しない理由と危険、記録の印、委任時の承認の扱いを説明する変更で、承認済み要求の意味は変えない。
+    承認済みの要求と既存の決定は変更していない。この記録は実装者の照合だけを示し、独立したレビューと最終HEADでのreview検査は主張しない。
+  requirements:
+  - REQ-059
+  - REQ-060
+  - REQ-061
+  - REQ-062
+  - REQ-063
+  - REQ-064
+  - REQ-013
+  - REQ-014
+  - REQ-015
+  - REQ-018
+  - REQ-019
+  - REQ-022
+  - REQ-023
+  - REQ-048
+  - REQ-049
+  - REQ-050
+  - REQ-051
   decisions:
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A9
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A18
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A19
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A20
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A21
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A22
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A23
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A25
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A27
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A28
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A29
-  - docs/decision/records/2026-10-04-opencode-standalone.md#A30
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A1
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A2
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A3
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A4
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A5
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A6
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A7
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A8
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A9
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A10
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A11
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A12
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A13
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A14
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A15
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A16
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A17
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A18
+  - docs/decision/records/2026-10-04-auto-allow-ask.md#A19
   handoff: null
-  gaps:
-  - category: premise_conflict
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A9
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A19
-  - category: premise_conflict
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A18
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A30
-  - category: spec_conflict
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A21
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A22
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A23
-  - category: missing_spec
-    disposition: recorded
-    refs:
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A20
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A27
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A28
-    - docs/decision/records/2026-10-04-opencode-standalone.md#A29
+  gaps: []
