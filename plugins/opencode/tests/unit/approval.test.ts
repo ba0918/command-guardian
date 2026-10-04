@@ -36,18 +36,21 @@ test("req_053_cancellation_before_event_connection_settles_without_a_deadline",a
     expect(settled).toBeInstanceOf(Error);
   }finally{approval.close();}
 });
-function fixture(create?: (request: ApprovalRequest) => Promise<"ask" | "allow" | "deny">) {
-  const events = new Events();
+function fixture(create?: (request: ApprovalRequest) => Promise<"ask" | "allow" | "deny">, reconnect = true) {
+  const streams: Events[] = [];
   const requests: ApprovalRequest[] = [];
   const removed: string[] = [];
   let next=0;
   const approval = new Approval({
     newID:()=>String(++next),
-    events: () => events.stream(),
+    events: () => {
+      if (streams.length > 0 && !reconnect) throw new TypeError("fetch failed");
+      const events = new Events(); streams.push(events); return events.stream();
+    },
     create: async request => { requests.push(request); return create ? create(request) : "ask"; },
     reject: async id => { removed.push(id); },
   });
-  return { events, requests, removed, approval };
+  return { get events() { const latest = streams.at(-1); if (!latest) throw new Error("no event stream"); return latest; }, streams, requests, removed, approval };
 }
 async function waitFor(check: () => boolean) {
   for (let i = 0; i < 100; i++) { if (check()) return; await Promise.resolve(); }
@@ -88,6 +91,20 @@ test("ex_149_connection_lost_before_the_creation_response_is_left_to_opencode", 
   fail(new TypeError("fetch failed"));
   expect(await run).toBe("unavailable");
   f.approval.close();
+});
+
+// @kotowari[REQ-067, EX-151]
+test("ex_151_reject_reply_before_a_failed_creation_is_kept", async () => {
+  let fail: (error: Error) => void = () => {};
+  const f = fixture(() => new Promise((_resolve, reject) => { fail = reject; }));
+  const run = f.approval.request("session", input, "reason", new AbortController().signal).then(() => null, error => error);
+  await waitFor(() => f.requests.length === 1);
+  const request = f.requests[0]; if (!request) throw new Error("missing request");
+  f.events.emit({ type: "reply", id: request.id, session: "session", reply: "reject" });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  fail(new Error("authentication failed"));
+  expect(await run).toBeInstanceOf(Error);
+  f.approval.close(); f.events.end();
 });
 
 // @kotowari[REQ-067]

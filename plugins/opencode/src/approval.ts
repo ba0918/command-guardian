@@ -55,7 +55,9 @@ export class Approval {
     const controller = new AbortController();
     let settle: (error:Error|null)=>void = () => {};
     let cancelled: (error:Error)=>void = () => {};
-    const outcome = new Promise<Error|null>(resolve => { settle = resolve; });
+    // A reply can arrive before the creation response; a rejection received then still stands.
+    let settled: {error:Error|null} | undefined;
+    const outcome = new Promise<Error|null>(resolve => { settle = error => { settled ??= {error}; resolve(error); }; });
     const cancellation = new Promise<Error>(resolve => { cancelled = resolve; });
     let cancellationError: Error | undefined;
     const cancel = (error:Error) => {
@@ -78,6 +80,7 @@ export class Approval {
       if (created instanceof Error) throw created;
       if (!created) {
         if (cancellationError) throw cancellationError;
+        if (settled?.error) throw settled.error;
         // A request whose creation is unknown may remain; any later reply to it is ignored.
         this.reject(id,session);
         return "unavailable";
