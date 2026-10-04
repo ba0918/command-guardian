@@ -100,7 +100,7 @@ test("req_067_creation_after_the_event_connection_ended_is_left_to_opencode", as
   f.approval.close();
 });
 
-// @kotowari[REQ-067, REQ-053]
+// @kotowari[REQ-067, REQ-053, EX-150]
 test("req_067_creation_answered_after_the_event_connection_ended_is_cancelled", async () => {
   let answer: (value: "ask") => void = () => {};
   const f = fixture(() => new Promise(resolve => { answer = resolve; }));
