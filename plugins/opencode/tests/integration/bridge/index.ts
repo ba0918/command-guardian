@@ -8,6 +8,10 @@ import { Effect } from "effect";
 export default Plugin.define({
   id: "guardian.test.bridge",
   async setup(ctx) {
+    // Makes guardian approval creation fail at the host, as a server error would.
+    if (process.env.GUARDIAN_TEST_FAIL_APPROVAL === "1") await ctx.permission.hook("evaluate", event => {
+      if (event.action === "command-guardian") throw new Error("Fixture approval creation failure");
+    });
     await ctx.rpc.register(Rpc.define({id:"guardian-test",events:{},methods:{execute:{
       input:{type:"object",properties:{session:{type:"string"},command:{type:"string"},workdir:{type:"string"},background:{type:"boolean"},codeMode:{type:"boolean"}},required:["session","command"]},
       output:{type:"object",properties:{error:{type:"string"},content:{type:"string"}}},

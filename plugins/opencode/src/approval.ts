@@ -9,10 +9,12 @@ export interface ApprovalPort {
 }
 export class Approval {
   private readonly controller = new AbortController();
-  private readonly pending = new Map<string, {session:string; reply:(error:Error|null)=>void; cancel:(error:Error)=>void}>();
+  // Waiting starts when the creation response arrives; until then a lost connection does not cancel.
+  private readonly pending = new Map<string, {session:string; waiting:boolean; reply:(error:Error|null)=>void; cancel:(error:Error)=>void}>();
   private readonly ready: Promise<void>;
   private connected: (()=>void) = () => {};
   private stopped: Error | undefined;
+  private unloaded = false;
   constructor(private readonly port:ApprovalPort) {
     this.ready = new Promise(resolve => { this.connected = resolve; });
     void this.listen();
@@ -27,15 +29,16 @@ export class Approval {
           if (pending?.session === event.session) pending.reply(event.reply === "reject" ? new Error("Guardian approval rejected.") : null);
         }
       }
-      this.close(new Error("Guardian approval connection ended."));
+      this.stop(new Error("Guardian approval connection ended."),false);
     } catch {
-      this.close(new Error("Guardian approval connection failed."));
+      this.stop(new Error("Guardian approval connection failed."),false);
     }
   }
   private reject(id:string,session:string) {
     void this.port.reject(id,session).catch(() => {});
   }
-  async request(session:string,input:Invocation,reason:string,signal:AbortSignal):Promise<void> {
+  /** Resolves "approved" after an approval, or "unavailable" when no approval request could be made. */
+  async request(session:string,input:Invocation,reason:string,signal:AbortSignal):Promise<"approved"|"unavailable"> {
     if (signal.aborted) throw new Error("Guardian execution cancelled.");
     let rejectReady: (error:Error)=>void = () => {};
     const cancelledReady=new Promise<never>((_resolve,reject)=>{rejectReady=reject;});
@@ -45,8 +48,9 @@ export class Approval {
       if(signal.aborted)abortReady();
       await Promise.race([this.ready,cancelledReady]);
     }finally{signal.removeEventListener("abort",abortReady);}
-    if (this.stopped) throw this.stopped;
+    if (this.unloaded && this.stopped) throw this.stopped;
     if (signal.aborted) throw new Error("Guardian execution cancelled.");
+    if (this.stopped) return "unavailable";
     const id = this.port.newID();
     const controller = new AbortController();
     let settle: (error:Error|null)=>void = () => {};
@@ -55,27 +59,39 @@ export class Approval {
     const cancellation = new Promise<Error>(resolve => { cancelled = resolve; });
     let cancellationError: Error | undefined;
     const cancel = (error:Error) => {
-      cancellationError ??= error;
+      if (cancellationError) return;
+      cancellationError = error;
       controller.abort();
       settle(error); cancelled(error);
       this.reject(id,session);
     };
     const abort = () => cancel(new Error("Guardian execution cancelled."));
-    this.pending.set(id,{session,reply:settle,cancel});
+    const entry = {session,waiting:false,reply:settle,cancel};
+    this.pending.set(id,entry);
     signal.addEventListener("abort",abort,{once:true});
     try {
       if (signal.aborted) abort();
       const creation = this.port.create({id,session,input,reason},controller.signal);
       // A cancelled create may still reach the server. Never resume; retry cleanup when it settles.
       void creation.then(() => { if (cancellationError) this.reject(id,session); }, () => {});
-      const effect = await Promise.race([creation,cancellation]);
-      if (effect instanceof Error) throw effect;
+      const created = await Promise.race([creation.then(effect => ({effect}),() => undefined),cancellation]);
+      if (created instanceof Error) throw created;
+      if (!created) {
+        if (cancellationError) throw cancellationError;
+        // A request whose creation is unknown may remain; any later reply to it is ignored.
+        this.reject(id,session);
+        return "unavailable";
+      }
+      const effect = created.effect;
       if (effect !== "ask") throw new Error(`Guardian approval was not requested (${effect}).`);
+      entry.waiting = true;
+      if (this.stopped) throw this.stopped;
       const rejected = await outcome;
       if (rejected) throw rejected;
       if (cancellationError) throw cancellationError;
       if (this.stopped) throw this.stopped;
       if (signal.aborted) throw new Error("Guardian execution cancelled.");
+      return "approved";
     } catch (error) {
       this.reject(id,session);
       throw error;
@@ -84,10 +100,11 @@ export class Approval {
       this.pending.delete(id);
     }
   }
-  close(error = new Error("Guardian plugin unloaded.")) {
-    if (this.stopped) return;
-    this.stopped = error;
+  close() { this.stop(new Error("Guardian plugin unloaded."),true); }
+  private stop(error:Error,unloaded:boolean) {
+    if (unloaded) this.unloaded = true;
+    this.stopped ??= error;
     this.controller.abort(); this.connected();
-    for (const pending of this.pending.values()) pending.cancel(error);
+    for (const pending of this.pending.values()) if (unloaded || pending.waiting) pending.cancel(this.stopped);
   }
 }

@@ -71,11 +71,47 @@ test("req_050_each_execution_creates_a_fresh_request_after_always", async () => 
   f.approval.close(); f.events.end();
 });
 
-// @kotowari[REQ-052, EX-089]
-test("req_052_creation_failure_is_not_approval", async () => {
+// @kotowari[REQ-067, EX-147]
+test("req_067_creation_failure_is_left_to_opencode_not_approved_or_stopped", async () => {
   const f = fixture(async () => { throw new Error("authentication failed"); });
-  await expect(f.approval.request("session", input, "reason", new AbortController().signal)).rejects.toThrow("authentication failed");
+  expect(await f.approval.request("session", input, "reason", new AbortController().signal)).toBe("unavailable");
   f.approval.close(); f.events.end();
+});
+
+// @kotowari[REQ-067, EX-149]
+test("ex_149_connection_lost_before_the_creation_response_is_left_to_opencode", async () => {
+  let fail: (error: Error) => void = () => {};
+  const f = fixture(() => new Promise((_resolve, reject) => { fail = reject; }));
+  const run = f.approval.request("session", input, "reason", new AbortController().signal);
+  await waitFor(() => f.requests.length === 1);
+  f.events.end();
+  fail(new TypeError("fetch failed"));
+  expect(await run).toBe("unavailable");
+  f.approval.close();
+});
+
+// @kotowari[REQ-067]
+test("req_067_creation_after_the_event_connection_ended_is_left_to_opencode", async () => {
+  const f = fixture();
+  f.events.end();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(await f.approval.request("session", input, "reason", new AbortController().signal)).toBe("unavailable");
+  expect(f.requests).toHaveLength(0);
+  f.approval.close();
+});
+
+// @kotowari[REQ-067, REQ-053]
+test("req_067_creation_answered_after_the_event_connection_ended_is_cancelled", async () => {
+  let answer: (value: "ask") => void = () => {};
+  const f = fixture(() => new Promise(resolve => { answer = resolve; }));
+  const run = f.approval.request("session", input, "reason", new AbortController().signal).then(() => null, error => error);
+  await waitFor(() => f.requests.length === 1);
+  f.events.end();
+  answer("ask");
+  expect(await run).toBeInstanceOf(Error);
+  const request = f.requests[0]; if (!request) throw new Error("missing request");
+  expect(f.removed).toContain(request.id);
+  f.approval.close();
 });
 
 // @kotowari[REQ-050]
@@ -99,13 +135,15 @@ test("req_053_wait_has_no_independent_approval_deadline", async () => {
   f.approval.close(); f.events.end();
 });
 
-// @kotowari[REQ-053, REQ-054, EX-091, EX-093]
+// @kotowari[REQ-053, REQ-054, EX-091, EX-093, EX-148]
 test("req_053_abort_disconnect_and_unload_never_replay_late_approvals", async () => {
   for (const cancellation of ["abort", "disconnect", "unload"]) {
     const f = fixture(); const controller = new AbortController();
     const run = f.approval.request("session",input,"reason",controller.signal);
     const rejected = run.then(() => null, error => error);
     await waitFor(() => f.requests.length === 1);
+    // Waiting starts once the creation response has been received.
+    await new Promise(resolve => setTimeout(resolve, 0));
     if (cancellation === "abort") controller.abort();
     else if (cancellation === "disconnect") f.events.end();
     else f.approval.close();

@@ -71,7 +71,8 @@ export default Plugin.define({
       reject:async(id,session)=>{await ctx.permission.reply({sessionID:session,requestID:id,decision:"reject"});},
     }):undefined;
     const approve=(context:ToolContext)=>async(input:Invocation,reason:string)=>{
-      if(approval)await approval.request(context.sessionID,input,reason,context.signal);
+      if(approval&&await approval.request(context.sessionID,input,reason,context.signal)==="unavailable")
+        console.warn(`command-guardian: could not create the guardian approval request; the command is left to OpenCode's own permissions.`);
     };
     const check=async(input:Invocation,context:ToolContext)=>{
       fail();

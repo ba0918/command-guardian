@@ -15,6 +15,8 @@ type HostOptions={enforce?:boolean;shell?:string;nativeDeny?:boolean;nativeAsk?:
   recordJudgments?:boolean;
   // A guardian that never answers within the judgment deadline.
   slowGuardian?:boolean;
+  // Approval creation fails at the host.
+  failApproval?:boolean;
   // A managed-service registration written before launch.
   registration?:Record<string,unknown>};
 async function host(options:HostOptions={}) {
@@ -67,6 +69,7 @@ print(json.dumps({'status':'judged','mode':{'enforce':True},'verdict':'allow','r
     delete config.plugins[0].options;
     environment.OPENCODE_CONFIG_CONTENT=JSON.stringify(config);
   }
+  if(options.failApproval)environment.GUARDIAN_TEST_FAIL_APPROVAL="1";
   if(options.registration){
     await mkdir(join(home,"state/opencode"),{recursive:true});
     await writeFile(join(home,"state/opencode/service.json"),JSON.stringify(options.registration));
@@ -479,4 +482,23 @@ test("ex_146_standalone_commandless_truncation_is_left_to_opencode",async()=>{
     expect(await readFile(join(f.project,"notes"),"utf8")).toBe("");
     expect(await f.client.permission.list({sessionID:f.session.id})).toHaveLength(0);
   }finally{await f.close();}
+},20000);
+
+// @kotowari[REQ-067, EX-147]
+test("ex_147_failed_approval_creation_warns_and_leaves_the_command_to_opencode",async()=>{
+  for(const nativeAsk of [false,true]){
+    const f=await host({managedService:true,failApproval:true,nativeAsk});
+    try{
+      const run=f.execute(ask);
+      if(nativeAsk){
+        const request=(await pending(f,1))[0];if(!request)throw new Error("Missing OpenCode shell confirmation");
+        expect(request.action).not.toBe("command-guardian");
+        await f.client.permission.reply({sessionID:f.session.id,requestID:request.id,decision:"reject"});
+      }
+      await run;
+      if(nativeAsk)await expect(readFile(join(f.project,"ask-output"),"utf8")).rejects.toThrow();
+      else expect(await readFile(join(f.project,"ask-output"),"utf8")).toBe("ran");
+      expect(f.logs().split("\n").filter(line=>line.includes("command-guardian:")&&line.includes("approval request")).length).toBe(1);
+    }finally{await f.close();}
+  }
 },20000);
