@@ -98,7 +98,7 @@ export class Approval {
         if (cancellationError) throw cancellationError;
         if (settled?.error) throw settled.error;
         // A request whose creation is unknown may remain; any later reply to it is ignored.
-        this.reject(id,session);
+        // No reject reply: if it was created, rejecting it can also reject the session's other waits.
         return "unavailable";
       }
       const effect = created.effect;

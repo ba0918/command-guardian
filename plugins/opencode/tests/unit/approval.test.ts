@@ -82,6 +82,21 @@ test("req_067_creation_failure_is_left_to_opencode_not_approved_or_stopped", asy
   f.approval.close(); f.events.end();
 });
 
+// @kotowari[REQ-067, EX-157]
+test("ex_157_a_request_treated_as_not_created_gets_no_reject_reply_and_other_waits_continue", async () => {
+  const f = fixture(async request => { if (request.id === "2") throw new Error("authentication failed"); return "ask"; });
+  let firstDone = false;
+  const first = f.approval.request("session", input, "reason", new AbortController().signal).then(result => { firstDone = true; return result; });
+  await waitFor(() => f.requests.length === 1);
+  expect(await f.approval.request("session", input, "reason", new AbortController().signal)).toBe("unavailable");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(f.removed).toEqual([]);
+  expect(firstDone).toBe(false);
+  f.events.emit({ type: "reply", id: "1", session: "session", reply: "once" });
+  expect(await first).toBe("approved");
+  f.approval.close(); f.events.end();
+});
+
 // @kotowari[REQ-067, EX-149]
 test("ex_149_connection_lost_before_the_creation_response_is_left_to_opencode", async () => {
   let fail: (error: Error) => void = () => {};
