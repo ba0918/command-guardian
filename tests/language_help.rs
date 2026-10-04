@@ -33,6 +33,23 @@ fn json_check(home: &std::path::Path, text: &str) -> (i32, serde_json::Value) {
     )
 }
 
+/// stdin を開いたままでも終わることを確かめてから、出力を集める。
+fn output_without_reading_stdin(
+    mut child: std::process::Child,
+    label: &str,
+) -> std::process::Output {
+    let start = Instant::now();
+    while child.try_wait().unwrap().is_none() {
+        if start.elapsed() > Duration::from_secs(3) {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("{label} waited for stdin");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    child.wait_with_output().unwrap()
+}
+
 // @kotowari[REQ-011, REQ-017, EX-058]
 #[test]
 fn non_allow_text_output_including_verdict_stays_within_four_lines() {
@@ -64,26 +81,14 @@ fn help_at_each_entry_exits_without_reading_open_stdin_or_broken_config() {
             if let Some(entry) = entry {
                 cmd.arg(entry);
             }
-            let mut child = cmd
+            let child = cmd
                 .arg(flag)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
                 .unwrap();
-            let start = Instant::now();
-            loop {
-                if child.try_wait().unwrap().is_some() {
-                    break;
-                }
-                if start.elapsed() > Duration::from_secs(3) {
-                    child.kill().unwrap();
-                    child.wait().unwrap();
-                    panic!("help waited for stdin: {entry:?} {flag}");
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            let out = child.wait_with_output().unwrap();
+            let out = output_without_reading_stdin(child, &format!("help {entry:?} {flag}"));
             assert!(out.status.success());
             assert!(out.stderr.is_empty(), "{:?}", out.stderr);
             let help = String::from_utf8(out.stdout).unwrap();
@@ -115,10 +120,87 @@ fn help_at_each_entry_exits_without_reading_open_stdin_or_broken_config() {
                 _ => {
                     assert!(help.contains("check"));
                     assert!(help.contains("hook"));
+                    assert!(help.contains("--version, -V"), "{help}");
                 }
             }
         }
     }
+}
+
+fn manifest_version() -> String {
+    let manifest =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+    let value: toml::Table = manifest.parse().unwrap();
+    value["package"]["version"].as_str().unwrap().to_string()
+}
+
+// @kotowari[REQ-071, EX-154]
+#[test]
+fn ex_154_version_prints_the_manifest_version_without_reading_open_stdin_or_broken_config() {
+    let home = fixture();
+    config(home.path(), "broken = [");
+    for flag in ["--version", "-V"] {
+        let child = command(home.path())
+            .arg(flag)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let out = output_without_reading_stdin(child, &format!("version {flag}"));
+        assert_eq!(out.status.code(), Some(0), "{flag}");
+        assert!(out.stderr.is_empty(), "{:?}", out.stderr);
+        assert_eq!(
+            String::from_utf8(out.stdout).unwrap(),
+            format!("command-guardian {}\n", manifest_version())
+        );
+    }
+}
+
+// @kotowari[REQ-071, EX-155]
+#[test]
+fn ex_155_version_after_hook_is_handled_by_the_hook_entry() {
+    let home = fixture();
+    let version_line = format!("command-guardian {}", manifest_version());
+    let out = command(home.path())
+        .args(["hook", "--version"])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(out.stdout.is_empty(), "{:?}", out.stdout);
+    let mut child = command(home.path())
+        .args(["hook", "--version", "--agent", "claude"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let input = serde_json::json!({"hook_event_name":"PreToolUse", "tool_name":"Bash", "tool_input":{"command":"rm -rf /etc/nginx"}, "cwd":"/tmp"});
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.to_string().as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(!text.contains(&version_line), "{text}");
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(json["hookSpecificOutput"]["permissionDecision"], "deny");
+}
+
+// @kotowari[REQ-071]
+#[test]
+fn req_071_version_after_check_is_not_a_version_request() {
+    let home = fixture();
+    let out = command(home.path())
+        .args(["check", "--version"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert!(out.stdout.is_empty(), "{:?}", out.stdout);
 }
 
 // @kotowari[REQ-044, EX-068]

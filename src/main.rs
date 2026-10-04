@@ -26,6 +26,13 @@ fn run(args: &[OsString]) -> i32 {
             let _ = output(format_args!("{ROOT_HELP}"));
             0
         }
+        Some("--version" | "-V") => {
+            let _ = output(format_args!(
+                "command-guardian {}",
+                env!("CARGO_PKG_VERSION")
+            ));
+            0
+        }
         Some("check") => cmd_check(&args[1..]),
         Some("hook") => hook::run(&args[1..]),
         Some(other) => {
@@ -49,7 +56,8 @@ Commands:
   hook   Read an agent hook request from stdin (use hook --help for options).
 
 Options:
-  --help, -h  Show this help without reading configuration or stdin.
+  --help, -h     Show this help without reading configuration or stdin.
+  --version, -V  Show the version without reading configuration or stdin.
 
 Examples:
   command-guardian check 'rm -rf /etc/nginx' --cwd /tmp
@@ -57,7 +65,7 @@ Examples:
 
 Exit codes:
   check: 0 allow, 1 ask, 2 block, 3 unable to produce a judgment.
-  hook: always 0. Help: 0. Invalid invocation: 3.";
+  hook: always 0. Help and version: 0. Invalid invocation: 3.";
 
 const CHECK_HELP: &str = "Judge a Bash command without executing it.
 
