@@ -134,7 +134,7 @@ test("req_065_failed_explicit_connection_warns_at_load_and_on_each_execution", a
   } finally { delete process.env.GUARDIAN_SETUP_TEST_PASSWORD; transport.mockRestore(); warn.mockRestore(); await f.restore(); }
 });
 
-// @kotowari[REQ-065, REQ-053]
+// @kotowari[REQ-065]
 test("req_065_unloading_during_the_connection_recheck_does_not_start_a_block_command", async () => {
   const f = await fixture("block");
   const warn = spyOn(console, "warn").mockImplementation(() => {});
