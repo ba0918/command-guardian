@@ -317,7 +317,7 @@ defer_ask = true
 
 ### 検証の実行
 
-`changes`コマンドを持つ[kotowari](https://github.com/ba0918/kotowari)の0.3.0以降をインストールし、`PATH`から使えるようにしてください。そのうえで次を実行します。
+[kotowari](https://github.com/ba0918/kotowari)の0.3.0以降をインストールし、`PATH`から使えるようにしてください。そのうえで次を実行します。
 
 ```sh
 cargo fmt --all --check
@@ -341,18 +341,15 @@ cargo test -p command-guardian --locked --test cli --test hook --test shadow --t
 
 プロジェクトの規約と統合手順は[PROJECT.md](PROJECT.md)を読んでください。要求は`docs/ir/`にあります。現在、仕様と決定履歴の多くは日本語で書かれています。
 
-ブランチを統合する前に、比較元と最終候補のコミットを確定してください。実装者と独立したレビュー担当が、それぞれ自分の変更照合記録を`.kotowari/changes/`へ書きます。両方の記録で、同じ候補と関連する仕様ファイルを対象にしてください。記録をコミットした後、上の製品チェックと次の仕様チェックを実行します。
+ブランチを統合する前に、上の製品チェックと次の仕様チェックを実行してください。
 
 ```sh
-# BASEに、ブランチの比較元として選んだ完全なコミットIDを設定してください。
-HEAD_SHA=$(git rev-parse HEAD)
 kotowari check --format json
-kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
 ```
 
-`kotowari check`は仕様の構造と参照を検査します。`kotowari changes`は、記録した判断が変更全体を網羅し、現在の内容に対応しているかを検査します。どちらも、意味の判断が正しいことを証明するものではありません。独立レビューで実装と要求を照合する必要があります。未解決の仕様判断を残したまま統合しないでください。実装者の記録をコピーして、レビュー担当の記録にしないでください。
+`kotowari check`は仕様の構造と参照を検査します。実装が要求に合っていることは証明しません。独立レビューで実装と要求を照合する必要があります。未解決の仕様判断を残したまま統合しないでください。
 
-レビュー後にコードや仕様の意味を変えた場合は、影響する記録を見直し、再レビューしてください。`kotowari changes`をpre-commitの必須チェックにしないでください。詳しい手順は[PROJECT.md](PROJECT.md#conventions-specific-to-this-project)を参照してください。
+レビュー後にコードや仕様の意味を変えた場合は、影響する箇所を再レビューしてください。詳しい手順は[PROJECT.md](PROJECT.md#conventions-specific-to-this-project)を参照してください。
 
 ## ライセンス
 

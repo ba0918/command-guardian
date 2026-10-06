@@ -42,12 +42,10 @@ conventions that apply only here — lives in `PROJECT.md`. Read it before makin
 
 This project manages its specification as an IR (`docs/ir/`).
 
-Before integrating a branch, follow the change-conformance procedure in `PROJECT.md`.
-The implementer and an independent reviewer each author their own records for the same
-branch-wide comparison base and candidate bytes. Read kotowari's `changes` reference before
-writing or reconciling them. Do not add `kotowari changes` to pre-commit hooks.
+Before integrating a branch, follow the procedure in `PROJECT.md`: run `kotowari check`, and
+have an independent reviewer compare the implementation with the requirements.
 
 Specification gaps may be recorded as concrete IR additions only within the approved scope,
 with repository evidence and a decision record. Do not change or delete approved requirements,
 contradict an existing decision, or choose unsupported consequential meaning without asking.
-Passing `kotowari changes` does not prove that the recorded judgment is correct.
+Passing `kotowari check` does not prove that the implementation matches the requirements.

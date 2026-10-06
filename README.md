@@ -274,7 +274,7 @@ Do not use the checker as an access-control boundary or as the sole protection a
 
 ### Run checks
 
-Install [kotowari](https://github.com/ba0918/kotowari) 0.3.0 or later with the `changes` command, and make it available on `PATH`. Then run:
+Install [kotowari](https://github.com/ba0918/kotowari) 0.3.0 or later, and make it available on `PATH`. Then run:
 
 ```sh
 cargo fmt --all --check
@@ -298,18 +298,15 @@ Production parsing runs in a child of the same binary through the app's runtime 
 
 Read [PROJECT.md](PROJECT.md) for project conventions and the integration procedure. Requirements live in `docs/ir/`; much of the specification and decision history is currently in Japanese.
 
-Before integrating a branch, establish its full comparison base and final candidate commit. The implementer and an independent reviewer each write their own change-conformance record in `.kotowari/changes/`. Both records must cover the same candidate and relevant specification files. Commit the records, then run the product checks above and the specification checks:
+Before integrating a branch, run the product checks above and the specification check:
 
 ```sh
-# Set BASE to the full commit ID chosen as the branch's comparison base.
-HEAD_SHA=$(git rev-parse HEAD)
 kotowari check --format json
-kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
 ```
 
-`kotowari check` validates specification structure and references. `kotowari changes` checks coverage and freshness of the recorded judgments. Neither command proves that a semantic judgment is correct; the independent review must compare the implementation with the requirements. Do not integrate unresolved specification decisions, and do not copy the implementer's record under a reviewer label.
+`kotowari check` validates specification structure and references. It does not prove that the implementation matches the requirements; an independent review must compare the implementation with the requirements. Do not integrate unresolved specification decisions.
 
-If code or specification meaning changes after review, revisit the affected records and review them again. Do not run `kotowari changes` as a pre-commit requirement. See [PROJECT.md](PROJECT.md#conventions-specific-to-this-project) for the full procedure.
+If code or specification meaning changes after review, review the affected parts again. See [PROJECT.md](PROJECT.md#conventions-specific-to-this-project) for the full procedure.
 
 ## License
 

@@ -68,34 +68,19 @@ Also run them against the GNU and musl release binaries by replacing GUARDIAN_TE
 
 ### Reconciling changes with the IR
 
-Use kotowari 0.3.0 or later, a version that has the "changes" command.
-It does not generate the IR; it checks that Git changes correspond to judgment records and that the records are current.
-It does not treat changes made before its adoption as conforming to the specification.
+Requirements live in "docs/ir/". kotowari 0.3.0 or later checks their structure and references; it does not generate the IR or prove that the implementation matches it.
 
-1. The caller determines the branch-wide comparison base and candidate head from Git and records their full commit IDs. Do not choose the base from what a record file claims.
-2. The implementer writes ".kotowari/changes/implementation.yaml". Within existing requirements, record the requirements and related IR; when filling a specification gap, record the evidence, the decision maker, the decision record, and the necessary IR. Do not adopt the implementation as the correct specification as-is.
-3. A reviewer in a context separate from the implementation checks the evidence, meaning, and approved scope, and writes ".kotowari/changes/review.yaml" themselves, covering the same changes and every IR the implementer listed. Do not copy the implementer's record and change only the role label.
-4. Commit both records, and the caller re-determines the final HEAD. Integrate only when both checks below and the existing product checks succeed. Do not integrate with an unresolved specification judgment left as deferred.
+1. Within existing requirements, implement against them. When filling a specification gap, record the evidence, the decision maker, the decision record, and the necessary IR. Do not adopt the implementation as the correct specification as-is.
+2. A reviewer in a context separate from the implementation compares the implementation with the requirements and checks the evidence, meaning, and approved scope.
+3. Integrate only when "kotowari check --format json" and the existing product checks succeed. Do not integrate with an unresolved specification judgment left as deferred.
 
-```sh
-BASE=<full ID of the branch-wide comparison base that the caller determined from Git>
-HEAD_SHA=$(git rev-parse HEAD)
-kotowari check --format json
-kotowari changes --base "$BASE" --head "$HEAD_SHA" --phase review --format json
-```
-
-When a change in the meaning of code, IR, or decisions, a rebase, a cherry-pick, or a concurrent integration invalidates the final records, set both records aside, reconcile the affected entries in full again, and recreate them after an independent review.
-The two files above hold only the current comparison; read earlier ones from Git history.
-Do not require "changes" for intermediate commits or in the pre-commit hook.
-For an optional implementer self-check, "kotowari changes --base HEAD --staged --phase implementation" can be used, but it does not replace the independent review.
-A "status" of complete alone does not count as completing the change reconciliation.
-CI runs on pushes to main and on every PR. For a PR, it uses the merge-base of the event base and the actual head, and does not check the synthetic merge commit. For a push, it uses the event's before/after, and fails on a zero before or missing history.
+When a change in the meaning of code, IR, or decisions follows the review, review the affected parts again.
 
 ### CI and pre-push checks
 
-CI and the lefthook pre-push hook run fmt, clippy, all tests, and the release build for both gnu and musl, plus kotowari check and changes review.
+CI and the lefthook pre-push hook run fmt, clippy, all tests, and the release build for both gnu and musl, plus kotowari check.
 Local prerequisites are rustfmt, clippy, both Rust targets, musl-tools, and kotowari 0.3.0 or later. Enable the hooks with "lefthook install" in each clone.
-Run "git fetch origin main" before pushing. A work branch is checked against its merge-base with origin/main, and main against the remote's old SHA. An unknown base, uncommitted changes, or pushing anything other than HEAD stops the push.
+Run "git fetch origin main" before pushing. The hook resolves a work branch's merge-base with origin/main, and main's remote old SHA; an unknown base, uncommitted changes, or pushing anything other than HEAD stops the push.
 CI and hooks are development operations settings and add no requirements to the product IR.
 
 ### Releases

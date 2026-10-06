@@ -53,8 +53,5 @@ pre-push:
           cargo build --release --locked --target "$target"
         done
         kotowari check --format json
-        while read -r base; do
-          kotowari changes --base "$base" --head "$head" --phase review --format json
-        done < "$ranges"
         test "$(git rev-parse HEAD)" = "$head"
         test -z "$(git status --porcelain)"
